@@ -1,15 +1,16 @@
 #include "power_panel.h"
+#include "plr_status.h"
+#include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
 
 #include <map>
-#include <fstream>
 
 LV_IMG_DECLARE(back);
 
 PowerPanel::PowerPanel(KWebSocketClient &websocket_client, std::mutex &l)
-  : ws(websocket_client)
-  , lv_lock(l)
+  : NotifyConsumer(l)
+  , ws(websocket_client)
   , cont(lv_obj_create(lv_scr_act()))
   , back_btn(cont, &back, "Back", &PowerPanel::_handle_callback, this)
 {
@@ -23,6 +24,8 @@ PowerPanel::PowerPanel(KWebSocketClient &websocket_client, std::mutex &l)
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
   lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+
+  ws.register_notify_update(this);
 }
 
 void PowerPanel::build_recovery_section() {
@@ -57,7 +60,7 @@ void PowerPanel::build_recovery_section() {
 
   recovery_dismiss_btn = lv_btn_create(btn_row);
   lv_obj_t *dl = lv_label_create(recovery_dismiss_btn);
-  lv_label_set_text(dl, LV_SYMBOL_CLOSE " Dismiss");
+  lv_label_set_text(dl, LV_SYMBOL_TRASH " Discard");
   lv_obj_center(dl);
   lv_obj_add_event_cb(recovery_dismiss_btn, &PowerPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
@@ -66,69 +69,87 @@ void PowerPanel::build_recovery_section() {
   lv_obj_add_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
 }
 
-std::string PowerPanel::recoverable_print(std::string &display) {
-  display = "";
-  // The saved-state file lives on the printer's filesystem; only readable when the UI
-  // runs locally on the machine (not the desktop simulator / remote).
-  if (!KUtils::is_running_local()) {
-    return "";
-  }
-  std::ifstream f("/usr/data/creality/userdata/config/print_file_name.json");
-  if (!f.good()) {
-    return "";
-  }
-  try {
-    json j = json::parse(f, nullptr, false);
-    if (j.is_discarded() || !j.contains("file_path")) {
-      return "";
-    }
-    std::string fp = j["file_path"].template get<std::string>();
-    if (fp.empty()) {
-      return "";
-    }
-    // SDCARD_PRINT_FILE wants the path relative to the gcodes dir.
-    std::string rel = fp;
-    auto pos = fp.find("/gcodes/");
-    if (pos != std::string::npos) {
-      rel = fp.substr(pos + 8); // strlen("/gcodes/")
-    }
-    auto slash = rel.find_last_of('/');
-    display = (slash == std::string::npos) ? rel : rel.substr(slash + 1);
-    return rel;
-  } catch (...) {
-    return "";
-  }
-}
-
 void PowerPanel::refresh_recovery() {
   if (recovery_cont == nullptr) {
     return;
   }
-  std::string display;
-  recovery_relpath = recoverable_print(display);
+  auto plr = parse_plr_status(State::get_instance()
+    ->get_data("/printer_state/nebulaos_power_loss_recovery"_json_pointer));
+  auto view = plr_view(plr, KUtils::is_printing());
 
-  bool show_actions = false;
-  if (KUtils::is_printing()) {
-    lv_label_set_text(recovery_status,
-      "A print is running. If power is lost, reopen this screen to resume.");
-  } else if (recovery_relpath.empty()) {
-    lv_label_set_text(recovery_status, "No interrupted print to recover.");
-  } else {
-    lv_label_set_text(recovery_status,
-      ("Last print: " + display + "\nResume from where power was lost?").c_str());
-    show_actions = true;
-  }
-
-  if (show_actions) {
+  lv_label_set_text(recovery_status, view.text.c_str());
+  if (view.show_resume) {
     lv_obj_clear_flag(recovery_resume_btn, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
   } else {
     lv_obj_add_flag(recovery_resume_btn, LV_OBJ_FLAG_HIDDEN);
+  }
+  if (view.show_discard) {
+    lv_obj_clear_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
+  } else {
     lv_obj_add_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
   }
 }
 
+void PowerPanel::consume(json &j) {
+  // State has already merged this notification into printer_state. Read-only lookups:
+  // operator[] would insert nulls into the shared notification, and a null merged as a
+  // patch deletes the key.
+  const json &n = j;
+  if (!n.contains("/params/0/nebulaos_power_loss_recovery"_json_pointer)
+      && !n.contains("/params/0/print_stats/state"_json_pointer)) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(lv_lock);
+  refresh_recovery();
+}
+
+// Called from LVGL event handlers; the response arrives on the websocket thread.
+void PowerPanel::send_plr_command(const char *cmd, const char *failure) {
+  std::string what(failure);
+  ws.gcode_script(cmd, [this, what](json &resp) {
+    if (!resp.contains("error")) {
+      return;
+    }
+    std::string msg = resp["/error/message"_json_pointer].is_string()
+      ? resp["/error/message"_json_pointer].template get<std::string>()
+      : resp["error"].dump();
+    spdlog::warn("power panel: {}: {}", what, msg);
+    std::lock_guard<std::mutex> lock(lv_lock);
+    KUtils::notify_toast(what + ": " + msg, 6000);
+    refresh_recovery();
+  });
+}
+
+// Never a one-tap resume: the backend's position_safe is always false (Z is assumed to
+// have held while unpowered), so the operator confirms after reading what will happen.
+void PowerPanel::confirm_resume() {
+  auto plr = parse_plr_status(State::get_instance()
+    ->get_data("/printer_state/nebulaos_power_loss_recovery"_json_pointer));
+  if (!plr_view(plr, KUtils::is_printing()).show_resume) {
+    refresh_recovery();
+    return;
+  }
+
+  static const char *btns[] = {"Cancel", "Resume", ""};
+  lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, plr_resume_confirm_text(plr).c_str(), btns, false);
+  lv_obj_add_event_cb(mbox, [](lv_event_t *e) {
+    lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(e));
+    auto *panel = (PowerPanel *)lv_event_get_user_data(e);
+    bool resume = lv_msgbox_get_active_btn(obj) == 1;
+    lv_msgbox_close(obj);
+    if (resume) {
+      panel->send_plr_command(PLR_RESUME_COMMAND, "Resume failed");
+      KUtils::notify_toast("Resuming print after power loss...", 2500);
+      lv_label_set_text(panel->recovery_status, "Resuming...");
+      lv_obj_add_flag(panel->recovery_resume_btn, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_add_flag(panel->recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
+    }
+  }, LV_EVENT_VALUE_CHANGED, this);
+  KUtils::style_lock_mbox(mbox, 90);
+}
+
 PowerPanel::~PowerPanel() {
+  ws.unregister_notify_update(this);
   if (cont != NULL) {
     lv_obj_del(cont);
     cont = NULL;
@@ -229,19 +250,9 @@ void PowerPanel::handle_callback(lv_event_t *e) {
     if (btn == back_btn.get_container()) {
       lv_obj_move_background(cont);
     } else if (btn == recovery_resume_btn) {
-      if (!recovery_relpath.empty()) {
-        // Creality's virtual_sdcard restores the saved breakpoint (reheat + position)
-        // when ISCONTINUEPRINT=1; if no valid breakpoint exists it safely starts the
-        // file normally rather than crashing.
-        ws.gcode_script("SDCARD_PRINT_FILE FILENAME=\"" + recovery_relpath + "\" ISCONTINUEPRINT=1");
-        KUtils::notify_toast("Resuming print after power loss...", 2500);
-        lv_label_set_text(recovery_status, "Resuming...");
-        lv_obj_add_flag(recovery_resume_btn, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_move_background(cont);
-      }
+      confirm_resume();
     } else if (btn == recovery_dismiss_btn) {
-      lv_label_set_text(recovery_status, "No interrupted print to recover.");
+      send_plr_command(PLR_DISCARD_COMMAND, "Discard failed");
       lv_obj_add_flag(recovery_resume_btn, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
     }

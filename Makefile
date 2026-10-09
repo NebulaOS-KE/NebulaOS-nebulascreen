@@ -113,9 +113,9 @@ wpaclient:
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## docs/z_compensate_status_api.md.
-.PHONY: test test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety
+.PHONY: test test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status
 
-test: test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety
+test: test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status
 
 # 2026-08-06 crash-fix regression test: Config::init()/ThemeConfig::init()
 # must fall back to defaults, never crash, when a stat()-present file fails
@@ -132,6 +132,14 @@ test-z-compensate-status: libhv.a
 		src/z_compensate_status.cpp tests/test_z_compensate_status.cpp \
 		-o build/test_z_compensate_status
 	./build/test_z_compensate_status
+
+# NebulaOS power-loss recovery panel logic (src/plr_status.cpp): what the panel offers
+# for each nebulaos_power_loss_recovery state, and the exact commands it sends.
+test-plr-status: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		src/plr_status.cpp tests/test_plr_status.cpp \
+		-o build/test_plr_status
+	./build/test_plr_status
 
 test-z-offset-persistence:
 	g++ -std=c++17 -Wall -Wextra -I. \
