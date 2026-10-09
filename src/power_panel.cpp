@@ -235,6 +235,9 @@ void PowerPanel::foreground() {
   // Re-check for a recoverable print each time the screen is opened.
   refresh_recovery();
 
+  if (devices.empty()) {
+    return;  // no [power] devices (NebulaOS default): nothing to poll
+  }
   json params;
   for (auto &device : devices) {
     params[device.first] = 0; // value is ignored by moonraker

@@ -72,7 +72,7 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	this->main_panel.subscribe();
 
 	// spoolman
-	ws.send_jsonrpc("server.info", [this](json &j) {
+	ws.send_jsonrpc("server.info", [this, &ws](json &j) {
 	  spdlog::debug("server_info {}", j.dump());
 	  State::get_instance()->set_data("server_info", j, "/result");
 	  
@@ -81,6 +81,13 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	    const auto &has_spoolman = components.template get<std::vector<std::string>>();
 	    if (std::find(has_spoolman.begin(), has_spoolman.end(), "spoolman") != has_spoolman.end()) {
 	      this->main_panel.enable_spoolman();
+	    }
+	    // Power devices only exist with a [power] section (NebulaOS ships
+	    // none); without it every machine.device_power.* call is an error.
+	    if (std::find(has_spoolman.begin(), has_spoolman.end(), "power") != has_spoolman.end()) {
+	      ws.send_jsonrpc("machine.device_power.devices", [this](json& d) {
+	        main_panel.get_tune_panel().get_power_panel().create_devices(d);
+	      });
 	    }
 	  }
 	});
@@ -135,9 +142,6 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	}
   });
 
-  ws.send_jsonrpc("machine.device_power.devices", [this](json& j) {
-    main_panel.get_tune_panel().get_power_panel().create_devices(j);
-  });
 }
 
 void InitPanel::disconnected(KWebSocketClient &ws) {
