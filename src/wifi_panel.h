@@ -23,8 +23,6 @@ public:
 
   void foreground();
   void handle_back_btn(lv_event_t *event);
-  void handle_pm_toggle(lv_event_t *event);
-  void refresh_pm_label();
   void handle_wpa_event(const std::string &events);
   void confirm_remove_network(const std::string &ssid, const std::string &nid);
   void handle_kb_input(lv_event_t *e);
@@ -48,10 +46,6 @@ public:
     panel->handle_back_btn(event);
   };
 
-  static void _handle_pm_toggle(lv_event_t *event) {
-    WifiPanel *panel = (WifiPanel *)event->user_data;
-    panel->handle_pm_toggle(event);
-  };
 
   static void _handle_kb_input(lv_event_t *e) {
     WifiPanel *panel = (WifiPanel *)e->user_data;
@@ -80,10 +74,6 @@ private:
   lv_obj_t *eye_btn;
   ButtonContainer back_btn;
   lv_obj_t *kb;
-  lv_obj_t *pm_cont;
-  lv_obj_t *pm_btn;
-  lv_obj_t *pm_label;
-  lv_obj_t *pm_hint;
   std::string selected_network;
   std::string cur_network;
   std::string pending_remove_nid;

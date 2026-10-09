@@ -27,10 +27,6 @@ WifiPanel::WifiPanel(KWebSocketClient &ws, std::mutex &l)
   , eye_btn(lv_btn_create(pw_row))
   , back_btn(cont, &back, "Back", &WifiPanel::_handle_back_btn, this)
   , kb(lv_keyboard_create(cont))
-  , pm_cont(lv_obj_create(wifi_right))
-  , pm_btn(lv_btn_create(pm_cont))
-  , pm_label(lv_label_create(pm_btn))
-  , pm_hint(lv_label_create(pm_cont))
   , static_ip_panel(ws, l)
   , network_detail_panel(l,
       [this]() { open_static_ip_for_current(); },
@@ -55,9 +51,7 @@ WifiPanel::WifiPanel(KWebSocketClient &ws, std::mutex &l)
   lv_obj_set_style_border_width(top_cont, 0, 0);
   lv_obj_set_width(top_cont, LV_PCT(100));
 
-  // The list gets more than half the row now that the right-hand panel no
-  // longer needs to reserve space for a screen-dominating Low Latency pill -
-  // see pm_cont below.
+  // The list gets more than half the row.
   lv_obj_set_flex_grow(wifi_list_cont, 3);
   lv_obj_set_height(wifi_list_cont, LV_PCT(90));
   lv_obj_set_flex_flow(wifi_list_cont, LV_FLEX_FLOW_COLUMN);
@@ -116,67 +110,6 @@ WifiPanel::WifiPanel(KWebSocketClient &ws, std::mutex &l)
   lv_obj_add_event_cb(prompt_cont, &WifiPanel::_handle_kb_input, LV_EVENT_CLICKED, this);
   lv_obj_add_event_cb(wifi_label, &WifiPanel::_handle_kb_input, LV_EVENT_CLICKED, this);
 
-  // "Low Latency" control: a compact link-style row, not the screen-dominant
-  // pill this used to be - it's an advanced, set-once radio-tuning setting,
-  // not part of the everyday connect flow, so it no longer competes with the
-  // connection status for the right panel's primary visual weight. Same
-  // underlying toggle (pm_btn, CHECKABLE) and handler as before.
-  lv_obj_add_flag(pm_cont, LV_OBJ_FLAG_FLOATING);
-  lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_size(pm_cont, LV_PCT(92), LV_SIZE_CONTENT);
-  lv_obj_set_style_border_width(pm_cont, 0, 0);
-  lv_obj_set_style_bg_opa(pm_cont, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_pad_all(pm_cont, 0, 0);
-  lv_obj_set_style_pad_row(pm_cont, 2, 0);
-  lv_obj_set_flex_flow(pm_cont, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(pm_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  // Anchored to the TOP of the panel, not CENTER/BOTTOM - the floating Back
-  // button is a full 110px-wide box (button_container.cpp) sitting in the
-  // bottom-right corner, and both earlier placements (BOTTOM_MID, then a
-  // CENTER+45 guess) still landed pm_cont's ~177px-wide box squarely across
-  // Back's actual x/y footprint - confirmed by computing the real
-  // coordinates, not by eyeballing a screenshot a second time. Anchoring to
-  // the top, right under the (max 3-line) status text, keeps this entirely
-  // above Back's top edge regardless of wifi_right's exact height.
-  lv_obj_align(pm_cont, LV_ALIGN_TOP_MID, 0, 90);
-
-  lv_obj_add_flag(pm_btn, LV_OBJ_FLAG_CHECKABLE);
-  lv_obj_set_size(pm_btn, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-  // Both states need the transparent/no-border override - LV_STATE_CHECKED
-  // otherwise falls back to the theme's default checked-button styling
-  // (a solid accent-colored pill), which is exactly the screen-dominating
-  // look this control is being demoted away from.
-  for (lv_state_t state : {LV_STATE_DEFAULT, LV_STATE_CHECKED}) {
-    lv_obj_set_style_bg_opa(pm_btn, LV_OPA_TRANSP, LV_PART_MAIN | state);
-    lv_obj_set_style_shadow_width(pm_btn, 0, LV_PART_MAIN | state);
-    lv_obj_set_style_border_width(pm_btn, 0, LV_PART_MAIN | state);
-  }
-  lv_obj_set_style_pad_all(pm_btn, 2, 0);
-  lv_label_set_text(pm_label, "Low Latency: OFF");
-  lv_obj_set_style_text_font(pm_label, &lv_font_montserrat_12, 0);
-  lv_obj_set_style_text_decor(pm_label, LV_TEXT_DECOR_UNDERLINE, 0);
-  lv_obj_center(pm_label);
-
-  lv_obj_set_width(pm_hint, LV_PCT(100));
-  lv_label_set_long_mode(pm_hint, LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_text_align(pm_hint, LV_TEXT_ALIGN_CENTER, 0);
-  // Roaming policy is platform/kernel-owned on NebulaOS (ROAMOFF1 baseline
-  // variant), not this toggle's responsibility - see set_wifi_low_latency().
-  lv_label_set_text(pm_hint, "steadier WiFi - no power-save/BT");
-  lv_obj_set_style_text_font(pm_hint, &lv_font_montserrat_10, 0);
-  lv_obj_set_style_text_color(pm_hint, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
-
-  {
-    auto v = Config::get_instance()->get_json("/wifi_low_latency");
-    if (!v.is_null() && v.template get<bool>()) {
-      lv_obj_add_state(pm_btn, LV_STATE_CHECKED);
-    } else {
-      lv_obj_clear_state(pm_btn, LV_STATE_CHECKED);
-    }
-  }
-  refresh_pm_label();
-  lv_obj_add_event_cb(pm_btn, &WifiPanel::_handle_pm_toggle, LV_EVENT_VALUE_CHANGED, this);
-
   lv_obj_move_background(cont);
   lv_obj_move_foreground(spinner);
 
@@ -215,25 +148,6 @@ void WifiPanel::handle_back_btn(lv_event_t *e) {
     lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_background(cont);
   }
-}
-
-void WifiPanel::refresh_pm_label() {
-  bool low_latency = lv_obj_has_state(pm_btn, LV_STATE_CHECKED);
-  lv_label_set_text(pm_label, low_latency ? "Low Latency: ON"
-                                          : "Low Latency: OFF");
-}
-
-void WifiPanel::handle_pm_toggle(lv_event_t *e) {
-  if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) {
-    return;
-  }
-  bool low_latency = lv_obj_has_state(pm_btn, LV_STATE_CHECKED);
-  KUtils::set_wifi_low_latency(low_latency);
-  Config *conf = Config::get_instance();
-  conf->set<bool>("/wifi_low_latency", low_latency);
-  conf->save();
-  refresh_pm_label();
-  spdlog::debug("wifi low-latency toggled: {}", low_latency);
 }
 
 void WifiPanel::rebuild_wifi_rows() {
@@ -313,7 +227,6 @@ void WifiPanel::handle_row_activated(const std::string &ssid) {
     entering_password = true;
     lv_label_set_text(wifi_label, fmt::format("Enter password for {}", ssid).c_str());
     lv_obj_clear_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(pm_cont, LV_OBJ_FLAG_HIDDEN);
     lv_event_send(password_input, LV_EVENT_FOCUSED, NULL);
   }
   lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
@@ -436,19 +349,6 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
       wpa_event.send_command("SCAN");
     }
   } else if (event.rfind("<3>CTRL-EVENT-CONNECTED", 0) == 0) {
-    // The driver resets the WiFi low-latency knobs (PM/mpc) to their
-    // defaults on every link-up (reconnect or network switch), silently
-    // reverting them. Re-apply the whole bundle here so the toggle stays
-    // truthful. Runs on the wpa monitor thread (no LVGL).
-    auto pm = Config::get_instance()->get_json("/wifi_low_latency");
-    if (!pm.is_null() && pm.template get<bool>()) {
-      // BCM4343 firmware resets PM to its NVRAM default after finalising
-      // association, which happens slightly after CONNECTED fires.  A short
-      // delay ensures our PM=0 lands after that reset.
-      std::this_thread::sleep_for(std::chrono::milliseconds(500));
-      KUtils::set_wifi_low_latency(true);
-    }
-
     if (find_current_network()) {
       spdlog::trace("cur_network {}", cur_network);
       std::lock_guard<std::mutex> lock(lv_lock);
@@ -496,7 +396,6 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
     pw_visible = false;
     lv_textarea_set_password_mode(password_input, true);
     lv_label_set_text(lv_obj_get_child(eye_btn, 0), LV_SYMBOL_EYE_CLOSE);
-    lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(back_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_READY) {
@@ -516,7 +415,6 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
     pw_visible = false;
     lv_textarea_set_password_mode(password_input, true);
     lv_label_set_text(lv_obj_get_child(eye_btn, 0), LV_SYMBOL_EYE_CLOSE);
-    lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(back_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_CLICKED) {
