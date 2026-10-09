@@ -113,9 +113,9 @@ wpaclient:
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## docs/z_compensate_status_api.md.
-.PHONY: test test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network
+.PHONY: test test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros
 
-test: test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network
+test: test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros
 
 # 2026-08-06 crash-fix regression test: Config::init()/ThemeConfig::init()
 # must fall back to defaults, never crash, when a stat()-present file fails
@@ -155,6 +155,13 @@ test-nebulaos-network: libhv.a
 		src/nebulaos_network.cpp tests/test_nebulaos_network.cpp \
 		-o build/test_nebulaos_network
 	./build/test_nebulaos_network
+
+# GuppyScreen action -> NebulaOS macro mapping (src/nebulaos_macros.cpp).
+test-nebulaos-macros:
+	g++ -std=c++17 -Wall -Wextra -I. \
+		src/nebulaos_macros.cpp tests/test_nebulaos_macros.cpp \
+		-o build/test_nebulaos_macros
+	./build/test_nebulaos_macros
 
 test-z-offset-persistence:
 	g++ -std=c++17 -Wall -Wextra -I. \

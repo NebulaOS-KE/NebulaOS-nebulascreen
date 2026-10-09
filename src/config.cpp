@@ -61,8 +61,8 @@ void Config::init(std::string config_path, const std::string thumbdir) {
 
   json cooldown_conf = {{ "cooldown", "SET_HEATER_TEMPERATURE HEATER=extruder TARGET=0\nSET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=0"}};
   json default_macros_conf = {
-    {"load_filament", "_GUPPY_LOAD_MATERIAL"},
-    {"unload_filament", "_GUPPY_QUIT_MATERIAL"}
+    {"load_filament", "LOAD_FILAMENT"},
+    {"unload_filament", "UNLOAD_FILAMENT"}
   };
 
   bool parsed = false;
@@ -140,11 +140,11 @@ void Config::init(std::string config_path, const std::string thumbdir) {
       // ones. Rewrite in place; the config is re-saved at the end of init().
       if (default_macros.contains("load_filament")
           && default_macros["load_filament"] == "LOAD_MATERIAL") {
-        default_macros["load_filament"] = "_GUPPY_LOAD_MATERIAL";
+        default_macros["load_filament"] = "LOAD_FILAMENT";
       }
       if (default_macros.contains("unload_filament")
           && default_macros["unload_filament"] == "UNLOAD_MATERIAL") {
-        default_macros["unload_filament"] = "_GUPPY_QUIT_MATERIAL";
+        default_macros["unload_filament"] = "UNLOAD_FILAMENT";
       }
     }
 

@@ -225,8 +225,8 @@ PrinterSelectPanel::PrinterSelectPanel()
 	      {"monitored_sensors", {} },
 	      {"fans", {} },
 	      {"default_macros", {
-		  {"load_filament", "_GUPPY_LOAD_MATERIAL"},
-		  {"unload_filament", "_GUPPY_QUIT_MATERIAL"},
+		  {"load_filament", "LOAD_FILAMENT"},
+		  {"unload_filament", "UNLOAD_FILAMENT"},
 		  { "cooldown", "SET_HEATER_TEMPERATURE HEATER=extruder TARGET=0\nSET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=0"}
 		}
 	      }

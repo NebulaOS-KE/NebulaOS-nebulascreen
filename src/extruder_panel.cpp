@@ -1,4 +1,5 @@
 #include "extruder_panel.h"
+#include "nebulaos_macros.h"
 #include "state.h"
 #include "config.h"
 #include "utils.h"
@@ -720,11 +721,9 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
 
     if (btn == unload_btn.get_container()) {
       // Heat to the selected temp first (run_when_hot), then run the macro.
-      // _GUPPY_QUIT_MATERIAL also takes EXTRUDER_TEMP; a plain UNLOAD_FILAMENT
-      // macro is whatever the user defined, but now always runs hot.
-      std::string gcode = unload_filament_macro == "_GUPPY_QUIT_MATERIAL"
-        ? fmt::format("{} EXTRUDER_TEMP={}", unload_filament_macro, effective_temp())
-        : unload_filament_macro;
+      // Legacy _GUPPY_QUIT_MATERIAL configs run NebulaOS's UNLOAD_FILAMENT,
+      // which takes EXTRUDER_TEMP (see nebulaos_macros.h).
+      std::string gcode = unload_filament_gcode(unload_filament_macro, effective_temp());
       run_when_hot(PA_UNLOAD, "Unload", gcode);
       return;
     }
