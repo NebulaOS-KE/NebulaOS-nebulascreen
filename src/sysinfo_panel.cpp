@@ -1,4 +1,5 @@
 #include "sysinfo_panel.h"
+#include "nebulaos_display.h"
 #include "utils.h"
 #include "config.h"
 #include "theme.h"
@@ -54,24 +55,10 @@ static const SleepOption sleep_options[] = {
   {"1 Hour", 3600}
 };
 
-// Brightness presets as percentages of the device's max_brightness. 10% is
-// the floor (chosen to keep the screen readable enough to navigate back to
-// this menu and recover from a too-dark setting).
-struct BrightnessOption {
-  const char *label;
-  int percent;
-};
-
-static const BrightnessOption brightness_options[] = {
-  {"Low (10%)",    10},
-  {"Dim (25%)",    25},
-  {"Medium (50%)", 50},
-  {"Bright (75%)", 75},
-  {"Max (100%)",  100},
-};
-
-SysInfoPanel::SysInfoPanel()
-  : cont(lv_obj_create(lv_scr_act()))
+SysInfoPanel::SysInfoPanel(KWebSocketClient &c, std::mutex &lock)
+  : ws(c)
+  , lv_lock(lock)
+  , cont(lv_obj_create(lv_scr_act()))
   , left_cont(lv_obj_create(cont))
   , right_cont(lv_obj_create(cont))
   , network_label(lv_label_create(right_cont))
@@ -160,47 +147,18 @@ SysInfoPanel::SysInfoPanel()
   lv_obj_add_event_cb(display_sleep_dd, &SysInfoPanel::_handle_callback,
     LV_EVENT_VALUE_CHANGED, this);
 
-  // Brightness preset dropdown - same row layout as Display Sleep above.
-  // Hidden if the device has no controllable backlight.
+  // Brightness dropdown - same row layout as Display Sleep above. NebulaOS owns the
+  // backlight; the levels and the current one come from machine.nebulaos.display.status
+  // in refresh_brightness(), and the row stays hidden until it reports a backlight.
   lv_obj_set_size(brightness_cont, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(brightness_cont, 0, 0);
-  int b_max = KUtils::backlight_max();
-  if (b_max > 0) {
-    lv_obj_t *bl_label = lv_label_create(brightness_cont);
-    lv_label_set_text(bl_label, "Brightness");
-    lv_obj_align(bl_label, LV_ALIGN_LEFT_MID, 0, 0);
-    lv_obj_align(brightness_dd, LV_ALIGN_RIGHT_MID, 0, 0);
-
-    std::string b_dd_options;
-    for (const auto &opt : brightness_options) {
-      b_dd_options += opt.label;
-      b_dd_options += '\n';
-    }
-    b_dd_options.pop_back();
-    lv_dropdown_set_options(brightness_dd, b_dd_options.c_str());
-
-    // Pick the saved value's closest preset (or Max if nothing saved).
-    int saved_pct = 100;
-    auto v_b = conf->get_json("/display_brightness");
-    if (!v_b.is_null()) {
-      saved_pct = (v_b.template get<int>() * 100) / b_max;
-    }
-    size_t best_idx = std::size(brightness_options) - 1;
-    int best_diff = std::abs(saved_pct - brightness_options[best_idx].percent);
-    for (size_t i = 0; i < std::size(brightness_options); ++i) {
-      int d = std::abs(saved_pct - brightness_options[i].percent);
-      if (d < best_diff) {
-        best_diff = d;
-        best_idx = i;
-      }
-    }
-    lv_dropdown_set_selected(brightness_dd, best_idx);
-
-    lv_obj_add_event_cb(brightness_dd, &SysInfoPanel::_handle_callback,
-      LV_EVENT_VALUE_CHANGED, this);
-  } else {
-    lv_obj_add_flag(brightness_cont, LV_OBJ_FLAG_HIDDEN);
-  }
+  lv_obj_t *bl_label = lv_label_create(brightness_cont);
+  lv_label_set_text(bl_label, "Brightness");
+  lv_obj_align(bl_label, LV_ALIGN_LEFT_MID, 0, 0);
+  lv_obj_align(brightness_dd, LV_ALIGN_RIGHT_MID, 0, 0);
+  lv_obj_add_flag(brightness_cont, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_event_cb(brightness_dd, &SysInfoPanel::_handle_callback,
+    LV_EVENT_VALUE_CHANGED, this);
 
   lv_obj_set_size(ll_cont, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(ll_cont, 0, 0);
@@ -397,8 +355,26 @@ SysInfoPanel::~SysInfoPanel() {
   }
 }
 
+// Called from the LVGL thread; the reply arrives on the websocket thread.
+void SysInfoPanel::refresh_brightness() {
+  ws.send_jsonrpc(DISPLAY_STATUS_METHOD, json::object(), [this](json &reply) {
+    auto status = parse_display_status(reply);
+    std::lock_guard<std::mutex> lock(lv_lock);
+    if (!status.available) {
+      brightness_levels.clear();
+      lv_obj_add_flag(brightness_cont, LV_OBJ_FLAG_HIDDEN);
+      return;
+    }
+    brightness_levels = status.levels;
+    lv_dropdown_set_options(brightness_dd, brightness_dropdown_options(status).c_str());
+    lv_dropdown_set_selected(brightness_dd, brightness_dropdown_index(status));
+    lv_obj_clear_flag(brightness_cont, LV_OBJ_FLAG_HIDDEN);
+  });
+}
+
 void SysInfoPanel::foreground() {
   lv_obj_move_foreground(cont);
+  refresh_brightness();
 
   auto ifaces = KUtils::get_interfaces();
   std::vector<std::string> network_detail;
@@ -487,15 +463,20 @@ void SysInfoPanel::handle_callback(lv_event_t *e)
       conf->set<int>("/default_extruder_temp", std::stoi(buf));
       conf->save();
     } else if (obj == brightness_dd) {
-      // Resolve preset → absolute brightness, apply, and persist.
+      // NebulaOS applies and persists the level (and restores it at boot).
       auto idx = lv_dropdown_get_selected(brightness_dd);
-      if (idx < std::size(brightness_options)) {
-        int b_max = KUtils::backlight_max();
-        int value = (b_max * brightness_options[idx].percent) / 100;
-        if (value < 1) value = 1;  // never write 0 from settings (sleep path does that)
-        KUtils::backlight_set(value);
-        conf->set<int>("/display_brightness", value);
-        conf->save();
+      if (idx < brightness_levels.size()) {
+        json params = {{"level", brightness_levels[idx]}};
+        ws.send_jsonrpc(DISPLAY_BRIGHTNESS_METHOD, params, [this](json &reply) {
+          auto err = jsonrpc_error_message(reply);
+          if (err.empty()) {
+            return;
+          }
+          spdlog::warn("display brightness failed: {}", err);
+          std::lock_guard<std::mutex> lock(lv_lock);
+          KUtils::notify_toast("Brightness not changed: " + err, 4000);
+          refresh_brightness();
+        });
       }
     }
   }

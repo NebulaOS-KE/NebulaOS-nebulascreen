@@ -4,14 +4,16 @@
 #include "button_container.h"
 #include "selector.h"
 #include "lvgl/lvgl.h"
+#include "websocket_client.h"
 
 #include <functional>
+#include <mutex>
 #include <vector>
 #include <string>
 
 class SysInfoPanel {
  public:
-  SysInfoPanel();
+  SysInfoPanel(KWebSocketClient &ws, std::mutex &l);
   ~SysInfoPanel();
 
   void foreground();
@@ -26,6 +28,11 @@ class SysInfoPanel {
   };
 
  private:
+  void refresh_brightness();
+
+  KWebSocketClient &ws;
+  std::mutex &lv_lock;
+
   lv_obj_t *cont;
   lv_obj_t *left_cont;
   lv_obj_t *right_cont;
@@ -34,9 +41,11 @@ class SysInfoPanel {
   lv_obj_t *disp_sleep_cont;
   lv_obj_t *display_sleep_dd;
 
-  // Brightness preset dropdown (hidden if /sys/class/backlight has no device).
+  // Brightness dropdown: levels and selection from machine.nebulaos.display.status;
+  // hidden until NebulaOS reports a usable backlight.
   lv_obj_t *brightness_cont;
   lv_obj_t *brightness_dd;
+  std::vector<int> brightness_levels;
 
   lv_obj_t *ll_cont;
   lv_obj_t *loglevel_dd;

@@ -27,7 +27,7 @@ SettingPanel::SettingPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent,
 #ifndef OS_ANDROID
   , wifi_panel(l)
 #endif
-  , sysinfo_panel()
+  , sysinfo_panel(c, l)
   , spoolman_panel(sm)
   , wifi_btn(cont, &network_img, "WIFI", &SettingPanel::_handle_callback, this)
   , restart_klipper_btn(cont, &refresh_img, "Restart\nKlipper", &SettingPanel::_handle_callback, this)

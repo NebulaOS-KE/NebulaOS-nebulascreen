@@ -1,4 +1,5 @@
 #include "guppyscreen.h"
+#include "nebulaos_display.h"
 
 #include "config.h"
 #ifndef OS_ANDROID
@@ -241,15 +242,16 @@ void GuppyScreen::loop() {
   /*Handle LitlevGL tasks (tickless mode)*/
 #if !defined(SIMULATOR) && !defined(OS_ANDROID)
   std::atomic_bool is_sleeping(false);
-  int saved_brightness = -1;
   Config *conf = Config::get_instance();
-
-  // Apply the user's configured brightness on startup. Fall back to whatever
-  // the device already has if no value is stored.
-  auto stored_b = conf->get_json("/display_brightness");
-  if (!stored_b.is_null()) {
-    KUtils::backlight_set(stored_b.template get<int>());
-  }
+  // Brightness is NebulaOS's: it persists the level and restores it at boot.
+  auto display_call = [](const char *method) {
+    ws.send_jsonrpc(method, json::object(), [method](json &reply) {
+      auto err = jsonrpc_error_message(reply);
+      if (!err.empty()) {
+        spdlog::info("{}: {}", method, err);
+      }
+    });
+  };
 
   // Cache sleep config; re-read only periodically so the hot loop doesn't
   // do a JSON lookup every tick.
@@ -271,14 +273,11 @@ void GuppyScreen::loop() {
       if (lv_disp_get_inactive_time(NULL) > display_sleep) {
         if (!is_sleeping.load()) {
           spdlog::debug("putting display to sleeping");
-          // fbdev_blank() uses FB_BLANK_POWERDOWN which the Ingenic X2000
-          // kernel 4.4.94 DSI driver cannot recover from via FB_BLANK_UNBLANK
-          // (backlight returns but video stays white). Instead: kill the
-          // backlight via /sys/class/backlight, which is a separate code
-          // path from DSI panel power-down, and overlay the LVGL screen_saver
-          // so the panel is black if the user wakes mid-DSI-refresh.
-          saved_brightness = KUtils::backlight_get();
-          KUtils::backlight_set(0);
+          // Never fbdev_blank(): the panel cannot recover from
+          // FB_BLANK_POWERDOWN. NebulaOS switches the backlight off; it
+          // refuses (backlight stays on) when no touch-wake path can run, so
+          // the black screen_saver overlay is what always shows.
+          display_call(DISPLAY_SLEEP_METHOD);
           lv_obj_move_foreground(screen_saver);
           is_sleeping = true;
         }
@@ -288,9 +287,9 @@ void GuppyScreen::loop() {
           fbdev_unblank();
           lv_obj_move_background(screen_saver);
           lv_obj_invalidate(lv_scr_act());
-          if (saved_brightness > 0) {
-            KUtils::backlight_set(saved_brightness);
-          }
+          // NebulaOS's touch watcher has usually woken the backlight
+          // already; this is idempotent and restores the selected level.
+          display_call(DISPLAY_WAKE_METHOD);
           is_sleeping = false;
         }
       }

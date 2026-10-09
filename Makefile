@@ -113,9 +113,9 @@ wpaclient:
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## docs/z_compensate_status_api.md.
-.PHONY: test test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status
+.PHONY: test test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display
 
-test: test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status
+test: test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display
 
 # 2026-08-06 crash-fix regression test: Config::init()/ThemeConfig::init()
 # must fall back to defaults, never crash, when a stat()-present file fails
@@ -140,6 +140,14 @@ test-plr-status: libhv.a
 		src/plr_status.cpp tests/test_plr_status.cpp \
 		-o build/test_plr_status
 	./build/test_plr_status
+
+# NebulaOS display contract helpers (src/nebulaos_display.cpp): brightness levels and
+# selection from machine.nebulaos.display.status, error messages.
+test-nebulaos-display: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		src/nebulaos_display.cpp tests/test_nebulaos_display.cpp \
+		-o build/test_nebulaos_display
+	./build/test_nebulaos_display
 
 test-z-offset-persistence:
 	g++ -std=c++17 -Wall -Wextra -I. \

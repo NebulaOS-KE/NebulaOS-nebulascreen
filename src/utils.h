@@ -86,15 +86,6 @@ namespace KUtils {
   std::string eta_string(int64_t s);
   size_t bytes_to_mb(size_t s);
 
-  // Backlight helpers. Scan /sys/class/backlight/ on first call; pick the first
-  // device. backlight_max() returns 0 if no device is found, in which case the
-  // callers should hide the brightness UI and skip writes. backlight_set() is
-  // a no-op when no device is available (or in SIMULATOR builds where it just
-  // caches the value for the sysinfo slider to read back).
-  int backlight_max();
-  int backlight_get();
-  void backlight_set(int value);
-
   // WiFi power-save. on=true disables NIC power-save (Broadcom `wl PM 0`) for
   // lower/steadier latency; on=false restores fast power-save (`wl PM 2`).
   // Shells out to /usr/bin/wl; a harmless no-op when that tool is absent
