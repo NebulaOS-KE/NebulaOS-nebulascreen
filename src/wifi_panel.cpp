@@ -13,7 +13,7 @@
 
 LV_IMG_DECLARE(back);
 
-WifiPanel::WifiPanel(std::mutex &l)
+WifiPanel::WifiPanel(KWebSocketClient &ws, std::mutex &l)
   : lv_lock(l)
   , cont(lv_obj_create(lv_scr_act()))
   , spinner(lv_spinner_create(cont, 1000, 60))
@@ -31,7 +31,7 @@ WifiPanel::WifiPanel(std::mutex &l)
   , pm_btn(lv_btn_create(pm_cont))
   , pm_label(lv_label_create(pm_btn))
   , pm_hint(lv_label_create(pm_cont))
-  , static_ip_panel(l)
+  , static_ip_panel(ws, l)
   , network_detail_panel(l,
       [this]() { open_static_ip_for_current(); },
       [this]() { forget_current_network(); })

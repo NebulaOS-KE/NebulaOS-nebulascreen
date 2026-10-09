@@ -17,7 +17,7 @@
 
 class WifiPanel {
 public:
-  WifiPanel(std::mutex &l);
+  WifiPanel(KWebSocketClient &ws, std::mutex &l);
 
   ~WifiPanel();
 

@@ -113,9 +113,9 @@ wpaclient:
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## docs/z_compensate_status_api.md.
-.PHONY: test test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display
+.PHONY: test test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network
 
-test: test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display
+test: test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network
 
 # 2026-08-06 crash-fix regression test: Config::init()/ThemeConfig::init()
 # must fall back to defaults, never crash, when a stat()-present file fails
@@ -148,6 +148,13 @@ test-nebulaos-display: libhv.a
 		src/nebulaos_display.cpp tests/test_nebulaos_display.cpp \
 		-o build/test_nebulaos_display
 	./build/test_nebulaos_display
+
+# NebulaOS network contract helpers for the static IP panel (src/nebulaos_network.cpp).
+test-nebulaos-network: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		src/nebulaos_network.cpp tests/test_nebulaos_network.cpp \
+		-o build/test_nebulaos_network
+	./build/test_nebulaos_network
 
 test-z-offset-persistence:
 	g++ -std=c++17 -Wall -Wextra -I. \

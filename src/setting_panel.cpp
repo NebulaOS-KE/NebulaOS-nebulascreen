@@ -25,7 +25,7 @@ SettingPanel::SettingPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent,
   : ws(c)
   , cont(lv_obj_create(parent))
 #ifndef OS_ANDROID
-  , wifi_panel(l)
+  , wifi_panel(c, l)
 #endif
   , sysinfo_panel(c, l)
   , spoolman_panel(sm)

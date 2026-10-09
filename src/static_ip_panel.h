@@ -3,20 +3,22 @@
 
 #include "button_container.h"
 #include "lvgl/lvgl.h"
+#include "websocket_client.h"
 #include <mutex>
 #include <string>
 
-// Per-SSID static IP configuration sub-screen, reached from NetworkDetailPanel's
-// "Configure Static IP" button. Backed entirely by shelling out to
-// static_ip.py (see memory/project_static_ip_design.md for the full design and
-// k1/scripts/static_ip.py for the backend) - this panel never touches wlan0
-// itself, it only reads/writes state through that script.
+// Static IP configuration sub-screen, reached from NetworkDetailPanel's "Configure
+// Static IP" button. Backed by NebulaOS (machine.nebulaos.network.status / .ipv4, see
+// nebulaos_network.h): persistent across reboots, verified on apply with automatic
+// revert, and global for wlan0 - not per Wi-Fi network. This panel never touches wlan0
+// itself.
 class StaticIpPanel {
 public:
-  StaticIpPanel(std::mutex &l);
+  StaticIpPanel(KWebSocketClient &ws, std::mutex &l);
   ~StaticIpPanel();
 
-  // Scopes the panel to ssid, shows it, and kicks off a live status refresh.
+  // Shows the panel (ssid is only the network it was opened from) and kicks off a
+  // status refresh.
   void foreground(const std::string &ssid);
 
   void handle_back_btn(lv_event_t *event);
@@ -40,12 +42,11 @@ private:
   void set_manual_mode(bool manual);
   void update_revert_visibility();
   void set_busy(bool busy, const std::string &msg);
-  // Runs `python3 static_ip.py <args>` on a background thread (backend calls
-  // can take several seconds - never block the LVGL thread), then re-takes
-  // lv_lock before calling on_done with the result.
-  void run_backend_async(const std::string &args, const std::string &busy_msg,
-                          const std::function<void(int, const std::string &)> &on_done);
+  // Sends machine.nebulaos.network.ipv4 (verification + automatic revert can
+  // take a minute or more); the reply arrives on the websocket thread.
+  void apply_ipv4(const json &params, bool to_static, const std::string &busy_msg);
 
+  KWebSocketClient &ws;
   std::mutex &lv_lock;
   std::string ssid;
 
