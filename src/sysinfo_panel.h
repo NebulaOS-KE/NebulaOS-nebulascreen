@@ -29,6 +29,9 @@ class SysInfoPanel {
 
  private:
   void refresh_brightness();
+  // Restarts GuppyScreen through Moonraker (nothing respawns it on NebulaOS,
+  // so exiting would leave the screen frozen until a reboot).
+  void restart_guppyscreen();
 
   KWebSocketClient &ws;
   std::mutex &lv_lock;

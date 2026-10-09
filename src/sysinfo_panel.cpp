@@ -12,6 +12,7 @@
 #include <map>
 
 #include <experimental/filesystem>
+#include <fstream>
 
 namespace fs = std::experimental::filesystem;
 
@@ -44,6 +45,11 @@ struct SleepOption {
   const char *label;
   int32_t seconds;
 };
+
+// NebulaOS keeps the shipped guppyconfig.json here (the live one is bind-mounted
+// over /opt/guppyscreen/guppyconfig.json); see NebulaOS-firmware post-build.
+static const char *const GUPPY_DEFAULT_CONFIG =
+  "/usr/share/nebulaos/guppyscreen/guppyconfig.default.json";
 
 static const SleepOption sleep_options[] = {
   {"Never", -1},
@@ -531,32 +537,8 @@ void SysInfoPanel::show_reset_options() {
 
   lv_obj_t *btn1 = make_opt_btn(
     "Reset GuppyScreen settings",
-    "Deletes display config and sensor layout.\nGuppyScreen restarts with defaults."
+    "Restores the shipped display config and sensor\nlayout. GuppyScreen restarts with defaults."
   );
-
-  // NebulaOS Phase 0 cleanup: /etc/init.d/S58factoryreset is confirmed absent
-  // from NebulaOS-firmware's overlay - OpenKE's own emergency-reset script,
-  // with no NebulaOS equivalent yet (a real feature gap, not implemented
-  // here - see the architecture audit's M10 finding). Capability-gate this
-  // button the same way spoolman_btn is gated in setting_panel.cpp, rather
-  // than leaving a dead button with no user-visible error.
-  bool have_factory_reset = fs::exists("/etc/init.d/S58factoryreset");
-  lv_obj_t *btn2 = make_opt_btn(
-    "Factory Reset Printer",
-    have_factory_reset
-      ? "Wipes OpenKE, Klipper config, gcodes and\ncalibration. Reboots to stock Creality firmware."
-      : "Not available on this build - NebulaOS has\nno factory-reset/recovery script yet."
-  );
-  if (!have_factory_reset) {
-    // Disable the button and its label/desc children, same as
-    // ButtonContainer::disable() does elsewhere in this codebase (e.g.
-    // spoolman_btn), so the text visibly greys out too, not just the button.
-    lv_obj_add_state(btn2, LV_STATE_DISABLED);
-    uint32_t child_cnt = lv_obj_get_child_cnt(btn2);
-    for (uint32_t i = 0; i < child_cnt; i++) {
-      lv_obj_add_state(lv_obj_get_child(btn2, i), LV_STATE_DISABLED);
-    }
-  }
 
   lv_obj_t *btn3 = make_opt_btn(
     "Reset Touch Calibration",
@@ -579,45 +561,62 @@ void SysInfoPanel::show_reset_options() {
 
   lv_obj_add_event_cb(btn1, [](lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-    ((SysInfoPanel *)e->user_data)->show_reset_confirm(
+    auto *panel = (SysInfoPanel *)e->user_data;
+    panel->show_reset_confirm(
       "Reset GuppyScreen settings?",
-      "Deletes guppyconfig.json and restarts.\nKlipper keeps running.\n\nThis cannot be undone.",
-      []() {
+      "Restores the shipped guppyconfig.json and\nrestarts. Klipper keeps running.\n\nThis cannot be undone.",
+      [panel]() {
+        // The config is a bind-mounted persistent file on NebulaOS: overwrite
+        // it in place with the image's read-only default (never delete it).
+        std::ifstream src(GUPPY_DEFAULT_CONFIG, std::ios::binary);
+        if (!src) {
+          KUtils::notify_toast("No default config found on this system.", 4000);
+          return;
+        }
         Config *conf = Config::get_instance();
-        fs::remove(conf->get_path());
-        spdlog::warn("GuppyScreen config reset.");
-        _exit(0);
-      }
-    );
-  }, LV_EVENT_CLICKED, this);
-
-  lv_obj_add_event_cb(btn2, [](lv_event_t *e) {
-    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-    ((SysInfoPanel *)e->user_data)->show_reset_confirm(
-      "Factory Reset Printer?",
-      "Wipes OpenKE, Klipper config, gcodes\nand calibration. Reboots to stock.\n\nThis cannot be undone.",
-      []() {
-        spdlog::warn("Factory reset printer: executing S58factoryreset reset");
-        system("/etc/init.d/S58factoryreset reset");
+        {
+          std::ofstream dst(conf->get_path(), std::ios::binary | std::ios::trunc);
+          dst << src.rdbuf();
+          if (!dst) {
+            KUtils::notify_toast("Could not write the GuppyScreen config.", 4000);
+            return;
+          }
+        }
+        spdlog::warn("GuppyScreen config reset to {}.", GUPPY_DEFAULT_CONFIG);
+        panel->restart_guppyscreen();
       }
     );
   }, LV_EVENT_CLICKED, this);
 
   lv_obj_add_event_cb(btn3, [](lv_event_t *e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-    ((SysInfoPanel *)e->user_data)->show_reset_confirm(
+    auto *panel = (SysInfoPanel *)e->user_data;
+    panel->show_reset_confirm(
       "Reset Touch Calibration?",
       "Clears saved calibration. GuppyScreen\nwill restart and ask you to recalibrate.",
-      []() {
+      [panel]() {
         spdlog::warn("Touch calibration reset requested.");
         Config *conf = Config::get_instance();
         conf->set<bool>("/touch_calibrated", true);
         conf->set<json>("/touch_calibration_coeff", json());
         conf->save();
-        _exit(0);
+        panel->restart_guppyscreen();
       }
     );
   }, LV_EVENT_CLICKED, this);
+}
+
+void SysInfoPanel::restart_guppyscreen() {
+  json params = {{"service", "guppyscreen"}};
+  ws.send_jsonrpc("machine.services.restart", params, [this](json &reply) {
+    auto err = jsonrpc_error_message(reply);
+    if (err.empty()) {
+      return;
+    }
+    spdlog::warn("GuppyScreen restart failed: {}", err);
+    std::lock_guard<std::mutex> lock(lv_lock);
+    KUtils::notify_toast("Saved. Restart failed (" + err + ") - reboot to apply.", 6000);
+  });
 }
 
 void SysInfoPanel::show_reset_confirm(const char *title, const char *detail,
