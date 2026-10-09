@@ -1,5 +1,6 @@
 #include "setting_panel.h"
 #include "config.h"
+#include "utils.h"
 #include "spdlog/spdlog.h"
 #include "subprocess.hpp"
 
@@ -23,6 +24,7 @@ LV_IMG_DECLARE(print);
 
 SettingPanel::SettingPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, SpoolmanPanel &sm)
   : ws(c)
+  , lv_lock(l)
   , cont(lv_obj_create(parent))
 #ifndef OS_ANDROID
   , wifi_panel(c, l)
@@ -117,23 +119,21 @@ void SettingPanel::handle_callback(lv_event_t *event) {
       spoolman_panel.foreground();
     } else if (btn == guppy_restart_btn.get_container()) {
       spdlog::trace("restart guppy pressed");
-      Config *conf = Config::get_instance();
-      auto init_script = conf->get<std::string>("/guppy_init_script");
-      const fs::path script(init_script);
-      if (fs::exists(script)) {
-        // Pass as one command string, not {init_script, "restart"} - that
-        // vector<string> overload uses init_script verbatim as argv[0], so a
-        // value with an embedded space (e.g. the historical, broken
-        // "service guppyscreen") was never executable on either OpenKE or
-        // NebulaOS. The string overload below splits on whitespace into a
-        // proper argv, same as a shell would.
-        int rc = sp::call(init_script + " restart");
-        if (rc != 0) {
-          spdlog::warn("Restart Guppy Screen: '{} restart' exited with code {}", init_script, rc);
+      // Through Moonraker (GUI_BACKEND=MOONRAKER_ONLY): its supervisorctl shim
+      // runs /etc/init.d/S58guppyscreen restart; NebulaOS allows the service in
+      // moonraker.asvc. On success this process is stopped and restarted.
+      json params = {{"service", "guppyscreen"}};
+      ws.send_jsonrpc("machine.services.restart", params, [this](json &reply) {
+        if (!reply.contains("error")) {
+          return;
         }
-      } else {
-        spdlog::warn("Failed to restart Guppy Screen. Restart script not found: {}", init_script);
-      }
+        auto msg = reply["/error/message"_json_pointer].is_string()
+          ? reply["/error/message"_json_pointer].template get<std::string>()
+          : reply["error"].dump();
+        spdlog::warn("Restart Guppy Screen failed: {}", msg);
+        std::lock_guard<std::mutex> lock(lv_lock);
+        KUtils::notify_toast("Restart failed: " + msg, 5000);
+      });
     } else if (btn == guppy_update_btn.get_container()) {
       spdlog::trace("update guppy pressed");
       // TODO: throw this inside the global threadpool to make it async

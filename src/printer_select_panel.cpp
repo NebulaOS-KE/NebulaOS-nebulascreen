@@ -54,12 +54,13 @@ PrinterSelectContainer::PrinterSelectContainer(PrinterSelectPanel &ps,
 	  conf->set<std::string>("/default_printer", ((PrinterSelectContainer*)e->user_data)->name);
 	  conf->save();
 		  
+	  // Deliberately local, not machine.services.restart: this restarts
+	  // the GuppyScreen process on this screen, and the websocket may be
+	  // talking to another printer's Moonraker at this point. The string
+	  // overload splits on whitespace into a proper argv.
 	  auto init_script = conf->get<std::string>("/guppy_init_script");
 	  const fs::path script(init_script);
 	  if (fs::exists(script)) {
-	    // See setting_panel.cpp's guppy_restart_btn handler for why this is
-	    // one command string (splits on whitespace into a proper argv)
-	    // rather than {init_script, "restart"}.
 	    int rc = sp::call(init_script + " restart");
 	    if (rc != 0) {
 	      spdlog::warn("Restart Guppy Screen (printer switch): '{} restart' exited with code {}", init_script, rc);

@@ -34,6 +34,7 @@ class SettingPanel {
 
  private:
   KWebSocketClient &ws;
+  std::mutex &lv_lock;
   lv_obj_t *cont;
 
 #ifndef OS_ANDROID
