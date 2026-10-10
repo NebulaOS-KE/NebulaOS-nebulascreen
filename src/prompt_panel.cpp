@@ -274,9 +274,15 @@ void PromptPanel::consume(json &j) {
 
   if (cmd.rfind("prompt_begin", 0) == 0) {
     lv_label_set_text(header, (std::string(LV_SYMBOL_WARNING) + " " + cmd.substr(13)).c_str());
+    lv_label_set_text(body, "");
 
   } else if (cmd.rfind("prompt_text", 0) == 0) {
-    lv_label_set_text(body, cmd.substr(12).c_str());
+    // Each prompt_text is one line of the dialog (NebulaOS's guided
+    // calibrations send several); append instead of replacing, so only the
+    // last line is no longer the only one shown.
+    std::string current = lv_label_get_text(body);
+    std::string line = cmd.substr(12);
+    lv_label_set_text(body, (current.empty() ? line : current + "\n" + line).c_str());
 
   } else if (cmd.rfind("prompt_button", 0) == 0 || cmd.rfind("prompt_footer_button", 0) == 0) {
     if (cmd.rfind("prompt_button_group", 0) == 0) return;
