@@ -5,7 +5,6 @@
 #include "zoffset_panel.h"
 #include "limits_panel.h"
 #include "bedmesh_panel.h"
-#include "inputshaper_panel.h"
 #include "tmc_tune_panel.h"
 #include "tmc_status_panel.h"
 #include "power_panel.h"
@@ -39,7 +38,6 @@ class PrinterTunePanel {
   FineTunePanel &finetune_panel;
   ZOffsetPanel &zoffset_panel;
   LimitsPanel limits_panel;
-  InputShaperPanel inputshaper_panel;
   TmcTunePanel tmc_tune_panel;
   TmcStatusPanel tmc_status_panel;
   PowerPanel power_panel;

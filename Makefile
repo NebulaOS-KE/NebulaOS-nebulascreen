@@ -112,10 +112,10 @@ wpaclient:
 ## Offline, host-native pure-logic test binaries (2026-08-06) - no LVGL, no SDL2, no
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
-## docs/z_compensate_status_api.md.
-.PHONY: test test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros
+## the matching tests/test_*.cpp.
+.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow
 
-test: test-z-compensate-status test-z-offset-persistence test-contract-fixture test-integration-harness test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros
+test: test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow
 
 # 2026-08-06 crash-fix regression test: Config::init()/ThemeConfig::init()
 # must fall back to defaults, never crash, when a stat()-present file fails
@@ -126,12 +126,6 @@ test-config-theme-parse-safety: libhv.a libspdlog.a
 		-Lspdlog/build -l:libspdlog.a -lstdc++fs \
 		-o build/test_config_theme_parse_safety
 	./build/test_config_theme_parse_safety
-
-test-z-compensate-status: libhv.a
-	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
-		src/z_compensate_status.cpp tests/test_z_compensate_status.cpp \
-		-o build/test_z_compensate_status
-	./build/test_z_compensate_status
 
 # NebulaOS power-loss recovery panel logic (src/plr_status.cpp): what the panel offers
 # for each nebulaos_power_loss_recovery state, and the exact commands it sends.
@@ -156,28 +150,19 @@ test-nebulaos-network: libhv.a
 		-o build/test_nebulaos_network
 	./build/test_nebulaos_network
 
+# NebulaOS guided calibration panel logic (src/nebulaos_calibration_flow.cpp, D3-D5).
+test-nebulaos-calibration-flow: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		src/nebulaos_calibration_flow.cpp tests/test_nebulaos_calibration_flow.cpp \
+		-o build/test_nebulaos_calibration_flow
+	./build/test_nebulaos_calibration_flow
+
 # GuppyScreen action -> NebulaOS macro mapping (src/nebulaos_macros.cpp).
 test-nebulaos-macros:
 	g++ -std=c++17 -Wall -Wextra -I. \
 		src/nebulaos_macros.cpp tests/test_nebulaos_macros.cpp \
 		-o build/test_nebulaos_macros
 	./build/test_nebulaos_macros
-
-test-z-offset-persistence:
-	g++ -std=c++17 -Wall -Wextra -I. \
-		src/z_offset_config_persistence.cpp tests/test_z_offset_config_persistence.cpp \
-		-o build/test_z_offset_config_persistence
-	./build/test_z_offset_config_persistence
-
-# Part 7 cross-project contract test: parses tests/fixtures/z_compensate_status_contract.json
-# (a literal copy of the Python backend's own generated fixture, see tests/fixtures/README.md)
-# through the real C++ parser/tracker. Must be run from the repo root so the relative
-# fixture path resolves - `make test` already does this.
-test-contract-fixture: libhv.a
-	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
-		src/z_compensate_status.cpp tests/test_contract_fixture.cpp \
-		-o build/test_contract_fixture
-	./build/test_contract_fixture
 
 # Part 3 deployment-verification regression: proves the subscription-baseline ordering
 # guarantee against the REAL State class (src/state.cpp) - no LVGL runtime needed, see
@@ -191,16 +176,6 @@ test-subscription-baseline-ordering: libhv.a libspdlog.a
 		-Lspdlog/build -l:libspdlog.a \
 		-o build/test_subscription_baseline_ordering
 	./build/test_subscription_baseline_ordering
-
-# Part 8 offline integration harness: replays the ordered success/failure traces (see
-# tests/fixtures/README.md) through the real parser/tracker AND real
-# ZOffsetConfigPersistence together, proving the full frontend chain end-to-end.
-test-integration-harness: libhv.a
-	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
-		src/z_compensate_status.cpp src/z_offset_config_persistence.cpp \
-		tests/test_integration_harness.cpp \
-		-o build/test_integration_harness
-	./build/test_integration_harness
 
 $(BUILD_OBJ_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)

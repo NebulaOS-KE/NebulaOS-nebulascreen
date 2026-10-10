@@ -3,10 +3,8 @@
 
 #include "lvgl/lvgl.h"
 #include "websocket_client.h"
-#include "recalibration_wizard_panel.h"
-#include "esteps_calibration_panel.h"
+#include "guided_calibration_panel.h"
 #include "bedmesh_panel.h"
-#include "inputshaper_panel.h"
 #include "axis_twist_panel.h"
 #include "skew_correction_panel.h"
 #include "tmc_tune_panel.h"
@@ -36,7 +34,7 @@
 class CalibrationMenuPanel {
  public:
   CalibrationMenuPanel(KWebSocketClient &, std::mutex &,
-                        BedMeshPanel &, InputShaperPanel &,
+                        BedMeshPanel &,
                         AxisTwistPanel &, SkewCorrectionPanel &,
                         TmcTunePanel &);
   ~CalibrationMenuPanel();
@@ -84,16 +82,18 @@ class CalibrationMenuPanel {
   std::vector<lv_obj_t*> rows;
   int highlight_index;
 
-  RecalibrationWizardPanel recalibration_wizard_panel;
-  EstepsCalibrationPanel esteps_calibration_panel;
+  // NebulaOS guided flows (D3-D5): the workflows run in Klipper
+  // (nebulaos_calibration) and prompt the operator; these panels start them,
+  // show their state and offer Cancel / the E-steps measurement.
+  GuidedCalibrationPanel auto_calibrate_panel;
+  GuidedCalibrationPanel esteps_panel;
+  GuidedCalibrationPanel input_shaper_panel;
   BedMeshPanel &bedmesh_panel;
-  InputShaperPanel &inputshaper_panel;
   AxisTwistPanel &axis_twist_panel;
   SkewCorrectionPanel &skew_correction_panel;
   TmcTunePanel &tmc_tune_panel;
 
   bool tmc_tune_available;
-  bool esteps_available;
 };
 
 #endif  // __CALIBRATION_MENU_PANEL_H__
