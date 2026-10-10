@@ -10,6 +10,7 @@
 #include "sysinfo_panel.h"
 #include "spoolman_panel.h"
 #include "printer_select_panel.h"
+#include "system_panel.h"
 #include "button_container.h"
 #include "websocket_client.h"
 #include "lvgl/lvgl.h"
@@ -44,13 +45,16 @@ class SettingPanel {
   SysInfoPanel sysinfo_panel;
   SpoolmanPanel &spoolman_panel;
   PrinterSelectPanel printer_select_panel;
+  SystemPanel system_panel;
   ButtonContainer wifi_btn;
   ButtonContainer restart_klipper_btn;
   ButtonContainer restart_firmware_btn;
   ButtonContainer sysinfo_btn;
   ButtonContainer spoolman_btn;
   ButtonContainer guppy_restart_btn;
-  ButtonContainer guppy_update_btn;
+  // "Power & System" (D9) - took the place of "Update Guppy", which NebulaOS
+  // never supported (GuppyScreen updates with the firmware image).
+  ButtonContainer system_btn;
   ButtonContainer printer_select_btn;
   
 };

@@ -113,9 +113,9 @@ wpaclient:
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## the matching tests/test_*.cpp.
-.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow
+.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system
 
-test: test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow
+test: test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system
 
 # 2026-08-06 crash-fix regression test: Config::init()/ThemeConfig::init()
 # must fall back to defaults, never crash, when a stat()-present file fails
@@ -156,6 +156,13 @@ test-nebulaos-calibration-flow: libhv.a
 		src/nebulaos_calibration_flow.cpp tests/test_nebulaos_calibration_flow.cpp \
 		-o build/test_nebulaos_calibration_flow
 	./build/test_nebulaos_calibration_flow
+
+# "Power & System" / Logs screen logic (src/nebulaos_system.cpp, D9).
+test-nebulaos-system: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		src/nebulaos_system.cpp tests/test_nebulaos_system.cpp \
+		-o build/test_nebulaos_system
+	./build/test_nebulaos_system
 
 # GuppyScreen action -> NebulaOS macro mapping (src/nebulaos_macros.cpp).
 test-nebulaos-macros:
