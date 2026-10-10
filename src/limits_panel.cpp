@@ -2,8 +2,17 @@
 #include "state.h"
 #include "spdlog/spdlog.h"
 
+#include <cmath>
+
 LV_IMG_DECLARE(refresh_img);
 LV_IMG_DECLARE(back);
+
+// The pinned upstream Klipper replaced max_accel_to_decel / ACCEL_TO_DECEL with
+// minimum_cruise_ratio (0 <= ratio < 1); SET_VELOCITY_LIMIT ignores ACCEL_TO_DECEL.
+static int ratio_to_pct(double ratio) {
+  int pct = (int)std::lround(ratio * 100.0);
+  return pct < 0 ? 0 : (pct > 99 ? 99 : pct);
+}
 
 LimitsPanel::LimitsPanel(KWebSocketClient &c, std::mutex &l)
   : NotifyConsumer(l)
@@ -13,11 +22,11 @@ LimitsPanel::LimitsPanel(KWebSocketClient &c, std::mutex &l)
   , velocity(limit_cont, "Velocity (mm/s)", &refresh_img, "Reset", &refresh_img, NULL, &LimitsPanel::_handle_callback, this, "")
   , acceleration(limit_cont, "Acceleration (mm/s2)", &refresh_img, "Reset", &refresh_img, NULL, &LimitsPanel::_handle_callback, this, "")
   , square_corner(limit_cont, "Square Corner Velocity (mm/s)", &refresh_img, "Reset", &refresh_img, NULL, &LimitsPanel::_handle_callback, this, "")
-  , accel_to_decel(limit_cont, "Acceleration to Deceleration (mm/s2)", &refresh_img, "Reset", &refresh_img, NULL, &LimitsPanel::_handle_callback, this, "")
+  , min_cruise_ratio(limit_cont, "Minimum Cruise Ratio (%)", &refresh_img, "Reset", &refresh_img, NULL, &LimitsPanel::_handle_callback, this, "")
   , back_btn(cont, &back, "Back", &LimitsPanel::_handle_callback, this)
   , max_velocity_default(1000)
   , max_accel_default(20000)
-  , max_accel_to_decel_default(10000)
+  , min_cruise_ratio_default(50)
   , square_corner_default(5)
 {
   lv_obj_move_background(cont);
@@ -30,7 +39,10 @@ LimitsPanel::LimitsPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_set_flex_flow(limit_cont, LV_FLEX_FLOW_COLUMN);
 
   lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
-  
+
+  // Klipper accepts 0 <= MINIMUM_CRUISE_RATIO < 1.
+  min_cruise_ratio.set_range(0, 99);
+
   ws.register_notify_update(this);
 }
 
@@ -55,9 +67,8 @@ void LimitsPanel::init(json &j) {
       acceleration.set_range(1, max_accel_default);
     }
 
-    if (v.contains("max_accel_to_decel")) {
-      max_accel_to_decel_default = v["max_accel_to_decel"].template get<int>();
-      accel_to_decel.set_range(1, max_accel_to_decel_default);
+    if (v.contains("minimum_cruise_ratio") && v["minimum_cruise_ratio"].is_number()) {
+      min_cruise_ratio_default = ratio_to_pct(v["minimum_cruise_ratio"].template get<double>());
     }
 
     if (v.contains("square_corner_velocity")) {
@@ -77,9 +88,9 @@ void LimitsPanel::init(json &j) {
     acceleration.update_value(v.template get<int>());
   }
 
-  v = j["/result/status/toolhead/max_accel_to_decel"_json_pointer];
-  if (!v.is_null()) {
-    accel_to_decel.update_value(v.template get<int>());
+  v = j["/result/status/toolhead/minimum_cruise_ratio"_json_pointer];
+  if (v.is_number()) {
+    min_cruise_ratio.update_value(ratio_to_pct(v.template get<double>()));
   }
 
   v = j["/result/status/toolhead/square_corner_velocity"_json_pointer];
@@ -104,9 +115,9 @@ void LimitsPanel::consume(json &j) {
     acceleration.update_value(v.template get<int>());
   }
 
-  v = j["/params/0/toolhead/max_accel_to_decel"_json_pointer];
-  if (!v.is_null()) {
-    accel_to_decel.update_value(v.template get<int>());
+  v = j["/params/0/toolhead/minimum_cruise_ratio"_json_pointer];
+  if (v.is_number()) {
+    min_cruise_ratio.update_value(ratio_to_pct(v.template get<double>()));
   }
 
   v = j["/params/0/toolhead/square_corner_velocity"_json_pointer];
@@ -134,8 +145,8 @@ void LimitsPanel::handle_callback(lv_event_t *e) {
     } else if (obj == acceleration.get_slider()) {
       ws.gcode_script(fmt::format("SET_VELOCITY_LIMIT ACCEL={}", v));
 
-    } else if (obj == accel_to_decel.get_slider()) {
-      ws.gcode_script(fmt::format("SET_VELOCITY_LIMIT ACCEL_TO_DECEL={}", v));
+    } else if (obj == min_cruise_ratio.get_slider()) {
+      ws.gcode_script(fmt::format("SET_VELOCITY_LIMIT MINIMUM_CRUISE_RATIO={:.2f}", v / 100.0));
       
     } else if (obj == square_corner.get_slider()) {
       ws.gcode_script(fmt::format("SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY={}", v));
@@ -149,8 +160,9 @@ void LimitsPanel::handle_callback(lv_event_t *e) {
     } else if (btn == acceleration.get_off()) {
       ws.gcode_script(fmt::format("SET_VELOCITY_LIMIT ACCEL={}", max_accel_default));
 
-    } else if (btn == accel_to_decel.get_off()) {
-      ws.gcode_script(fmt::format("SET_VELOCITY_LIMIT ACCEL_TO_DECEL={}", max_accel_to_decel_default));
+    } else if (btn == min_cruise_ratio.get_off()) {
+      ws.gcode_script(fmt::format("SET_VELOCITY_LIMIT MINIMUM_CRUISE_RATIO={:.2f}",
+        min_cruise_ratio_default / 100.0));
       
     } else if (btn == square_corner.get_off()) {
       ws.gcode_script(fmt::format("SET_VELOCITY_LIMIT SQUARE_CORNER_VELOCITY={}", square_corner_default));
