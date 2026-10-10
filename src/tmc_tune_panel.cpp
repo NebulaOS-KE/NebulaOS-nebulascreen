@@ -150,23 +150,21 @@ AutoTmcContainer::~AutoTmcContainer() {
   }
 }
 
+// NebulaOS stages [autotune_tmc <stepper>] through Klipper's own configfile
+// (NebulaOS-klipper-extensions nebulaos_tmc_autotune.py, decision D8) instead of
+// the _GUPPY_SAVE_CONFIG / _GUPPY_DELETE_CONFIG shell helper it does not ship;
+// save_config() follows with SAVE_CONFIG. Sensorless thresholds are not staged:
+// the KE's TMC2208 drivers have no StallGuard.
 std::string AutoTmcContainer::get_config_macro() {
   char buf[128];
   lv_dropdown_get_selected_str(motors_dd, buf, sizeof(buf));
   std::string motor = std::string(buf);
   if (motor == "Not Configured") {
-    return fmt::format("_GUPPY_DELETE_CONFIG SECTION=\"autotune_tmc {}\"", name);
+    return fmt::format("NEBULAOS_TMC_AUTOTUNE STEPPER={} REMOVE=1", name);
   }
 
   lv_dropdown_get_selected_str(tuning_goal_dd, buf, sizeof(buf));
-  if (has_sg) {
-    auto sg_value = lv_spinbox_get_value(sensorless_threshold);
-    return fmt::format("_GUPPY_SAVE_CONFIG SECTION=\"autotune_tmc {}\" KEY_VALUE=\"motor:{},tuning_goal:{},{}:{}\"",
-		       name, motor, buf, sg_range.first == 0 ? "sg4_thrs" : "sgt", sg_value);
-  } else {
-    return fmt::format("_GUPPY_SAVE_CONFIG SECTION=\"autotune_tmc {}\" KEY_VALUE=\"motor:{},tuning_goal:{}\"",
-		       name, motor, buf);
-  }
+  return fmt::format("NEBULAOS_TMC_AUTOTUNE STEPPER={} MOTOR={} GOAL={}", name, motor, buf);
 }
 
 TmcTunePanel::TmcTunePanel(KWebSocketClient &c)

@@ -136,8 +136,9 @@ void Config::init(std::string config_path, const std::string thumbdir) {
       // Migrate dead filament macro names shipped in older configs. The KE has
       // no LOAD_MATERIAL / UNLOAD_MATERIAL command (Klipper rejects them as
       // "Unknown command"), so Unload silently no-ops and, with auto-cooldown,
-      // just heats to target-5 then cools. The real macros are the _GUPPY_*
-      // ones. Rewrite in place; the config is re-saved at the end of init().
+      // just heats to target-5 then cools. NebulaOS ships LOAD_FILAMENT /
+      // UNLOAD_FILAMENT (legacy _GUPPY_* names are mapped in nebulaos_macros).
+      // Rewrite in place; the config is re-saved at the end of init().
       if (default_macros.contains("load_filament")
           && default_macros["load_filament"] == "LOAD_MATERIAL") {
         default_macros["load_filament"] = "LOAD_FILAMENT";
