@@ -25,9 +25,9 @@ TmcStatusPanel::TmcStatusPanel(KWebSocketClient &c,
 
   lv_obj_set_size(top, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_t *l = lv_label_create(top);
-  lv_label_set_text(l, "TMC Metrics is experimental and disabled by default. "
-		    "Turn it on as needed. For in-depth detail, refer to the TMC "
-		    "driver datasheet.");
+  lv_label_set_text(l, "Live TMC driver metrics, refreshed every second. "
+		    "Turn off to stop polling the drivers. For in-depth detail, "
+		    "refer to the TMC driver datasheet.");
   lv_obj_set_width(l, LV_PCT(70));
   lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
 
@@ -39,11 +39,10 @@ TmcStatusPanel::TmcStatusPanel(KWebSocketClient &c,
     lv_obj_t * obj = lv_event_get_target(e);
     if(code == LV_EVENT_VALUE_CHANGED) {
       TmcStatusPanel *p = (TmcStatusPanel*)e->user_data;      
-      if (lv_obj_has_state(obj, LV_STATE_CHECKED)) {
-	p->ws.gcode_script("_GUPPY_LOAD_MODULE SECTION=tmcstatus");
-      } else {
-	p->ws.gcode_script("_GUPPY_UNLOAD_MODULE SECTION=tmcstatus");
-      }
+      // NebulaOS's [tmcstatus] is always loaded; TMCSTATUS pauses/resumes
+      // its refresh at runtime (no printer.cfg edit, no Klipper restart).
+      p->ws.gcode_script(lv_obj_has_state(obj, LV_STATE_CHECKED)
+        ? "TMCSTATUS ENABLE=1" : "TMCSTATUS ENABLE=0");
     }
   }, LV_EVENT_VALUE_CHANGED, this);
 
