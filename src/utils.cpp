@@ -13,11 +13,7 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
-#include <sys/ioctl.h>
 #include <sys/wait.h>
-#include <linux/if.h>
-#include <ifaddrs.h>
-#include <arpa/inet.h>
 #include <unistd.h>
 #include <cstdlib>
 #include <cstdio>
@@ -389,89 +385,6 @@ namespace KUtils {
     spdlog::trace("downloaded file size {}", size);
 
     return dest_fullpath.string();
-  }
-
-  std::vector<std::string> get_interfaces() {
-    std::vector<std::string> ifaces;
-#ifndef OS_ANDROID
-    struct ifaddrs *addrs;
-    getifaddrs(&addrs);
-    for (struct ifaddrs *addr = addrs; addr != nullptr; addr = addr->ifa_next) {
-      if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_PACKET) {
-        const std::string iface = addr->ifa_name;
-        if (!iface.empty() && (iface[0] == 'w' || iface[0] == 'e')) {
-          ifaces.push_back(iface);
-        }
-      }
-    }
-
-    freeifaddrs(addrs);
-#endif // OS_ANDROID
-    return ifaces;
-  }
-
-  std::string interface_ip(const std::string &interface) {
-    int fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-
-    struct ifreq ifr {};
-    strcpy(ifr.ifr_name, interface.c_str());
-    ioctl(fd, SIOCGIFADDR, &ifr);
-    close(fd);
-
-    char ip[INET_ADDRSTRLEN];
-    strcpy(ip, inet_ntoa(((sockaddr_in *)&ifr.ifr_addr)->sin_addr));
-    return ip;
-  }
-
-  std::string get_wifi_interface() {
-    std::string wpa_socket = Config::get_instance()->get<std::string>("/wpa_supplicant");
-    if (fs::is_directory(fs::status(wpa_socket))) {
-      for (const auto &e : fs::directory_iterator(wpa_socket)) {
-        if (fs::is_socket(e.path()) && e.path().string().find("p2p") == std::string::npos) {
-          return e.path().filename().string();
-        }
-      }
-    }
-
-    return "";
-  }
-
-  // Returns the default-route gateway IP for `iface`, or "" if none.
-  // /proc/net/route stores addresses as hex in host byte order.
-  std::string gateway_ip(const std::string &iface) {
-    std::ifstream f("/proc/net/route");
-    std::string line;
-    std::getline(f, line); // skip header
-    while (std::getline(f, line)) {
-      std::istringstream iss(line);
-      std::string dev, dest, gw;
-      iss >> dev >> dest >> gw;
-      if (dev != iface || dest != "00000000") continue;
-      uint32_t gw_val = 0;
-      sscanf(gw.c_str(), "%x", &gw_val);
-      if (gw_val == 0) continue;
-      struct in_addr addr;
-      addr.s_addr = htonl(gw_val);
-      return inet_ntoa(addr);
-    }
-    return "";
-  }
-
-  // Returns true once the gateway has a completed ARP entry in /proc/net/arp.
-  bool gateway_in_arp(const std::string &gw_ip) {
-    std::ifstream f("/proc/net/arp");
-    std::string line;
-    std::getline(f, line); // skip header
-    while (std::getline(f, line)) {
-      std::istringstream iss(line);
-      std::string ip, hw_type, flags;
-      iss >> ip >> hw_type >> flags;
-      if (ip != gw_ip) continue;
-      int flag_val = 0;
-      sscanf(flags.c_str(), "%x", &flag_val);
-      return (flag_val & 0x2) != 0; // ATF_COM: entry is complete
-    }
-    return false;
   }
 
   template <typename Out>

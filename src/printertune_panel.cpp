@@ -11,11 +11,7 @@ LV_IMG_DECLARE(retract_img);
 LV_IMG_DECLARE(home_z);
 LV_IMG_DECLARE(calibration_img);
 
-#ifndef ZBOLT
 LV_IMG_DECLARE(power_devices_img);
-#else
-LV_IMG_DECLARE(print);
-#endif
 
 PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, FineTunePanel &finetune, ZOffsetPanel &zoffset)
   : cont(lv_obj_create(parent))
@@ -34,11 +30,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   , finetune_btn(cont, &fine_tune_img, "Fine Tune", &PrinterTunePanel::_handle_callback, this)
   , limits_btn(cont, &limit_img, "Limits", &PrinterTunePanel::_handle_callback, this)
   , tmc_status_btn(cont, &chart_img, "TMC Metrics", &PrinterTunePanel::_handle_callback, this)
-#ifndef ZBOLT
   , power_devices_btn(cont, &power_devices_img, "Power Settings", &PrinterTunePanel::_handle_callback, this)
-#else
-  , power_devices_btn(cont, &print, "Power Settings", &PrinterTunePanel::_handle_callback, this)
-#endif
   , retraction_btn(cont, &retract_img, "Retraction", &PrinterTunePanel::_handle_callback, this)
   , zoffset_btn(cont, &home_z, "Z Offset", &PrinterTunePanel::_handle_callback, this)
   , calibration_btn(cont, &calibration_img, "Calibration", &PrinterTunePanel::_handle_callback, this)

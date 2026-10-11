@@ -13,7 +13,6 @@ if [ -f ./build/bin/guppybeep ]; then
     cp ./build/bin/guppybeep $RELEASES_DIR/guppybeep
 fi
 cp -r ./k1/k1_mods $RELEASES_DIR
-cp -r ./k1/scripts $RELEASES_DIR
 cp -r ./themes $RELEASES_DIR
 # NebulaOS Phase 0 cleanup (2026-08-16): installer.sh, installer-deb.sh,
 # update.sh, and debian/ (the OpenKE stock-firmware installer/patch/systemd-
@@ -22,8 +21,9 @@ cp -r ./themes $RELEASES_DIR
 # fetched or consumed by any NebulaOS boot path (NebulaOS-firmware pins and
 # cross-compiles this repo directly; see wiki/Integration-with-NebulaOS.md).
 # This release tarball now packages only what's actually load-bearing
-# anywhere: the compiled binaries, k1_mods (now just buzzer/ + tmcstatus.py),
-# k1/scripts, and themes/.
+# anywhere: the compiled binaries, k1_mods (just buzzer/, the guppybeep
+# source) and themes/. k1/scripts and tmcstatus.py went in the 2026-10-11
+# cleanup (NebulaOS ships its own macros and [tmcstatus]).
 if [ -f ./custom_upgrade.sh ]; then
     cp ./custom_upgrade.sh $RELEASES_DIR
 fi

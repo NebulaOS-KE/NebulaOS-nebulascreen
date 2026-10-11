@@ -86,7 +86,6 @@ void Config::init(std::string config_path, const std::string thumbdir) {
     data = {
         {"log_path", "/opt/printer_data/logs/guppyscreen.log"},
         {"thumbnail_path", thumbdir},
-        {"wpa_supplicant", "/var/run/wpa_supplicant"},
         {"display_sleep_sec", 600},
         {"default_extruder_temp", 240}
 #ifndef OS_ANDROID
@@ -234,12 +233,6 @@ std::string& Config::df() {
 
 std::string Config::get_thumbnail_path() {
   return get<std::string>("/thumbnail_path");
-}
-
-std::string Config::get_wifi_interface() {
-  return fs::path(get<std::string>("/wpa_supplicant"))
-    .filename()
-    .string();
 }
 
 std::string Config::get_path() {
