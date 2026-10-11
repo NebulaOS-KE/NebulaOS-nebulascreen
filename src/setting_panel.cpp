@@ -111,6 +111,22 @@ void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
     {"10-swap-confirm", [this, close_dialogs]() { close_dialogs(); reset_panel.sim_tap(3); }},
     {"11-reboot-confirm", [this, close_dialogs]() {
       close_dialogs(); system_panel.foreground(); system_panel.sim_fill(); system_panel.sim_tap_reboot(); }},
+    // Run 4: printer name and MCU firmware.
+    {"12-hostname", [this, close_dialogs]() {
+      close_dialogs(); connections_panel.foreground(); connections_panel.sim_fill();
+      connections_panel.sim_rename(); connections_panel.sim_hostname().sim_type("ke-workshop"); }},
+    {"13-hostname-invalid", [this]() { connections_panel.sim_hostname().sim_type("ke_workshop"); }},
+    {"14-hostname-confirm", [this]() {
+      connections_panel.sim_hostname().sim_type("ke-workshop"); connections_panel.sim_hostname().sim_save(); }},
+    {"15-printer", [this, close_dialogs]() { close_dialogs(); printer_panel.foreground(); }},
+    {"16-mcu", [this]() { printer_panel.sim_mcu().foreground(); printer_panel.sim_mcu().sim_fill(); }},
+    {"17-mcu-confirm", [this]() { printer_panel.sim_mcu().sim_install(0); }},
+    {"18-mcu-busy", [this, close_dialogs]() { close_dialogs(); printer_panel.sim_mcu().sim_busy(); }},
+    {"19-mcu-done", [this]() {
+      printer_panel.sim_mcu().sim_result(R"({"result":{"result":"FLASHED","native":false}})"); }},
+    {"20-mcu-failed", [this, close_dialogs]() {
+      close_dialogs(); printer_panel.sim_mcu().sim_result(
+        R"({"error":{"code":500,"message":"FLASH_FAILED: Could not enter bootloader: no handshake"}})"); }},
   };
   lv_timer_create([](lv_timer_t *timer) {
     auto *t = (SimTour *)timer->user_data;

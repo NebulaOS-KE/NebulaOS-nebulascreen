@@ -6,6 +6,7 @@
 
 LV_IMG_DECLARE(back);
 LV_IMG_DECLARE(refresh_img);
+LV_IMG_DECLARE(chip_img);
 
 static lv_obj_t *right_switch(lv_obj_t *row, bool on) {
   lv_obj_t *sw = lv_switch_create(row);
@@ -25,6 +26,7 @@ PrinterSettingsPanel::PrinterSettingsPanel(KWebSocketClient &c, std::mutex &lock
   : ws(c)
   , lv_lock(lock)
   , cont(SettingsUi::page("Printer", &body))
+  , mcu_panel(c, lock)
   , back_btn(cont, &back, "Back", &PrinterSettingsPanel::_handle_callback, this)
 {
   lv_obj_t *left = SettingsUi::column(body, 58);
@@ -52,7 +54,10 @@ PrinterSettingsPanel::PrinterSettingsPanel(KWebSocketClient &c, std::mutex &lock
                                                 &PrinterSettingsPanel::_handle_callback, this);
   restart_mcu_btn = SettingsUi::icon_button(right, &refresh_img, "Restart MCU",
                                             &PrinterSettingsPanel::_handle_callback, this);
-  SettingsUi::hint(right, "Restart MCU restarts the printer board's firmware, then Klipper.");
+  mcu_fw_btn = SettingsUi::icon_button(right, &chip_img, "MCU firmware",
+                                       &PrinterSettingsPanel::_handle_callback, this);
+  SettingsUi::hint(right, "Restart MCU restarts the printer board's firmware, then Klipper. "
+                          "MCU firmware installs a new one.");
 
   for (lv_obj_t *w : {temp_dd, estop_sw, invert_y_sw, invert_z_sw}) {
     lv_obj_add_event_cb(w, &PrinterSettingsPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
@@ -81,6 +86,8 @@ void PrinterSettingsPanel::handle_callback(lv_event_t *e) {
   if (code == LV_EVENT_CLICKED) {
     if (obj == back_btn.get_container()) {
       lv_obj_move_background(cont);
+    } else if (obj == mcu_fw_btn) {
+      mcu_panel.foreground();
     } else if (obj == restart_klipper_btn || obj == restart_mcu_btn) {
       bool mcu = obj == restart_mcu_btn;
       KUtils::confirm_if_printing(

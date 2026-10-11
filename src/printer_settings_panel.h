@@ -2,13 +2,15 @@
 #define __PRINTER_SETTINGS_PANEL_H__
 
 #include "button_container.h"
+#include "mcu_panel.h"
 #include "websocket_client.h"
 #include "lvgl/lvgl.h"
 
 #include <mutex>
 
 // Settings > Printer (S1, 2026-10-11): Restart Klipper, Restart MCU (Klipper's
-// FIRMWARE_RESTART), and the screen's printer preferences: default extruder
+// FIRMWARE_RESTART), MCU firmware (install a .bin, run 4), and the screen's
+// printer preferences: default extruder
 // temperature, ask before an emergency stop, inverted Y/Z jog arrows.
 class PrinterSettingsPanel {
  public:
@@ -16,6 +18,9 @@ class PrinterSettingsPanel {
   ~PrinterSettingsPanel();
 
   void foreground();
+#ifdef SIMULATOR
+  McuPanel &sim_mcu() { return mcu_panel; }
+#endif
 
   static void _handle_callback(lv_event_t *e) {
     ((PrinterSettingsPanel *)e->user_data)->handle_callback(e);
@@ -31,6 +36,8 @@ class PrinterSettingsPanel {
   lv_obj_t *cont;
   lv_obj_t *restart_klipper_btn;
   lv_obj_t *restart_mcu_btn;
+  lv_obj_t *mcu_fw_btn;
+  McuPanel mcu_panel;
   lv_obj_t *temp_dd;
   lv_obj_t *estop_sw;
   lv_obj_t *invert_y_sw;

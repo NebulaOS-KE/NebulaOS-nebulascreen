@@ -56,6 +56,15 @@ void confirm(const char *title, const char *text, const char *confirm_label,
 // Closes every open confirmation as if Cancel was tapped.
 void dismiss_confirms();
 
+// Modal message with a single OK button (same look as confirm()).
+void notice(const char *title, const char *text);
+
+// Modal "please wait" box without buttons, above everything (also above the
+// "waiting for printer" screen while Klipper restarts). Returns its text
+// label for updates; close it with close_busy(label).
+lv_obj_t *busy(const char *title, const char *text);
+void close_busy(lv_obj_t *label);
+
 }  // namespace SettingsUi
 
 #endif // __SETTINGS_UI_H__

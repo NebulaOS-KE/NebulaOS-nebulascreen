@@ -1,4 +1,5 @@
-// Offline tests for the Connections, Wi-Fi and Updates screen logic (S1, Q3) -
+// Offline tests for the Connections, Wi-Fi, Updates, printer-name and MCU
+// firmware screen logic (S1, Q3, run 4) -
 // no LVGL, no Moonraker. Build/run:
 //   make test-nebulaos-settings
 //
@@ -127,6 +128,119 @@ TEST(Updates, unknown_remote_is_not_an_update) {
   json r = {{"result", {{"version_info", {{"mainsail", {{"version", "v2.13.0"}, {"remote_version", "?"}}}}}}}};
   auto rows = update_rows(r);
   ASSERT_FALSE(rows[0].available);
+}
+
+// -- Printer name (run 4) ---------------------------------------------------------
+
+TEST(Hostname, check) {
+  auto ok = hostname_check("  KE-Workshop ", "nebulaos");
+  ASSERT_TRUE(ok.ok);
+  ASSERT_EQ(ok.name, std::string("ke-workshop"));
+  ASSERT_EQ(ok.message, std::string("Reachable as ke-workshop.local after saving."));
+  ASSERT_TRUE(hostname_check(std::string(63, 'a'), "nebulaos").ok);
+  struct Bad { const char *in; const char *msg; };
+  Bad bad[] = {
+    {"", "Enter a name."}, {"   ", "Enter a name."},
+    {"a_b", "Use only letters a-z, digits 0-9 and '-'."},
+    {"a.b", "Use only letters a-z, digits 0-9 and '-'."},
+    {"a b", "Use only letters a-z, digits 0-9 and '-'."},
+    {"-ke", "The name cannot start or end with '-'."},
+    {"ke-", "The name cannot start or end with '-'."},
+    {"1234", "The name needs at least one letter."},
+    {"LocalHost", "'localhost' is reserved."},
+    {"NebulaOS", "This is the current name."},
+  };
+  for (const auto &b : bad) {
+    auto c = hostname_check(b.in, "nebulaos");
+    ASSERT_FALSE(c.ok);
+    ASSERT_EQ(c.message, std::string(b.msg));
+  }
+  ASSERT_EQ(hostname_check(std::string(64, 'a'), "x").message, std::string("At most 63 characters."));
+  ASSERT_EQ(hostname_params("ke")["hostname"].get<std::string>(), std::string("ke"));
+  ASSERT_EQ(moonraker_restart_params()["service"].get<std::string>(), std::string("moonraker"));
+}
+
+TEST(Hostname, reply) {
+  // Shape of machine.nebulaos.network.hostname (network.py set_hostname).
+  json applied = json::parse(R"({"result":{"result":"APPLIED","mdns_restart_required":true,
+    "config":{"hostname":"ke"}}})");
+  ASSERT_TRUE(hostname_restart_needed(applied));
+  ASSERT_EQ(hostname_error_text(applied), std::string(""));
+  ASSERT_FALSE(hostname_restart_needed(json::parse(R"({"result":{"result":"UNCHANGED"}})")));
+  json invalid = {{"error", {{"code", 400}, {"message", "INVALID_HOSTNAME: hostname must not be 'localhost'"}}}};
+  ASSERT_EQ(hostname_error_text(invalid),
+            std::string("The printer refused the name: hostname must not be 'localhost'"));
+  json failed = {{"error", {{"code", 500}, {"message", "HOSTNAME_APPLY_FAILED: could not apply the hostname"}}}};
+  ASSERT_EQ(hostname_error_text(failed), std::string("Could not apply the name. The old name is kept."));
+  ASSERT_EQ(connections_view(net_status("dhcp"), json()).hostname, std::string("nebulaos"));
+}
+
+// -- MCU firmware (run 4) --------------------------------------------------------
+
+// Shape of machine.nebulaos.mcu.files (nebulaos_osconfig/mcu.py list_files()).
+static json mcu_files_reply() {
+  std::string sha(64, 'a');
+  return json::parse(R"({"result":{"usb":["sda1"],"upload_dir":"/x",
+    "builtin":{"id":"builtin/candidate-001.bin","source":"builtin","name":"NebulaOS firmware",
+               "sha256":")" + std::string(64, 'c') + R"(","native":true,"size":40048,"valid":true,"kind":"packed"},
+    "files":[
+      {"id":"upload/junk.bin","source":"upload","name":"junk.bin","size":4096,"valid":false,
+       "kind":null,"sha256":")" + std::string(64, 'b') + R"(","native":false,
+       "problem":"not firmware for this printer's mainboard"},
+      {"id":"upload/klipper.bin","source":"upload","name":"klipper.bin","size":40048,"valid":true,
+       "kind":"raw","sha256":")" + sha + R"(","native":false,"problem":null},
+      {"id":"usb/sda1/KE.BIN","source":"usb","name":"KE.BIN","size":40048,"valid":true,
+       "kind":"packed","sha256":")" + std::string(64, 'c') + R"(","native":true,"problem":null}]}})");
+}
+
+TEST(Mcu, files) {
+  auto f = mcu_files(mcu_files_reply());
+  ASSERT_EQ(f.files.size(), (size_t)3);
+  ASSERT_TRUE(f.usb_present);
+  ASSERT_TRUE(f.has_builtin);
+  ASSERT_EQ(f.builtin.id, std::string("builtin/candidate-001.bin"));
+  ASSERT_FALSE(f.files[0].valid);
+  ASSERT_EQ(f.files[0].detail, std::string("Uploaded  -  4.0 KB  -  not firmware for this printer's mainboard"));
+  ASSERT_EQ(f.files[1].detail, std::string("Uploaded  -  39.1 KB  -  ready (raw build, packed on install)"));
+  ASSERT_EQ(f.files[2].detail, std::string("USB  -  39.1 KB  -  NebulaOS firmware"));
+  auto p = mcu_flash_params(f.files[1]);
+  ASSERT_EQ(p["file"].get<std::string>(), std::string("upload/klipper.bin"));
+  ASSERT_EQ(p["sha256"].get<std::string>(), std::string(64, 'a'));
+  ASSERT_TRUE(mcu_confirm_text(f.files[1]).find("another Klipper version") != std::string::npos);
+  ASSERT_TRUE(mcu_confirm_text(f.builtin).find("the NebulaOS firmware") != std::string::npos);
+  ASSERT_TRUE(mcu_files(json{{"error", {{"message", "x"}}}}).files.empty());
+  ASSERT_EQ(human_size(512), std::string("512 B"));
+}
+
+TEST(Mcu, status) {
+  json st = json::parse(R"({"result":{"managed":false,"guard":{"result":"WARN",
+    "application_class":"UNKNOWN_APPLICATION","application_identity":"v0.13.0-99"},
+    "last_flash":{"file":"usb/sda1/KE.BIN","ok":true}}})");
+  auto v = mcu_status_view(st);
+  ASSERT_EQ(v.running, std::string("custom firmware (v0.13.0-99)"));
+  ASSERT_EQ(v.ownership, std::string("you (custom firmware)"));
+  ASSERT_EQ(v.last, std::string("KE.BIN, installed"));
+  auto n = mcu_status_view(json::parse(R"({"result":{"managed":true,"guard":null,"last_flash":null}})"));
+  ASSERT_EQ(n.running, std::string("not checked yet this boot"));
+  ASSERT_EQ(n.last, std::string(""));
+  ASSERT_EQ(mcu_status_view(json()).running, std::string("unknown (no answer)"));
+}
+
+TEST(Mcu, flash_result) {
+  auto ok = mcu_flash_result(json::parse(R"({"result":{"result":"FLASHED","native":false}})"));
+  ASSERT_TRUE(ok.ok);
+  ASSERT_EQ(ok.title, std::string("Firmware installed"));
+  auto busy = mcu_flash_result({{"error", {{"message", "PRINTING: not possible while a print is active"}}}});
+  ASSERT_FALSE(busy.ok);
+  ASSERT_EQ(busy.title, std::string("Not installed"));
+  auto bad = mcu_flash_result({{"error", {{"message", "INVALID_FIRMWARE: too small for MCU firmware (100 bytes)"}}}});
+  ASSERT_EQ(bad.text, std::string("This file cannot be installed: too small for MCU firmware (100 bytes). Nothing was changed."));
+  auto failed = mcu_flash_result({{"error", {{"message", "FLASH_FAILED: Could not enter bootloader: timeout"}}}});
+  ASSERT_EQ(failed.title, std::string("Install failed"));
+  ASSERT_TRUE(failed.text.find("Could not enter bootloader: timeout") == 0);
+  auto gave_up = mcu_flash_result({{"error", {{"message", "TIMEOUT: no answer from the printer"}}}});
+  ASSERT_EQ(gave_up.title, std::string("No answer"));
+  ASSERT_EQ(gave_up.text, std::string("no answer from the printer."));
 }
 
 int main() {

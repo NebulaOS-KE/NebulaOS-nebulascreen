@@ -171,8 +171,9 @@ void dismiss_confirms() {
   open_confirms.clear();
 }
 
-void confirm(const char *title, const char *text, const char *confirm_label,
-             Tone tone, const std::function<void()> &on_confirm) {
+// Overlay + centered box with a title and a wrapped text; returns the box.
+static lv_obj_t *dialog_box(const char *title, const char *text, lv_obj_t **overlay_out,
+                            lv_obj_t **text_out) {
   lv_obj_t *overlay = lv_obj_create(lv_layer_top());
   KUtils::style_dialog_overlay(overlay);
   lv_obj_set_style_bg_color(overlay, lv_color_black(), 0);
@@ -194,6 +195,16 @@ void confirm(const char *title, const char *text, const char *confirm_label,
   lv_label_set_long_mode(msg, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_font(msg, &lv_font_montserrat_12, 0);
   lv_label_set_text(msg, text);
+  *overlay_out = overlay;
+  if (text_out != NULL) *text_out = msg;
+  return box;
+}
+
+// Cancel (when `cancel_label` is set) and a confirm button in `tone`.
+static void choice(const char *title, const char *text, const char *cancel_label,
+                   const char *confirm_label, Tone tone, const std::function<void()> &on_confirm) {
+  lv_obj_t *overlay;
+  lv_obj_t *box = dialog_box(title, text, &overlay, NULL);
 
   lv_obj_t *btns = lv_obj_create(box);
   lv_obj_set_size(btns, LV_PCT(100), LV_SIZE_CONTENT);
@@ -206,8 +217,9 @@ void confirm(const char *title, const char *text, const char *confirm_label,
 
   auto *ctx = new ConfirmCtx{overlay, on_confirm};
   open_confirms.insert(ctx);
-  const char *labels[] = {"Cancel", confirm_label};
+  const char *labels[] = {cancel_label, confirm_label};
   for (int i = 0; i < 2; ++i) {
+    if (labels[i] == NULL) continue;
     lv_obj_t *b = lv_btn_create(btns);
     lv_obj_set_size(b, LV_PCT(44), 40);
     lv_obj_t *l = lv_label_create(b);
@@ -222,6 +234,28 @@ void confirm(const char *title, const char *text, const char *confirm_label,
     }
     lv_obj_add_event_cb(b, confirm_clicked, LV_EVENT_CLICKED, ctx);
   }
+}
+
+void confirm(const char *title, const char *text, const char *confirm_label,
+             Tone tone, const std::function<void()> &on_confirm) {
+  choice(title, text, "Cancel", confirm_label, tone, on_confirm);
+}
+
+void notice(const char *title, const char *text) {
+  choice(title, text, NULL, "OK", Tone::Normal, std::function<void()>());
+}
+
+lv_obj_t *busy(const char *title, const char *text) {
+  lv_obj_t *overlay;
+  lv_obj_t *label;
+  dialog_box(title, text, &overlay, &label);
+  return label;
+}
+
+void close_busy(lv_obj_t *label) {
+  if (label == NULL) return;
+  // label -> box -> overlay
+  lv_obj_del_async(lv_obj_get_parent(lv_obj_get_parent(label)));
 }
 
 }  // namespace SettingsUi

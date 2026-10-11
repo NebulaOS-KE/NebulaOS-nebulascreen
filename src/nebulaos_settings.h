@@ -26,6 +26,11 @@ extern const char *const WIFI_FORGET_METHOD;     // machine.nebulaos.wifi.forget
 extern const char *const UPDATE_STATUS_METHOD;   // machine.update.status
 extern const char *const UPDATE_REFRESH_METHOD;  // machine.update.refresh
 extern const char *const UPDATE_UPGRADE_METHOD;  // machine.update.upgrade {"name"} (none = all)
+extern const char *const HOSTNAME_METHOD;        // machine.nebulaos.network.hostname {"hostname"}
+extern const char *const SERVICE_RESTART_METHOD; // machine.services.restart {"service"}
+extern const char *const MCU_STATUS_METHOD;      // machine.nebulaos.mcu.status
+extern const char *const MCU_FILES_METHOD;       // machine.nebulaos.mcu.files
+extern const char *const MCU_FLASH_METHOD;       // machine.nebulaos.mcu.flash {"file","sha256"}
 
 // -- Connections ------------------------------------------------------------------
 
@@ -33,6 +38,7 @@ struct ConnectionsView {
   std::string wifi;       // "Office (connected)" / "not connected"
   std::string address;    // "192.168.0.98 (DHCP)" / "-"
   std::string name;       // "nebulaos.local"
+  std::string hostname;   // "nebulaos" ("" when unknown)
   std::string mainsail;   // "http://192.168.0.98" / ""
   std::string moonraker;  // "192.168.0.98:7125" / ""
   std::string spoolman;   // the configured server, "" when not configured
@@ -88,5 +94,67 @@ struct UpdateRow {
 std::vector<UpdateRow> update_rows(const json &status_reply);
 bool updates_busy(const json &status_reply);
 std::string update_label(const std::string &name);
+
+// -- Printer name (run 4) -------------------------------------------------------------
+// Mirrors nebulaos_osconfig.network.validate_hostname: 1-63 characters a-z,
+// 0-9 and '-', not starting/ending with '-', not all digits, not "localhost".
+// Upper case is accepted and lowered, as the helper does.
+
+struct HostnameCheck {
+  bool ok = false;        // valid AND different from the current name
+  std::string name;       // normalised (trimmed, lower case)
+  std::string message;    // for the screen
+};
+
+HostnameCheck hostname_check(const std::string &input, const std::string &current);
+json hostname_params(const std::string &name);
+// After a successful rename: does mDNS need a Moonraker restart?
+bool hostname_restart_needed(const json &reply);
+json moonraker_restart_params();
+// A message for a failed rename or restart; "" when the call worked.
+std::string hostname_error_text(const json &reply);
+
+// -- MCU firmware (run 4) ----------------------------------------------------------------
+// machine.nebulaos.mcu.* (nebulaos_osconfig/mcu.py).
+
+struct McuFile {
+  std::string id;         // "upload/klipper.bin", "usb/sda1/KE.BIN", "builtin/..."
+  std::string name;
+  std::string source;     // "upload" | "usb" | "builtin"
+  std::string sha256;
+  long size = 0;
+  bool valid = false;
+  bool native = false;    // byte-identical to the built-in NebulaOS firmware
+  std::string kind;       // "packed" | "raw"
+  std::string problem;
+  std::string detail;     // one line for the list
+};
+
+struct McuFiles {
+  std::vector<McuFile> files;  // uploads, then USB
+  bool has_builtin = false;
+  McuFile builtin;
+  bool usb_present = false;
+};
+
+McuFiles mcu_files(const json &files_reply);
+
+struct McuStatusView {
+  std::string running;    // "NebulaOS firmware" / "custom firmware" / ...
+  std::string ownership;  // "Auto-restore on" / "Custom firmware, auto-restore off"
+  std::string last;       // "Last install: x.bin, OK" / ""
+};
+
+McuStatusView mcu_status_view(const json &status_reply);
+json mcu_flash_params(const McuFile &f);
+std::string mcu_confirm_text(const McuFile &f);
+// Result for the screen after machine.nebulaos.mcu.flash returned.
+struct McuFlashResult {
+  bool ok = false;
+  std::string title;
+  std::string text;
+};
+McuFlashResult mcu_flash_result(const json &reply);
+std::string human_size(long bytes);
 
 #endif // __NEBULAOS_SETTINGS_H__

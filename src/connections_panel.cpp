@@ -14,6 +14,7 @@ ConnectionsPanel::ConnectionsPanel(KWebSocketClient &c, std::mutex &lock, Spoolm
   , lv_lock(lock)
   , spoolman_panel(sm)
   , wifi_panel(c, lock)
+  , hostname_panel(c, lock)
   , cont(SettingsUi::page("Connections", &body))
   , back_btn(cont, &back, "Back", &ConnectionsPanel::_handle_callback, this)
 {
@@ -21,6 +22,16 @@ ConnectionsPanel::ConnectionsPanel(KWebSocketClient &c, std::mutex &lock, Spoolm
   wifi_value = SettingsUi::info_line(left, "Wi-Fi");
   address_value = SettingsUi::info_line(left, "Address");
   name_value = SettingsUi::info_line(left, "Name");
+  // Rename: a small button at the end of the Name line.
+  rename_btn = lv_btn_create(lv_obj_get_parent(name_value));
+  lv_obj_set_size(rename_btn, 64, 24);
+  lv_obj_t *rl = lv_label_create(rename_btn);
+  lv_label_set_text(rl, "Change");
+  lv_obj_set_style_text_font(rl, &lv_font_montserrat_12, 0);
+  lv_obj_center(rl);
+  lv_obj_add_event_cb(rename_btn, &ConnectionsPanel::_handle_callback, LV_EVENT_CLICKED, this);
+  lv_obj_set_flex_align(lv_obj_get_parent(name_value), LV_FLEX_ALIGN_START,
+                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   SettingsUi::divider(left);
   mainsail_value = SettingsUi::info_line(left, "Mainsail");
   moonraker_value = SettingsUi::info_line(left, "Moonraker");
@@ -71,6 +82,8 @@ void ConnectionsPanel::show(const json &net, const json &cfg) {
   lv_label_set_text(wifi_value, v.wifi.c_str());
   lv_label_set_text(address_value, v.address.c_str());
   lv_label_set_text(name_value, v.name.c_str());
+  hostname = v.hostname;
+  address = v.address == "-" ? "" : v.address.substr(0, v.address.find(' '));
   lv_label_set_text(mainsail_value, v.mainsail.empty() ? "-" : v.mainsail.c_str());
   lv_label_set_text(moonraker_value, v.moonraker.empty() ? "-" : v.moonraker.c_str());
   lv_label_set_text(spoolman_value, v.spoolman.empty() ? "not configured" : v.spoolman.c_str());
@@ -99,6 +112,8 @@ void ConnectionsPanel::handle_callback(lv_event_t *e) {
     lv_obj_move_background(cont);
   } else if (obj == wifi_btn) {
     wifi_panel.foreground();
+  } else if (obj == rename_btn) {
+    hostname_panel.foreground(hostname, address);
   } else if (obj == printers_btn) {
     printer_select_panel.foreground();
   } else if (obj == spoolman_btn) {
