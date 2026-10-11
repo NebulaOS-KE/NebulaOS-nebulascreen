@@ -14,6 +14,16 @@ static std::map<std::string, int> goal_idx_map = {
   {"autoswitch", 3 }
 };
 
+// S4 (2026-10-11): the Ender-3 V3 KE's own motors, pre-selected for steppers
+// that have no [autotune_tmc] section yet (decision D8, from OpenKE's tuning:
+// X/Y creality-42-34 performance, Z creality-42-40 silent). Only a preselection
+// on screen - nothing is written until Save. The extruder motor is unknown.
+static const std::map<std::string, std::pair<std::string, std::string>> ke_motor_defaults = {
+  {"stepper_x", {"creality-42-34", "performance"}},
+  {"stepper_y", {"creality-42-34", "performance"}},
+  {"stepper_z", {"creality-42-40", "silent"}},
+};
+
 static std::map<std::string, std::pair<int16_t, int16_t>> tmc_sg_range = {
   {"tmc2130", { -64, 63 } },
   {"tmc2209", { 0, 255 } },
@@ -308,7 +318,17 @@ void TmcTunePanel::init(json &j, fs::path &kp) {
     } else {
       spdlog::debug("did not find tuned config for stepper {}", s);
       int16_t sg_value = sg_range.first == 0 ? 80 : 1; // sg4 default 80, sgt default 1
-      steppers.push_back(std::make_shared<AutoTmcContainer>(motors, stepper_name, 0, 0,
+      int midx = 0;
+      int goal_idx = 0;
+      const auto &def = ke_motor_defaults.find(stepper_name);
+      if (def != ke_motor_defaults.end()) {
+        const auto &m = motor_index.find(def->second.first);
+        if (m != motor_index.end()) {
+          midx = m->second;
+          goal_idx = goal_idx_map[def->second.second];
+        }
+      }
+      steppers.push_back(std::make_shared<AutoTmcContainer>(motors, stepper_name, midx, goal_idx,
 							    has_virtual_endstop, sg_value, sg_range,
 							    controls_cont));
     }
