@@ -35,6 +35,28 @@ UpdatesPanel::UpdatesPanel(KWebSocketClient &c, std::mutex &lock)
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
   lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+
+  // G6: Moonraker's own progress lines while an update runs. They arrive on
+  // the websocket thread. When Moonraker updates itself it restarts, the
+  // upgrade reply never comes, and the "complete" line (or the next status,
+  // see show()) is what ends the busy state.
+  ws.register_method_callback("notify_update_response", "UpdatesPanel", [this](json &n) {
+    auto p = update_progress(n);
+    if (!p.valid) {
+      return;
+    }
+    std::lock_guard<std::mutex> lock(lv_lock);
+    if (p.complete) {
+      set_busy("");
+      lv_label_set_text(status_label, p.text.c_str());
+      ws.send_jsonrpc(UPDATE_STATUS_METHOD, json::object(), [this](json &status) {
+        std::lock_guard<std::mutex> lock(lv_lock);
+        show(status);
+      });
+    } else if (busy) {
+      lv_label_set_text(status_label, p.text.c_str());
+    }
+  });
 }
 
 UpdatesPanel::~UpdatesPanel() {
@@ -46,6 +68,8 @@ UpdatesPanel::~UpdatesPanel() {
 
 void UpdatesPanel::foreground() {
   lv_obj_move_foreground(cont);
+  // A reply lost to a Moonraker restart must not keep the page busy forever.
+  waiting_for_reply = false;
   refresh(false);
   ws.send_jsonrpc(SYSTEM_INFO_METHOD, json::object(), [this](json &reply) {
     auto info = system_info(reply);
@@ -142,6 +166,10 @@ void UpdatesPanel::show(const json &status_reply) {
   }
   if (updates_busy(status_reply)) {
     set_busy("An update is running...");
+  } else if (busy && !waiting_for_reply) {
+    // Moonraker restarted during its own update: no update runs any more.
+    set_busy("");
+    lv_label_set_text(status_label, "Update finished.");
   } else if (!busy) {
     lv_label_set_text(status_label, available ? "" : (rows.empty() ? "" : "Everything is up to date."));
   }
@@ -168,10 +196,12 @@ void UpdatesPanel::upgrade(const std::string &name, const std::string &label) {
       set_busy("Updating " + (name.empty() ? std::string("everything") : label) +
                "... (the screen reconnects if Moonraker restarts)");
       json params = name.empty() ? json::object() : json{{"name", name}};
+      waiting_for_reply = true;
       ws.send_jsonrpc(UPDATE_UPGRADE_METHOD, params, [this](json &reply) {
         auto err = jsonrpc_error_message(reply);
         {
           std::lock_guard<std::mutex> lock(lv_lock);
+          waiting_for_reply = false;
           set_busy("");
           lv_label_set_text(status_label, err.empty() ? "Update finished."
                                                       : ("Update failed: " + err).c_str());

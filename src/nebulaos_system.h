@@ -25,6 +25,7 @@ extern const char *const BOOT_DISPLAY_RESET_METHOD;   // machine.nebulaos.boot_d
 // reboot cannot be started (S2/S3).
 extern const char *const CLEAN_RESET_METHOD;          // machine.nebulaos.system.clean_reset
 extern const char *const SWAP_SLOT_METHOD;            // machine.nebulaos.system.swap_slot
+extern const char *const ACK_CLEAN_RESET_METHOD;      // machine.nebulaos.system.ack_clean_reset
 
 struct SystemInfo {
   bool ok = false;
@@ -34,6 +35,12 @@ struct SystemInfo {
 
 // From a machine.nebulaos.info JSON-RPC reply.
 SystemInfo system_info(const json &reply);
+
+// G2: true once after a clean NebulaOS reset (info "after_clean_reset"), until
+// the screen acknowledges it with ACK_CLEAN_RESET_METHOD.
+bool after_clean_reset(const json &info_reply);
+extern const char *const AFTER_RESET_TITLE;
+extern const char *const AFTER_RESET_TEXT;
 
 // "12.3 GB" / "512 MB" style.
 std::string human_bytes(double bytes);

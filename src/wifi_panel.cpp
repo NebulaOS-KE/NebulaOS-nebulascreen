@@ -163,7 +163,7 @@ void WifiPanel::show_scan(const json &reply) {
   if (!busy && !entering_password) {
     show_prompt(cur_network.empty()
       ? std::string("Please select your Wi-Fi network")
-      : "Connected to " + cur_network + "\nIP: " + (cur_address.empty() ? "-" : cur_address));
+      : "Connected to\n" + cur_network + "\nIP: " + (cur_address.empty() ? "-" : cur_address));
   }
   if (!entering_password) {
     rebuild_wifi_rows();
@@ -360,10 +360,9 @@ void WifiPanel::connect(const std::string &ssid, const std::string &password) {
     lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
     auto err = wifi_error_text(reply);
     if (err.empty()) {
-      std::string ip;
-      auto p = "/result/address"_json_pointer;
-      if (reply.contains(p) && reply[p].is_string()) ip = reply[p].template get<std::string>();
-      show_prompt("Connected to " + ssid + "\nIP: " + (ip.empty() ? "waiting for an address" : ip));
+      // G5: also says when a static address does not fit the new network.
+      bool address_ok = true;
+      show_prompt(wifi_connected_text(reply, ssid, &address_ok));
     } else {
       show_prompt(err);
     }

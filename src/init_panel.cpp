@@ -1,4 +1,6 @@
 #include "init_panel.h"
+#include "nebulaos_system.h"
+#include "settings_ui.h"
 #include "utils.h"
 #include "state.h"
 #include "config.h"
@@ -67,6 +69,19 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	};
 	ws.send_jsonrpc("server.database.get_item", h,
 			[](json& j) { State::get_instance()->set_data("guppysettings", j, "/result/value"); });	
+
+	// G2: once after a clean NebulaOS reset, say that Wi-Fi has to be
+	// connected again, then tell NebulaOS the notice was shown.
+	ws.send_jsonrpc(SYSTEM_INFO_METHOD, json::object(), [this, &ws](json &j) {
+	  if (!after_clean_reset(j)) {
+	    return;
+	  }
+	  {
+	    std::lock_guard<std::mutex> lock(this->lv_lock);
+	    SettingsUi::notice(AFTER_RESET_TITLE, AFTER_RESET_TEXT);
+	  }
+	  ws.send_jsonrpc(ACK_CLEAN_RESET_METHOD, json::object(), [](json &) {});
+	});
 
 	// console
 	this->main_panel.subscribe();

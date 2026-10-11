@@ -91,6 +91,15 @@ TEST(Logs, tail_starts_at_a_line) {
   ASSERT_EQ(tail_text("line one\nline two\nline three\n", 15), std::string("line three\n"));
 }
 
+TEST(Info, after_clean_reset) {
+  ASSERT_FALSE(after_clean_reset(info_reply()));
+  json j = info_reply();
+  j["result"]["after_clean_reset"] = "2026-10-12T01:00:00Z";
+  ASSERT_TRUE(after_clean_reset(j));
+  j["result"]["after_clean_reset"] = nullptr;
+  ASSERT_FALSE(after_clean_reset(j));
+}
+
 int main() {
   return minitest::run_all("nebulaos_system") > 0 ? 1 : 0;
 }

@@ -76,6 +76,9 @@ bool wifi_needs_password(const WifiNetwork &n);
 // A message for the screen from a failed Wi-Fi call; "" when the call worked.
 std::string wifi_error_text(const json &reply);
 json wifi_connect_params(const std::string &ssid, const std::string &password);
+// The status text after a successful connect: the address, or why the address
+// does not work on this network (static IP, G5). `ok` is false in that case.
+std::string wifi_connected_text(const json &reply, const std::string &ssid, bool *ok);
 
 // -- Updates ------------------------------------------------------------------------
 
@@ -93,6 +96,14 @@ struct UpdateRow {
 // updates the OS as a whole image.
 std::vector<UpdateRow> update_rows(const json &status_reply);
 bool updates_busy(const json &status_reply);
+// One notify_update_response notification (params[0] {application, message,
+// complete}): the line for the screen and whether the update has finished (G6).
+struct UpdateProgress {
+  bool valid = false;
+  bool complete = false;
+  std::string text;
+};
+UpdateProgress update_progress(const json &notification);
 std::string update_label(const std::string &name);
 
 // -- Printer name (run 4) -------------------------------------------------------------
@@ -127,7 +138,10 @@ struct McuFile {
   bool native = false;    // byte-identical to the built-in NebulaOS firmware
   std::string kind;       // "packed" | "raw"
   std::string problem;
+  std::string klipper_version;  // from the firmware's data dictionary, "" if unknown
+  std::string version_note;     // warning when the Klipper release differs (G32)
   std::string detail;     // one line for the list
+  bool warn = false;      // show the detail line in orange
 };
 
 struct McuFiles {

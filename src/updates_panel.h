@@ -51,6 +51,7 @@ class UpdatesPanel {
   std::vector<UpdateRow> rows;
   std::vector<lv_obj_t *> row_btns;
   bool busy = false;
+  bool waiting_for_reply = false;  // an upgrade request is still open
 };
 
 #endif // __UPDATES_PANEL_H__

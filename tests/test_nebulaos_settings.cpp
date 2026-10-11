@@ -243,6 +243,55 @@ TEST(Mcu, flash_result) {
   ASSERT_EQ(gave_up.text, std::string("no answer from the printer."));
 }
 
+TEST(Wifi, connected_text) {
+  bool ok = false;
+  json dhcp = json::parse(R"({"result":{"result":"CONNECTED","ssid":"Office_2.4Ghz",
+    "address":"192.168.0.98","address_mode":"dhcp","address_ok":true,"address_note":null}})");
+  ASSERT_EQ(wifi_connected_text(dhcp, "Office_2.4Ghz", &ok),
+            std::string("Connected to\nOffice_2.4Ghz\nIP: 192.168.0.98"));
+  ASSERT_TRUE(ok);
+  json bad = json::parse(R"({"result":{"result":"CONNECTED","address":"10.0.0.5",
+    "address_mode":"static","address_ok":false,
+    "address_note":"the static address 10.0.0.5 does not work on this network"}})");
+  std::string t = wifi_connected_text(bad, "Cafe", &ok);
+  ASSERT_FALSE(ok);
+  ASSERT_TRUE(t.find("does not work on this network") != std::string::npos);
+  // Older NebulaOS without address_ok: treated as fine.
+  json old = json::parse(R"({"result":{"result":"CONNECTED","address":null}})");
+  ASSERT_TRUE(wifi_connected_text(old, "X", &ok).find("waiting for an address") != std::string::npos);
+  ASSERT_TRUE(ok);
+}
+
+TEST(Updates, progress) {
+  json n = json::parse(R"({"jsonrpc":"2.0","method":"notify_update_response","params":[
+    {"application":"moonraker","proc_id":1,"message":"Updating Repo...\nGit Repo moonraker: Fetching\n","complete":false}]})");
+  auto p = update_progress(n);
+  ASSERT_TRUE(p.valid);
+  ASSERT_FALSE(p.complete);
+  ASSERT_EQ(p.text, std::string("Moonraker: Git Repo moonraker: Fetching"));
+  json done = json::parse(R"({"params":[{"application":"klipper","message":"","complete":true}]})");
+  p = update_progress(done);
+  ASSERT_TRUE(p.valid && p.complete);
+  ASSERT_EQ(p.text, std::string("Klipper: done"));
+  ASSERT_FALSE(update_progress(json::object()).valid);
+}
+
+TEST(Mcu, version_shown_and_warned) {
+  json files = json::parse(R"({"result":{"files":[
+    {"id":"usb/sda1/old.bin","name":"old.bin","source":"usb","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "size":39000,"valid":true,"kind":"packed","native":false,"klipper_version":"v0.12.0-300-gbeef",
+     "version_note":"built from Klipper v0.12.0, NebulaOS uses v0.13.0 - Klipper will probably not connect"},
+    {"id":"upload/new.bin","name":"new.bin","source":"upload","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "size":39000,"valid":true,"kind":"raw","native":false,"klipper_version":"v0.13.0-1-gdead","version_note":null}]}})");
+  auto m = mcu_files(files);
+  ASSERT_EQ(m.files.size(), (size_t)2);
+  ASSERT_TRUE(m.files[0].valid && m.files[0].warn);
+  ASSERT_TRUE(m.files[0].detail.find("Klipper v0.12.0-300-gbeef") != std::string::npos);
+  ASSERT_TRUE(mcu_confirm_text(m.files[0]).find("Warning: built from Klipper v0.12.0") != std::string::npos);
+  ASSERT_FALSE(m.files[1].warn);
+  ASSERT_TRUE(mcu_confirm_text(m.files[1]).find("Built from Klipper v0.13.0-1-gdead.") != std::string::npos);
+}
+
 int main() {
   return minitest::run_all("nebulaos_settings") > 0 ? 1 : 0;
 }

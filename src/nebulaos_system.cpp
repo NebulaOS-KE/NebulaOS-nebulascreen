@@ -11,6 +11,11 @@ const char *const BOOT_DISPLAY_IMAGE_METHOD = "machine.nebulaos.boot_display.ima
 const char *const BOOT_DISPLAY_RESET_METHOD = "machine.nebulaos.boot_display.reset_image";
 const char *const CLEAN_RESET_METHOD = "machine.nebulaos.system.clean_reset";
 const char *const SWAP_SLOT_METHOD = "machine.nebulaos.system.swap_slot";
+const char *const ACK_CLEAN_RESET_METHOD = "machine.nebulaos.system.ack_clean_reset";
+const char *const AFTER_RESET_TITLE = "NebulaOS was reset";
+const char *const AFTER_RESET_TEXT =
+  "Everything is back to how NebulaOS ships it, including Wi-Fi.\n\n"
+  "Connect to Wi-Fi under Settings > Connections > Wi-Fi networks.";
 // Console was removed (D10): NebulaOS reads a saved "console" as logo.
 const char *const BOOT_MODE_OPTIONS = "Logo\nBlank";
 
@@ -79,6 +84,10 @@ SystemInfo system_info(const json &reply) {
   }
   s.text = text;
   return s;
+}
+
+bool after_clean_reset(const json &info_reply) {
+  return !str_at(result_of(info_reply), "/after_clean_reset"_json_pointer).empty();
 }
 
 std::string boot_mode_at(int index) {

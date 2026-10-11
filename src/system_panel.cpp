@@ -61,22 +61,12 @@ SystemPanel::SystemPanel(KWebSocketClient &c, std::mutex &lock)
   logs_btn = SettingsUi::icon_button(right, &logs_img, "Logs", &SystemPanel::_handle_callback, this);
   restart_gui_btn = SettingsUi::icon_button(right, &refresh_img, "Restart GUI",
                                             &SystemPanel::_handle_callback, this);
-  // Reboot and Shut down side by side, clear of the Back button below.
-  lv_obj_t *power_row = lv_obj_create(right);
-  lv_obj_set_size(power_row, LV_PCT(100), LV_SIZE_CONTENT);
-  lv_obj_set_style_pad_all(power_row, 0, 0);
-  lv_obj_set_style_pad_column(power_row, 6, 0);
-  lv_obj_set_style_border_width(power_row, 0, 0);
-  lv_obj_set_style_bg_opa(power_row, LV_OPA_TRANSP, 0);
-  lv_obj_clear_flag(power_row, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_flex_flow(power_row, LV_FLEX_FLOW_ROW);
-  reboot_btn = SettingsUi::icon_button(power_row, &refresh_img, "Reboot", &SystemPanel::_handle_callback, this);
-  shutdown_btn = SettingsUi::icon_button(power_row, &power_img, "Shut down", &SystemPanel::_handle_callback, this);
-  for (lv_obj_t *b : {reboot_btn, shutdown_btn}) {
-    lv_obj_set_width(b, 0);
-    lv_obj_set_flex_grow(b, 1);
-    lv_obj_set_height(b, 48);
-    lv_obj_set_style_text_font(lv_obj_get_child(b, 1), &lv_font_montserrat_10, 0);
+  // Four full-width buttons, 34 px high, so the column ends above the Back
+  // button and "Shut down" fits on one line (G9).
+  reboot_btn = SettingsUi::icon_button(right, &refresh_img, "Reboot", &SystemPanel::_handle_callback, this);
+  shutdown_btn = SettingsUi::icon_button(right, &power_img, "Shut down", &SystemPanel::_handle_callback, this);
+  for (lv_obj_t *b : {logs_btn, restart_gui_btn, reboot_btn, shutdown_btn}) {
+    lv_obj_set_height(b, 34);
   }
   SettingsUi::set_tone(shutdown_btn, SettingsUi::Tone::Danger);
 

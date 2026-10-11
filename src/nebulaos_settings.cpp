@@ -155,6 +155,20 @@ json wifi_connect_params(const std::string &ssid, const std::string &password) {
   return {{"ssid", ssid}, {"password", password}};
 }
 
+std::string wifi_connected_text(const json &reply, const std::string &ssid, bool *ok) {
+  const json &r = result_of(reply);
+  std::string ip = str_at(r, "/address"_json_pointer);
+  std::string note = str_at(r, "/address_note"_json_pointer);
+  bool good = bool_at(r, "/address_ok"_json_pointer, true);
+  if (ok != nullptr) *ok = good;
+  // The network name on its own line: long names wrap cleanly (G9).
+  std::string text = "Connected to\n" + ssid + "\n";
+  if (!good) {
+    return text + (note.empty() ? std::string("The address does not work on this network.") : note);
+  }
+  return text + "IP: " + (ip.empty() ? std::string("waiting for an address") : ip);
+}
+
 // -- Updates ------------------------------------------------------------------------
 
 std::string update_label(const std::string &name) {
@@ -208,6 +222,27 @@ std::vector<UpdateRow> update_rows(const json &status_reply) {
     return a.label < b.label;
   });
   return rows;
+}
+
+UpdateProgress update_progress(const json &notification) {
+  UpdateProgress p;
+  auto ptr = "/params/0"_json_pointer;
+  if (!notification.is_object() || !notification.contains(ptr) || !notification[ptr].is_object()) {
+    return p;
+  }
+  const json &n = notification[ptr];
+  std::string app = str_at(n, "/application"_json_pointer);
+  std::string msg = str_at(n, "/message"_json_pointer);
+  p.complete = bool_at(n, "/complete"_json_pointer, false);
+  // Moonraker sends multi-line git output; the last non-empty line is enough.
+  auto end = msg.find_last_not_of(" \n\r");
+  msg = end == std::string::npos ? "" : msg.substr(0, end + 1);
+  auto nl = msg.rfind('\n');
+  if (nl != std::string::npos) msg = msg.substr(nl + 1);
+  if (msg.size() > 90) msg = msg.substr(0, 87) + "...";
+  p.valid = !msg.empty() || p.complete;
+  p.text = (app.empty() ? "" : update_label(app) + ": ") + (msg.empty() ? "done" : msg);
+  return p;
 }
 
 bool updates_busy(const json &status_reply) {
@@ -331,6 +366,8 @@ static McuFile mcu_file(const json &f) {
   if (f.contains("size") && f["size"].is_number_integer()) m.size = f["size"].template get<long>();
   m.valid = bool_at(f, "/valid"_json_pointer, false) && m.sha256.size() == 64;
   m.native = bool_at(f, "/native"_json_pointer, false);
+  m.klipper_version = str_at(f, "/klipper_version"_json_pointer);
+  m.version_note = str_at(f, "/version_note"_json_pointer);
   std::string where = m.source == "usb" ? "USB" : (m.source == "upload" ? "Uploaded" : "Built in");
   std::string state;
   if (!m.valid) {
@@ -341,6 +378,13 @@ static McuFile mcu_file(const json &f) {
     state = m.kind == "raw" ? "ready (raw build, packed on install)" : "ready";
   }
   m.detail = where + "  -  " + human_size(m.size) + "  -  " + state;
+  if (m.valid && !m.klipper_version.empty()) {
+    m.detail += "  -  Klipper " + m.klipper_version;
+  }
+  if (m.valid && !m.version_note.empty()) {
+    m.detail += "\n" + m.version_note;
+  }
+  m.warn = !m.valid || !m.version_note.empty();
   return m;
 }
 
@@ -400,8 +444,15 @@ std::string mcu_confirm_text(const McuFile &f) {
   std::string text = "Install " + what + " on the printer's mainboard?\n\n"
     "Klipper stops for about a minute. Do not switch the printer off.";
   if (!f.native) {
-    text += " Firmware built from another Klipper version leaves Klipper unable to "
-            "connect - then reinstall the NebulaOS firmware here.";
+    if (!f.klipper_version.empty()) {
+      text += "\n\nBuilt from Klipper " + f.klipper_version + ".";
+    }
+    if (!f.version_note.empty()) {
+      text += "\nWarning: " + f.version_note + ".";
+    } else {
+      text += " Firmware built from another Klipper version leaves Klipper unable to "
+              "connect - then reinstall the NebulaOS firmware here.";
+    }
   }
   return text;
 }

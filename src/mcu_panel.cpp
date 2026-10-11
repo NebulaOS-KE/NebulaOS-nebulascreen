@@ -124,8 +124,8 @@ void McuPanel::show_files(const json &files_reply) {
     lv_label_set_long_mode(detail, LV_LABEL_LONG_WRAP);
     lv_label_set_text(detail, f.detail.c_str());
     lv_obj_set_style_text_font(detail, &lv_font_montserrat_10, 0);
-    lv_obj_set_style_text_color(detail, f.valid ? lv_palette_lighten(LV_PALETTE_GREY, 1)
-                                                : lv_palette_main(LV_PALETTE_ORANGE), 0);
+    lv_obj_set_style_text_color(detail, f.warn ? lv_palette_main(LV_PALETTE_ORANGE)
+                                               : lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
     if (f.valid) {
       lv_obj_t *b = lv_btn_create(row);
       lv_obj_set_size(b, 66, 28);
@@ -243,12 +243,15 @@ void McuPanel::sim_fill() {
       "sha256":")" + c + R"(","native":true,"size":40048,"valid":true,"kind":"packed"},
     "files":[
       {"id":"upload/klipper.bin","source":"upload","name":"klipper.bin","size":40112,
-       "valid":true,"kind":"raw","sha256":")" + a + R"(","native":false},
+       "valid":true,"kind":"raw","sha256":")" + a + R"(","native":false,
+       "klipper_version":"v0.13.0-118-g1a2b3c4d"},
       {"id":"upload/printer.cfg.bin","source":"upload","name":"printer.cfg.bin","size":4096,
        "valid":false,"sha256":")" + b + R"(","native":false,
        "problem":"not firmware for this printer's mainboard: no Creality header and no NebulaOS placeholder at 0x200"},
       {"id":"usb/sda1/firmware/ke-klipper-v0.13.bin","source":"usb","name":"firmware/ke-klipper-v0.13.bin",
-       "size":40210,"valid":true,"kind":"packed","sha256":")" + a + R"(","native":false}]}})"));
+       "size":40210,"valid":true,"kind":"packed","sha256":")" + a + R"(","native":false,
+       "klipper_version":"v0.12.0-301-gbeef0011",
+       "version_note":"built from Klipper v0.12.0, NebulaOS uses v0.13.0: Klipper will probably not connect"}]}})"));
 }
 
 void McuPanel::sim_install(size_t index) {
