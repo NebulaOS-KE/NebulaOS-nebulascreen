@@ -1,75 +1,46 @@
 #include "setting_panel.h"
-#include "config.h"
-#include "utils.h"
 #include "spdlog/spdlog.h"
 
-#include <experimental/filesystem>
-
-namespace fs = std::experimental::filesystem;
-
 LV_IMG_DECLARE(network_img);
-LV_IMG_DECLARE(refresh_img);
-LV_IMG_DECLARE(spoolman_img);
-
-#ifdef ZBOLT
-LV_IMG_DECLARE(info_img);
-#else
-LV_IMG_DECLARE(sysinfo_img);
-#endif
-
+LV_IMG_DECLARE(display_img);
 LV_IMG_DECLARE(print);
-LV_IMG_DECLARE(power_devices_img);
+LV_IMG_DECLARE(sysinfo_img);
+LV_IMG_DECLARE(update_img);
+LV_IMG_DECLARE(reset_img);
 
 SettingPanel::SettingPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, SpoolmanPanel &sm)
   : ws(c)
   , lv_lock(l)
   , cont(lv_obj_create(parent))
-#ifndef OS_ANDROID
-  , wifi_panel(c, l)
-#endif
-  , sysinfo_panel(c, l)
-  , spoolman_panel(sm)
+  , connections_panel(c, l, sm)
+  , display_panel(c, l)
+  , printer_panel(c, l)
   , system_panel(c, l)
-  , wifi_btn(cont, &network_img, "WIFI", &SettingPanel::_handle_callback, this)
-  , restart_klipper_btn(cont, &refresh_img, "Restart\nKlipper", &SettingPanel::_handle_callback, this)
-  , restart_firmware_btn(cont, &refresh_img, "Restart\nFirmware", &SettingPanel::_handle_callback, this)
-#ifdef ZBOLT
-  , sysinfo_btn(cont, &info_img, "System", &SettingPanel::_handle_callback, this)
-#else
-  , sysinfo_btn(cont, &sysinfo_img, "System", &SettingPanel::_handle_callback, this)
-#endif
-  , spoolman_btn(cont, &spoolman_img, "Spoolman", &SettingPanel::_handle_callback, this)
-  , guppy_restart_btn(cont, &refresh_img, "Restart\nGuppy", &SettingPanel::_handle_callback, this)
-  , system_btn(cont, &power_devices_img, "Power &\nSystem", &SettingPanel::_handle_callback, this)
-  , printer_select_btn(cont, &print, "Printers", &SettingPanel::_handle_callback, this)
+  , updates_panel(c, l)
+  , reset_panel(c, l)
+  , connections_btn(cont, &network_img, "Connections", &SettingPanel::_handle_callback, this)
+  , display_btn(cont, &display_img, "Display", &SettingPanel::_handle_callback, this)
+  , printer_btn(cont, &print, "Printer", &SettingPanel::_handle_callback, this)
+  , system_btn(cont, &sysinfo_img, "System", &SettingPanel::_handle_callback, this)
+  , updates_btn(cont, &update_img, "Updates", &SettingPanel::_handle_callback, this)
+  , reset_btn(cont, &reset_img, "Reset", &SettingPanel::_handle_callback, this)
 {
   lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
 
-  spoolman_btn.disable();
-#ifdef OS_ANDROID
-  wifi_btn.disable();
-#endif
-
-  static lv_coord_t grid_main_row_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(5), LV_GRID_FR(5), LV_GRID_FR(1),
+  static lv_coord_t rows[] = {LV_GRID_FR(1), LV_GRID_FR(5), LV_GRID_FR(5), LV_GRID_FR(1),
     LV_GRID_TEMPLATE_LAST};
-  static lv_coord_t grid_main_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1),
+  static lv_coord_t cols[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1),
     LV_GRID_TEMPLATE_LAST};
+  lv_obj_set_grid_dsc_array(cont, cols, rows);
+  lv_obj_set_style_pad_column(cont, 14, 0);
 
-  lv_obj_set_grid_dsc_array(cont, grid_main_col_dsc, grid_main_row_dsc);
-
-  // row 1
-  lv_obj_set_grid_cell(restart_klipper_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(restart_firmware_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(guppy_restart_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(system_btn.get_container(), LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-
-  // row 2
-  lv_obj_set_grid_cell(wifi_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-  lv_obj_set_grid_cell(printer_select_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-  lv_obj_set_grid_cell(spoolman_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-  lv_obj_set_grid_cell(sysinfo_btn.get_container(), LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-
+  ButtonContainer *tiles[] = {&connections_btn, &display_btn, &printer_btn,
+                              &system_btn, &updates_btn, &reset_btn};
+  for (int i = 0; i < 6; ++i) {
+    lv_obj_set_grid_cell(tiles[i]->get_container(), LV_GRID_ALIGN_STRETCH, i % 3, 1,
+                         LV_GRID_ALIGN_STRETCH, 1 + i / 3, 1);
+  }
 }
 
 SettingPanel::~SettingPanel() {
@@ -83,53 +54,77 @@ lv_obj_t *SettingPanel::get_container() {
   return cont;
 }
 
-void SettingPanel::handle_callback(lv_event_t *event) {
-  if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
-    lv_obj_t *btn = lv_event_get_current_target(event);
+void SettingPanel::enable_spoolman() {
+  connections_panel.enable_spoolman();
+}
 
-    if (btn == wifi_btn.get_container()) {
-      spdlog::trace("wifi pressed");
-#ifndef OS_ANDROID
-      wifi_panel.foreground();
-#endif
-    } else if (btn == sysinfo_btn.get_container()) {
-      spdlog::trace("setting system info pressed");
-      sysinfo_panel.foreground();
-    } else if (btn == restart_klipper_btn.get_container()) {
-      spdlog::trace("setting restart klipper pressed");
-      ws.send_jsonrpc("printer.restart");
-    } else if (btn == restart_firmware_btn.get_container()) {
-      spdlog::trace("setting restart klipper pressed");
-      ws.send_jsonrpc("printer.firmware_restart");
-    } else if (btn == spoolman_btn.get_container()) {
-      spdlog::trace("setting spoolman pressed");
-      spoolman_panel.foreground();
-    } else if (btn == guppy_restart_btn.get_container()) {
-      spdlog::trace("restart guppy pressed");
-      // Through Moonraker (GUI_BACKEND=MOONRAKER_ONLY): its supervisorctl shim
-      // runs /etc/init.d/S58guppyscreen restart; NebulaOS allows the service in
-      // moonraker.asvc. On success this process is stopped and restarted.
-      json params = {{"service", "guppyscreen"}};
-      ws.send_jsonrpc("machine.services.restart", params, [this](json &reply) {
-        if (!reply.contains("error")) {
-          return;
-        }
-        auto msg = reply["/error/message"_json_pointer].is_string()
-          ? reply["/error/message"_json_pointer].template get<std::string>()
-          : reply["error"].dump();
-        spdlog::warn("Restart Guppy Screen failed: {}", msg);
-        std::lock_guard<std::mutex> lock(lv_lock);
-        KUtils::notify_toast("Restart failed: " + msg, 5000);
-      });
-    } else if (btn == system_btn.get_container()) {
-      system_panel.foreground();
-    } else if (btn == printer_select_btn.get_container()) {
-      spdlog::trace("setting printers pressed");
-      printer_select_panel.foreground();
-    }
+void SettingPanel::handle_callback(lv_event_t *event) {
+  if (lv_event_get_code(event) != LV_EVENT_CLICKED) {
+    return;
+  }
+  lv_obj_t *btn = lv_event_get_current_target(event);
+  if (btn == connections_btn.get_container()) {
+    connections_panel.foreground();
+  } else if (btn == display_btn.get_container()) {
+    display_panel.foreground();
+  } else if (btn == printer_btn.get_container()) {
+    printer_panel.foreground();
+  } else if (btn == system_btn.get_container()) {
+    system_panel.foreground();
+  } else if (btn == updates_btn.get_container()) {
+    updates_panel.foreground();
+  } else if (btn == reset_btn.get_container()) {
+    reset_panel.foreground();
   }
 }
 
-void SettingPanel::enable_spoolman() {
-  spoolman_btn.enable();
+#ifdef SIMULATOR
+#include "settings_ui.h"
+#include <cstdlib>
+#include <functional>
+#include <string>
+#include <vector>
+
+void sim_screenshot(const char *path);  // main.cpp
+
+struct SimTour {
+  std::string dir;
+  std::vector<std::pair<std::string, std::function<void()>>> steps;
+  size_t next = 0;
+  bool shoot = false;
+};
+
+void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
+  auto *t = new SimTour();
+  t->dir = dir;
+  auto close_dialogs = []() { SettingsUi::dismiss_confirms(); };
+  t->steps = {
+    {"01-settings", [home]() { lv_obj_move_foreground(home); }},
+    {"02-connections", [this]() { connections_panel.foreground(); connections_panel.sim_fill(); }},
+    {"03-wifi", [this]() { connections_panel.sim_wifi(); }},
+    {"04-display", [this]() { display_panel.foreground(); display_panel.sim_fill(); }},
+    {"05-printer", [this]() { printer_panel.foreground(); }},
+    {"06-system", [this]() { system_panel.foreground(); system_panel.sim_fill(); }},
+    {"07-updates", [this]() { updates_panel.foreground(); updates_panel.sim_fill(); }},
+    {"08-reset", [this]() { reset_panel.foreground(); }},
+    {"09-clean-reset-confirm", [this]() { reset_panel.sim_tap(2); }},
+    {"10-swap-confirm", [this, close_dialogs]() { close_dialogs(); reset_panel.sim_tap(3); }},
+    {"11-reboot-confirm", [this, close_dialogs]() {
+      close_dialogs(); system_panel.foreground(); system_panel.sim_fill(); system_panel.sim_tap_reboot(); }},
+  };
+  lv_timer_create([](lv_timer_t *timer) {
+    auto *t = (SimTour *)timer->user_data;
+    if (t->shoot) {
+      std::string path = t->dir + "/" + t->steps[t->next].first + ".ppm";
+      sim_screenshot(path.c_str());
+      t->shoot = false;
+      if (++t->next >= t->steps.size()) {
+        exit(0);
+      }
+      return;
+    }
+    t->steps[t->next].second();
+    t->shoot = true;
+  }, 600, t);
 }
+#endif

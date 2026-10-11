@@ -40,10 +40,13 @@ FilamentRunoutPanel::FilamentRunoutPanel(KWebSocketClient &websocket_client, std
 
 #ifdef SIMULATOR
   // no printer in the sim: pop the dialog once so it can be inspected
-  lv_timer_t *t = lv_timer_create([](lv_timer_t *tm) {
-    ((FilamentRunoutPanel *)tm->user_data)->sim_show();
-  }, 3000, this);
-  lv_timer_set_repeat_count(t, 1);
+  // (not during the settings screenshot tour, GUPPY_SIM_SHOTS)
+  if (getenv("GUPPY_SIM_SHOTS") == NULL) {
+    lv_timer_t *t = lv_timer_create([](lv_timer_t *tm) {
+      ((FilamentRunoutPanel *)tm->user_data)->sim_show();
+    }, 3000, this);
+    lv_timer_set_repeat_count(t, 1);
+  }
 #endif
 }
 

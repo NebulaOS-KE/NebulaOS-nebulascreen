@@ -35,9 +35,12 @@ NotificationManager::NotificationManager(KWebSocketClient &websocket_client, std
 #ifdef SIMULATOR
   // no printer in the sim - periodically re-show a demo of each severity so the
   // overlay can be inspected. (The info toast auto-dismisses; this re-adds it.)
-  lv_timer_create([](lv_timer_t *t) {
-    ((NotificationManager *)t->user_data)->sim_demo();
-  }, 6000, this);
+  // Not during the settings screenshot tour (GUPPY_SIM_SHOTS).
+  if (getenv("GUPPY_SIM_SHOTS") == NULL) {
+    lv_timer_create([](lv_timer_t *t) {
+      ((NotificationManager *)t->user_data)->sim_demo();
+    }, 6000, this);
+  }
 #endif
 }
 

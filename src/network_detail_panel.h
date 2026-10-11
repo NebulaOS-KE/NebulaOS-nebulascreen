@@ -11,10 +11,9 @@
 // Reached by tapping the currently-connected row in WifiPanel. Replaces the
 // old pencil-icon-in-a-table-cell pattern (a hidden, undiscoverable feature
 // whose icon meaning silently changed only for the connected row) with two
-// plainly-labelled buttons. Read-only: it never talks to wpa_supplicant or
-// the static-ip backend itself, only reports taps back to WifiPanel via the
+// plainly-labelled buttons. Read-only: it never talks to NebulaOS itself, only reports taps back to WifiPanel via the
 // callbacks handed to the constructor - WifiPanel already owns the
-// WpaEvent/StaticIpPanel plumbing those actions need.
+// StaticIpPanel plumbing those actions need.
 class NetworkDetailPanel {
 public:
   NetworkDetailPanel(std::mutex &l,

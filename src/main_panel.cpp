@@ -422,6 +422,14 @@ void MainPanel::enable_spoolman() {
 #include "config.h"
 
 void MainPanel::sim_setup_mock_data() {
+  /* GUPPY_SIM_SHOTS=<dir>: open the Settings tab and save a screenshot of
+   * every settings page into <dir>, then exit (headless with
+   * SDL_VIDEODRIVER=offscreen). No mock print, prompts or notifications. */
+  if (const char *shots = getenv("GUPPY_SIM_SHOTS")) {
+    lv_tabview_set_act(tabview, lv_obj_get_index(setting_tab), LV_ANIM_OFF);
+    setting_panel.sim_tour(shots, tabview);
+    return;
+  }
   Config *conf = Config::get_instance();
   json &user_sensors = conf->get_json(conf->df() + "monitored_sensors");
   if (user_sensors.is_null()) {
@@ -623,10 +631,7 @@ void MainPanel::sim_setup_mock_data() {
   spoolman_panel.sim_setup_mock_data();
   spoolman_panel.foreground();
 
-  /* Top-most: the System settings panel, so the new brightness slider is the
-   * first thing visible in the sim. Press Back to step back through the stack:
-   * sysinfo → spoolman → extruder → home. */
-  setting_panel.get_sysinfo_panel().foreground();
+
 
   /* Faster timer (300ms) gives a denser live chart since SIMULATOR mode
    * bypasses the 1s throttle in SensorContainer::update_series. */

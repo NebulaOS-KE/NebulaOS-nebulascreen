@@ -1,22 +1,21 @@
 #ifndef __SETTING_PANEL_H__
 #define __SETTING_PANEL_H__
 
-#include "platform.h"
-
-#ifndef OS_ANDROID
-#include "wifi_panel.h"
-#endif
-
-#include "sysinfo_panel.h"
-#include "spoolman_panel.h"
-#include "printer_select_panel.h"
-#include "system_panel.h"
 #include "button_container.h"
+#include "connections_panel.h"
+#include "display_panel.h"
+#include "printer_settings_panel.h"
+#include "reset_panel.h"
+#include "spoolman_panel.h"
+#include "system_panel.h"
+#include "updates_panel.h"
 #include "websocket_client.h"
 #include "lvgl/lvgl.h"
 
 #include <mutex>
 
+// Settings home (S1, 2026-10-11): six tiles, each opening one page -
+// Connections, Display, Printer, System, Updates, Reset.
 class SettingPanel {
  public:
   SettingPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, SpoolmanPanel &sm);
@@ -24,7 +23,6 @@ class SettingPanel {
 
   lv_obj_t *get_container();
   void enable_spoolman();
-  SysInfoPanel &get_sysinfo_panel() { return sysinfo_panel; }
 
   void handle_callback(lv_event_t *event);
 
@@ -33,31 +31,30 @@ class SettingPanel {
     panel->handle_callback(event);
   };
 
+#ifdef SIMULATOR
+  // Screenshot tour of every settings page (GUPPY_SIM_SHOTS=<dir>); exits
+  // the simulator when done. `home` is what to raise for the home screenshot.
+  void sim_tour(const char *dir, lv_obj_t *home);
+#endif
+
  private:
   KWebSocketClient &ws;
   std::mutex &lv_lock;
   lv_obj_t *cont;
 
-#ifndef OS_ANDROID
-  WifiPanel wifi_panel;
-#endif
-
-  SysInfoPanel sysinfo_panel;
-  SpoolmanPanel &spoolman_panel;
-  PrinterSelectPanel printer_select_panel;
+  ConnectionsPanel connections_panel;
+  DisplayPanel display_panel;
+  PrinterSettingsPanel printer_panel;
   SystemPanel system_panel;
-  ButtonContainer wifi_btn;
-  ButtonContainer restart_klipper_btn;
-  ButtonContainer restart_firmware_btn;
-  ButtonContainer sysinfo_btn;
-  ButtonContainer spoolman_btn;
-  ButtonContainer guppy_restart_btn;
-  // "Power & System" (D9) - took the place of "Update Guppy", which NebulaOS
-  // never supported (GuppyScreen updates with the firmware image).
+  UpdatesPanel updates_panel;
+  ResetPanel reset_panel;
+
+  ButtonContainer connections_btn;
+  ButtonContainer display_btn;
+  ButtonContainer printer_btn;
   ButtonContainer system_btn;
-  ButtonContainer printer_select_btn;
-  
+  ButtonContainer updates_btn;
+  ButtonContainer reset_btn;
 };
 
 #endif // __SETTING_PANEL_H__
-

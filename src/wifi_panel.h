@@ -1,20 +1,24 @@
 #ifndef __WIFI_PANEL_H__
 #define __WIFI_PANEL_H__
 
-#include "wpa_event.h"
 #include "button_container.h"
+#include "nebulaos_settings.h"
+#include "websocket_client.h"
 #include "static_ip_panel.h"
 #include "network_detail_panel.h"
 #include "wifi_row_item.h"
 #include "lvgl/lvgl.h"
 #include <mutex>
 
-#include <atomic>
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
+// Wi-Fi networks (Q3, 2026-10-11): every Wi-Fi action goes through NebulaOS -
+// machine.nebulaos.wifi.scan / connect / forget - instead of wpa_supplicant's
+// socket. NebulaOS saves a new network only once it connected, and puts the
+// previous one back after a wrong password or a timeout.
 class WifiPanel {
 public:
   WifiPanel(KWebSocketClient &ws, std::mutex &l);
@@ -23,13 +27,13 @@ public:
 
   void foreground();
   void handle_back_btn(lv_event_t *event);
-  void handle_wpa_event(const std::string &events);
+#ifdef SIMULATOR
+  void sim_fill();
+#endif
   void confirm_remove_network(const std::string &ssid, const std::string &nid);
   void handle_kb_input(lv_event_t *e);
   void handle_eye_btn(lv_event_t *e);
-  void wait_for_connectivity(const std::string &iface, const std::string &net, uint32_t gen);
-  void connect(const char *);
-  bool find_current_network();
+  void connect(const std::string &ssid, const std::string &password);
 
   // WifiRowItem calls this when its row is tapped: connects/reconnects for
   // an ordinary row, or opens NetworkDetailPanel if the row is the network
@@ -37,7 +41,7 @@ public:
   void handle_row_activated(const std::string &ssid);
 
   // NetworkDetailPanel's two buttons call back into here - it owns the
-  // WpaEvent connection and the StaticIpPanel instance those actions need.
+  // StaticIpPanel instance those actions need.
   void open_static_ip_for_current();
   void forget_current_network();
 
@@ -59,9 +63,12 @@ public:
 
 private:
   void rebuild_wifi_rows();
+  void scan();
+  void show_scan(const json &reply);   // LVGL lock held
+  void show_prompt(const std::string &text);
 
+  KWebSocketClient &ws;
   std::mutex &lv_lock;
-  WpaEvent wpa_event;
   lv_obj_t *cont;
   lv_obj_t *spinner;
   lv_obj_t *top_cont;
@@ -76,26 +83,15 @@ private:
   lv_obj_t *kb;
   std::string selected_network;
   std::string cur_network;
-  std::string pending_remove_nid;
-  std::map<std::string, std::string> list_networks;
-
-  // Everything the list needs to know about one SSID seen in a scan.
-  // "missed" is how many consecutive scans it's been absent from - lets
-  // rebuild_wifi_rows age a network out gradually instead of dropping it the
-  // instant a single noisy scan misses it.
-  struct WifiEntry {
-    int signal = -100;
-    bool secured = false;
-    int missed = 0;
-  };
-  std::map<std::string, WifiEntry> wifi_name_db;
+  std::string cur_address;
+  std::string pending_remove_ssid;
+  std::vector<WifiNetwork> networks;
   std::vector<std::unique_ptr<WifiRowItem>> wifi_rows;
 
   bool entering_password = false;
   bool pw_visible = false;
-  int rescan_budget = 0;
-  size_t last_scan_count = 0;
-  std::atomic<uint32_t> conn_gen{0};
+  bool busy = false;          // a connect or forget is running
+  int rescans_left = 0;
   StaticIpPanel static_ip_panel;
   NetworkDetailPanel network_detail_panel;
 

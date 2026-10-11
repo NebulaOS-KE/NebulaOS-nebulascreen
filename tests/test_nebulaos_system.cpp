@@ -50,11 +50,18 @@ TEST(Bytes, human) {
 
 TEST(BootMode, index_and_value) {
   ASSERT_EQ(boot_mode_index(boot_status("blank", "builtin")), 1);
-  ASSERT_EQ(boot_mode_index(boot_status("console", "builtin")), 2);
+  ASSERT_EQ(boot_mode_index(boot_status("console", "builtin")), 0);  // retired (D10): logo
   ASSERT_EQ(boot_mode_index(json()), 0);
   ASSERT_EQ(boot_mode_at(0), std::string("logo"));
-  ASSERT_EQ(boot_mode_at(2), std::string("console"));
-  ASSERT_EQ(boot_mode_at(3), std::string(""));
+  ASSERT_EQ(boot_mode_at(1), std::string("blank"));
+  ASSERT_EQ(boot_mode_at(2), std::string(""));
+  ASSERT_EQ(std::string(BOOT_MODE_OPTIONS), std::string("Logo\nBlank"));
+}
+
+TEST(Info, slot) {
+  json j = info_reply();
+  j["result"]["slot"] = "B";
+  ASSERT_TRUE(system_info(j).text.find("(2026-10-10), slot B") != std::string::npos);
 }
 
 TEST(BootImage, list_filters_and_sorts) {

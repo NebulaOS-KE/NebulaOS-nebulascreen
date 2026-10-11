@@ -8,10 +8,11 @@
 
 using json = nlohmann::json;
 
-// Pure, LVGL-free logic for the "Power & System" and Logs screens (decision D9,
-// 2026-10-10): system info and storage from machine.nebulaos.info, boot screen
-// mode/image from machine.nebulaos.boot_display.status and the nebulaos_boot
-// file root, and log files from the logs root (Moonraker server.files.list).
+// Pure, LVGL-free logic for the System, Display and Logs screens (decision D9,
+// 2026-10-10; settings layout S1, 2026-10-11): system info and storage from
+// machine.nebulaos.info, boot screen mode/image from
+// machine.nebulaos.boot_display.status and the nebulaos_boot file root, and log
+// files from the logs root (Moonraker server.files.list).
 //
 // This file may be distributed under the terms of the GNU GPLv3 license.
 
@@ -20,6 +21,10 @@ extern const char *const BOOT_DISPLAY_STATUS_METHOD;  // machine.nebulaos.boot_d
 extern const char *const BOOT_DISPLAY_MODE_METHOD;    // machine.nebulaos.boot_display.mode {"mode"}
 extern const char *const BOOT_DISPLAY_IMAGE_METHOD;   // machine.nebulaos.boot_display.image {"filename"}
 extern const char *const BOOT_DISPLAY_RESET_METHOD;   // machine.nebulaos.boot_display.reset_image
+// Both refuse while printing, reboot at once, and undo themselves when the
+// reboot cannot be started (S2/S3).
+extern const char *const CLEAN_RESET_METHOD;          // machine.nebulaos.system.clean_reset
+extern const char *const SWAP_SLOT_METHOD;            // machine.nebulaos.system.swap_slot
 
 struct SystemInfo {
   bool ok = false;
@@ -33,9 +38,9 @@ SystemInfo system_info(const json &reply);
 // "12.3 GB" / "512 MB" style.
 std::string human_bytes(double bytes);
 
-// Boot screen mode dropdown: fixed order logo, blank, console.
-extern const char *const BOOT_MODE_OPTIONS;   // "Logo\nBlank\nConsole"
-std::string boot_mode_at(int index);          // "logo" | "blank" | "console" | ""
+// Boot screen mode dropdown: fixed order logo, blank.
+extern const char *const BOOT_MODE_OPTIONS;   // "Logo\nBlank"
+std::string boot_mode_at(int index);          // "logo" | "blank" | ""
 int boot_mode_index(const json &status_reply); // index of config.mode (default 0)
 
 // Boot image dropdown: "Built-in" first, then uploaded PNG/BMP files (sorted).

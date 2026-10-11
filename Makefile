@@ -23,7 +23,7 @@ WARNINGS		:= -Wall -Wextra -Wno-unused-function -Wno-error=strict-prototypes -Wp
 					-Wno-missing-field-initializers -Wtype-limits -Wsizeof-pointer-memaccess -Wno-format-nonliteral -Wpointer-arith -Wno-cast-qual \
 					-Wunreachable-code -Wno-switch-default -Wreturn-type -Wmultichar -Wformat-security -Wno-sign-compare
 CFLAGS 			?= -O3 -g0 -MD -MP -I$(LVGL_DIR)/ $(WARNINGS) 
-LDFLAGS 		?= -static -lm -Llibhv/lib -Lspdlog/build -l:libhv.a -latomic -lpthread -Lwpa_supplicant/wpa_supplicant/ -l:libwpa_client.a -lstdc++fs -l:libspdlog.a
+LDFLAGS 		?= -static -lm -Llibhv/lib -Lspdlog/build -l:libhv.a -latomic -lpthread -lstdc++fs -l:libspdlog.a
 BIN 			= guppyscreen
 BUILD_DIR 		= ./build
 BUILD_OBJ_DIR 	= $(BUILD_DIR)/obj
@@ -34,7 +34,7 @@ prefix 			?= /usr
 bindir 			?= $(prefix)/bin
 
 #Collect the files to compile
-MAINSRC = 		$(filter-out $(LVGL_DIR)/src/kd_graphic_mode.cpp, $(wildcard $(LVGL_DIR)/src/*.cpp))
+MAINSRC = 		$(wildcard $(LVGL_DIR)/src/*.cpp)
 
 include $(LVGL_DIR)/lvgl/lvgl.mk
 include $(LVGL_DIR)/lv_drivers/lv_drivers.mk
@@ -54,12 +54,7 @@ DEFINES			+= -D GUPPY_ROTATE
 endif
 
 
-ifeq ($(GUPPY_THEME),zbolt)
-CSRCS 			+= $(wildcard $(LVGL_DIR)/assets/zbolt/*.c)
-DEFINES			+= -D ZBOLT
-else
 CSRCS 			+= $(wildcard $(LVGL_DIR)/assets/$(ASSET_DIR)/*.c)
-endif
 
 ifdef GUPPYSCREEN_VERSION
 DEFINES			+= -D GUPPYSCREEN_VERSION="\"${GUPPYSCREEN_VERSION}\""
@@ -76,7 +71,7 @@ DEPS                    = $(addprefix $(BUILD_OBJ_DIR)/, $(patsubst %.o, %.d, $(
 OBJS 			= $(AOBJS) $(COBJS) $(MAINOBJ)
 TARGET 			= $(addprefix $(BUILD_OBJ_DIR)/, $(patsubst ./%, %, $(OBJS)))
 
-INC 				:= -I./ -I./lvgl/ -I./lv_touch_calibration -I./spdlog/include -Ilibhv/include -Iwpa_supplicant/src/common
+INC 				:= -I./ -I./lvgl/ -I./lv_touch_calibration -I./spdlog/include -Ilibhv/include
 LDLIBS	 			:= -lm
 
 DEFINES				+= -D _GNU_SOURCE -DSPDLOG_COMPILED_LIB
@@ -106,16 +101,19 @@ libspdlog.a:
 	@cmake -B $(SPDLOG_DIR)/build -S $(SPDLOG_DIR)/ -DCMAKE_CXX_COMPILER=$(CXX)
 	$(MAKE) -C $(SPDLOG_DIR)/build -j$(nproc)
 
+# Wi-Fi goes through NebulaOS (machine.nebulaos.wifi.*) since 2026-10-11; the
+# wpa_supplicant client library is no longer linked. Kept as a no-op so older
+# firmware build scripts that still call it keep working.
 wpaclient:
-	$(MAKE) -C wpa_supplicant/wpa_supplicant -j$(nproc) libwpa_client.a
+	@true
 
 ## Offline, host-native pure-logic test binaries (2026-08-06) - no LVGL, no SDL2, no
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## the matching tests/test_*.cpp.
-.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system
+.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings
 
-test: test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system
+test: test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings
 
 # 2026-08-06 crash-fix regression test: Config::init()/ThemeConfig::init()
 # must fall back to defaults, never crash, when a stat()-present file fails
@@ -164,6 +162,13 @@ test-nebulaos-system: libhv.a
 		-o build/test_nebulaos_system
 	./build/test_nebulaos_system
 
+# Connections, Wi-Fi and Updates screen logic (src/nebulaos_settings.cpp).
+test-nebulaos-settings: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		src/nebulaos_settings.cpp tests/test_nebulaos_settings.cpp \
+		-o build/test_nebulaos_settings
+	./build/test_nebulaos_settings
+
 # GuppyScreen action -> NebulaOS macro mapping (src/nebulaos_macros.cpp).
 test-nebulaos-macros:
 	g++ -std=c++17 -Wall -Wextra -I. \
@@ -194,14 +199,6 @@ $(BUILD_OBJ_DIR)/%.o: %.c
 	@$(COMPILE_CC)  $(CFLAGS) -c $< -o $@
 	@echo "CC $<"
 
-$(BUILD_OBJ_DIR)/kd_graphic_mode.o: src/kd_graphic_mode.cpp
-	@mkdir -p $(dir $@)
-	@$(COMPILE_CC)  $(CFLAGS) -c $< -o $@
-	@echo "CC $<"
-
-kd_graphic_mode: $(BUILD_OBJ_DIR)/kd_graphic_mode.o
-	$(CC) -o $(BUILD_BIN_DIR)/kd_graphic_mode $(BUILD_OBJ_DIR)/kd_graphic_mode.o
-
 default: $(TARGET)
 	@mkdir -p $(dir $(BUILD_BIN_DIR)/)
 	$(CXX) -o $(BUILD_BIN_DIR)/$(BIN) $(TARGET) $(LDFLAGS) $(LDLIBS)
@@ -212,9 +209,6 @@ spdlogclean:
 
 libhvclean:
 	$(MAKE) -C libhv clean
-
-wpaclean:
-	$(MAKE) -C wpa_supplicant/wpa_supplicant clean
 
 clean:
 	rm -rf $(BUILD_DIR)
@@ -227,8 +221,6 @@ uninstall:
 	$(RM) -r $(addprefix $(DESTDIR)$(bindir)/,$(BIN))
 
 build:
-	$(MAKE) wpaclean
-	$(MAKE) wpaclient
 	$(MAKE) libhvclean
 	$(MAKE) libhv.a
 	$(MAKE) spdlogclean

@@ -150,6 +150,36 @@ static void hal_init(lv_color_t primary, lv_color_t secondary) {
 
 #else // SIMULATOR
 
+// A copy of everything flushed, so the screenshot tour (GUPPY_SIM_SHOTS) can
+// save what the screen shows without a window system.
+static lv_color_t sim_frame[MONITOR_HOR_RES * MONITOR_VER_RES];
+
+static void sim_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p) {
+  lv_coord_t w = lv_area_get_width(area);
+  for (lv_coord_t y = area->y1; y <= area->y2; y++) {
+    if (y < 0 || y >= MONITOR_VER_RES) continue;
+    for (lv_coord_t x = area->x1; x <= area->x2; x++) {
+      if (x < 0 || x >= MONITOR_HOR_RES) continue;
+      sim_frame[y * MONITOR_HOR_RES + x] = color_p[(y - area->y1) * w + (x - area->x1)];
+    }
+  }
+  sdl_display_flush(drv, area, color_p);
+}
+
+// Binary PPM of the last frame.
+void sim_screenshot(const char *path) {
+  FILE *f = fopen(path, "wb");
+  if (f == NULL) return;
+  fprintf(f, "P6\n%d %d\n255\n", MONITOR_HOR_RES, MONITOR_VER_RES);
+  for (int i = 0; i < MONITOR_HOR_RES * MONITOR_VER_RES; i++) {
+    uint32_t c = lv_color_to32(sim_frame[i]);
+    unsigned char px[3] = {(unsigned char)((c >> 16) & 0xff), (unsigned char)((c >> 8) & 0xff),
+                           (unsigned char)(c & 0xff)};
+    fwrite(px, 1, 3, f);
+  }
+  fclose(f);
+}
+
 /**
  * Initialize the Hardware Abstraction Layer (HAL) for the LVGL graphics
  * library
@@ -173,7 +203,7 @@ static void hal_init(lv_color_t primary, lv_color_t secondary)
   static lv_disp_drv_t disp_drv;
   lv_disp_drv_init(&disp_drv); /*Basic initialization*/
   disp_drv.draw_buf = &disp_buf1;
-  disp_drv.flush_cb = sdl_display_flush;
+  disp_drv.flush_cb = sim_flush;
   spdlog::debug("resolution {} x {}", MONITOR_VER_RES, MONITOR_HOR_RES);
   disp_drv.hor_res = MONITOR_HOR_RES;
   disp_drv.ver_res = MONITOR_VER_RES;

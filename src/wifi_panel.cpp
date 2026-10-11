@@ -1,20 +1,18 @@
 #include "wifi_panel.h"
+#include "nebulaos_display.h"
 #include "utils.h"
 #include "config.h"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
-#include <sstream>
-#include <iostream>
 #include <vector>
 #include <utility>
-#include <thread>
-#include <chrono>
 
 LV_IMG_DECLARE(back);
 
-WifiPanel::WifiPanel(KWebSocketClient &ws, std::mutex &l)
-  : lv_lock(l)
+WifiPanel::WifiPanel(KWebSocketClient &c, std::mutex &l)
+  : ws(c)
+  , lv_lock(l)
   , cont(lv_obj_create(lv_scr_act()))
   , spinner(lv_spinner_create(cont, 1000, 60))
   , top_cont(lv_obj_create(cont))
@@ -27,7 +25,7 @@ WifiPanel::WifiPanel(KWebSocketClient &ws, std::mutex &l)
   , eye_btn(lv_btn_create(pw_row))
   , back_btn(cont, &back, "Back", &WifiPanel::_handle_back_btn, this)
   , kb(lv_keyboard_create(cont))
-  , static_ip_panel(ws, l)
+  , static_ip_panel(c, l)
   , network_detail_panel(l,
       [this]() { open_static_ip_for_current(); },
       [this]() { forget_current_network(); })
@@ -112,11 +110,6 @@ WifiPanel::WifiPanel(KWebSocketClient &ws, std::mutex &l)
 
   lv_obj_move_background(cont);
   lv_obj_move_foreground(spinner);
-
-  wpa_event.register_callback("WifiPanel",
-    [this](const std::string &event) { this->handle_wpa_event(event); });
-
-  wpa_event.start();
 }
 
 WifiPanel::~WifiPanel() {
@@ -130,13 +123,52 @@ void WifiPanel::foreground() {
   spdlog::trace("wifi panel fg");
   lv_obj_move_foreground(cont);
   lv_obj_clear_flag(spinner, LV_OBJ_FLAG_HIDDEN);
-  rescan_budget = 4;
-  last_scan_count = 0;
-  std::string resp = wpa_event.send_command("SCAN");
-  if (resp.empty() || resp.find("FAIL") != std::string::npos) {
-    lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text(wifi_label, "Failed to start wifi scan.\nIs wpa_supplicant running?");
-    lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
+  show_prompt("Scanning for networks...");
+  // A second scan picks up access points that answered late.
+  rescans_left = 1;
+  scan();
+}
+
+void WifiPanel::show_prompt(const std::string &text) {
+  lv_label_set_text(wifi_label, text.c_str());
+  lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
+}
+
+// Called on the LVGL thread; the reply arrives on the websocket thread.
+void WifiPanel::scan() {
+  ws.send_jsonrpc(WIFI_SCAN_METHOD, json::object(), [this](json &reply) {
+    std::lock_guard<std::mutex> lock(lv_lock);
+    show_scan(reply);
+    if (rescans_left > 0 && jsonrpc_error_message(reply).empty()) {
+      rescans_left--;
+      scan();
+    }
+  });
+}
+
+void WifiPanel::show_scan(const json &reply) {
+  lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+  auto err = wifi_error_text(reply);
+  if (!err.empty()) {
+    if (!busy && !entering_password) {
+      show_prompt("Wi-Fi scan failed.\n" + err);
+    }
+    return;
+  }
+  networks = wifi_networks(reply);
+  auto current = wifi_current(reply);
+  cur_network = current.ssid;
+  cur_address = current.address;
+  if (!busy && !entering_password) {
+    show_prompt(cur_network.empty()
+      ? std::string("Please select your Wi-Fi network")
+      : "Connected to " + cur_network + "\nIP: " + (cur_address.empty() ? "-" : cur_address));
+  }
+  if (!entering_password) {
+    rebuild_wifi_rows();
+    lv_obj_scroll_to_y(wifi_list_cont, 0, LV_ANIM_OFF);
+    lv_obj_clear_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
   }
 }
 
@@ -154,21 +186,6 @@ void WifiPanel::rebuild_wifi_rows() {
   wifi_rows.clear();
   lv_obj_clean(wifi_list_cont);
 
-  std::vector<std::pair<std::string, WifiEntry>> known, other;
-  for (const auto &kv : wifi_name_db) {
-    if (list_networks.count(kv.first)) {
-      known.push_back(kv);
-    } else {
-      other.push_back(kv);
-    }
-  }
-  auto by_signal_desc = [](const std::pair<std::string, WifiEntry> &a,
-                            const std::pair<std::string, WifiEntry> &b) {
-    return a.second.signal > b.second.signal;
-  };
-  std::sort(known.begin(), known.end(), by_signal_desc);
-  std::sort(other.begin(), other.end(), by_signal_desc);
-
   auto make_group_label = [&](const char *text) {
     lv_obj_t *l = lv_label_create(wifi_list_cont);
     lv_label_set_text(l, text);
@@ -178,58 +195,56 @@ void WifiPanel::rebuild_wifi_rows() {
     lv_obj_set_style_pad_bottom(l, 2, 0);
     lv_obj_set_style_pad_left(l, 8, 0);
   };
-
-  if (!known.empty()) {
+  auto add_rows = [&](bool saved) {
+    for (const auto &n : networks) {
+      if (n.saved != saved || !wifi_supported(n)) continue;
+      // The forget button removes by name (the "nid" slot carries the SSID).
+      wifi_rows.push_back(std::make_unique<WifiRowItem>(
+        wifi_list_cont, n.ssid, n.signal, n.current, n.saved, n.ssid,
+        [this](const std::string &ssid) { handle_row_activated(ssid); },
+        [this](const std::string &ssid, const std::string &nid) { confirm_remove_network(ssid, nid); }));
+    }
+  };
+  bool any_saved = std::any_of(networks.begin(), networks.end(),
+    [](const WifiNetwork &n) { return n.saved && wifi_supported(n); });
+  bool any_other = std::any_of(networks.begin(), networks.end(),
+    [](const WifiNetwork &n) { return !n.saved && wifi_supported(n); });
+  if (any_saved) {
     make_group_label("KNOWN NETWORKS");
-    for (auto &kv : known) {
-      bool connected = (kv.first == cur_network);
-      auto nid_it = list_networks.find(kv.first);
-      std::string nid = nid_it != list_networks.end() ? nid_it->second : "";
-      wifi_rows.push_back(std::make_unique<WifiRowItem>(
-        wifi_list_cont, kv.first, kv.second.signal, connected, /*saved=*/true, nid,
-        [this](const std::string &ssid) { handle_row_activated(ssid); },
-        [this](const std::string &ssid, const std::string &nid) { confirm_remove_network(ssid, nid); }));
-    }
+    add_rows(true);
   }
-  if (!other.empty()) {
+  if (any_other) {
     make_group_label("OTHER NETWORKS IN RANGE");
-    for (auto &kv : other) {
-      wifi_rows.push_back(std::make_unique<WifiRowItem>(
-        wifi_list_cont, kv.first, kv.second.signal, /*connected=*/false, /*saved=*/false, "",
-        [this](const std::string &ssid) { handle_row_activated(ssid); },
-        [this](const std::string &ssid, const std::string &nid) { confirm_remove_network(ssid, nid); }));
-    }
+    add_rows(false);
   }
 }
 
 void WifiPanel::handle_row_activated(const std::string &ssid) {
+  if (busy) {
+    return;
+  }
+  auto it = std::find_if(networks.begin(), networks.end(),
+    [&ssid](const WifiNetwork &n) { return n.ssid == ssid; });
+  if (it == networks.end()) {
+    return;
+  }
   if (!cur_network.empty() && ssid == cur_network) {
-    auto it = wifi_name_db.find(ssid);
-    int signal = it != wifi_name_db.end() ? it->second.signal : -100;
-    bool secured = it != wifi_name_db.end() ? it->second.secured : true;
-    std::string signal_text = signal >= -50 ? "Excellent" : signal >= -60 ? "Good"
-                             : signal >= -70 ? "Fair" : "Weak";
-    std::string security_text = secured ? "Secured (WPA/WPA2)" : "Open (unsecured)";
-    auto ip = KUtils::interface_ip(KUtils::get_wifi_interface());
-    network_detail_panel.foreground(ssid, signal_text, security_text, ip);
+    std::string security_text = it->security == "open" ? "Open (unsecured)" : "Secured (WPA/WPA2)";
+    network_detail_panel.foreground(ssid, wifi_signal_text(it->signal), security_text,
+                                    cur_address.empty() ? "-" : cur_address);
     return;
   }
 
   selected_network = ssid;
-  if (list_networks.count(ssid)) {
-    auto nid = list_networks.find(ssid)->second;
-    lv_label_set_text(wifi_label, fmt::format("Connecting to {} ...", ssid).c_str());
-    lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
-    wpa_event.send_command(fmt::format("SELECT_NETWORK {}", nid));
-    wpa_event.send_command("SAVE_CONFIG");
-    wpa_event.send_command("REASSOCIATE");
+  if (!wifi_needs_password(*it)) {
+    connect(ssid, "");
   } else {
     entering_password = true;
     lv_label_set_text(wifi_label, fmt::format("Enter password for {}", ssid).c_str());
     lv_obj_clear_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
     lv_event_send(password_input, LV_EVENT_FOCUSED, NULL);
   }
-  lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
 }
 
 void WifiPanel::open_static_ip_for_current() {
@@ -239,9 +254,7 @@ void WifiPanel::open_static_ip_for_current() {
 
 void WifiPanel::forget_current_network() {
   if (cur_network.empty()) return;
-  auto it = list_networks.find(cur_network);
-  if (it == list_networks.end()) return;
-  confirm_remove_network(cur_network, it->second);
+  confirm_remove_network(cur_network, cur_network);
 }
 
 void WifiPanel::confirm_remove_network(const std::string &ssid, const std::string &nid) {
@@ -252,125 +265,27 @@ void WifiPanel::confirm_remove_network(const std::string &ssid, const std::strin
     lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(ev));
     auto *self = static_cast<WifiPanel *>(lv_event_get_user_data(ev));
     bool confirmed = lv_msgbox_get_active_btn(obj) == 0;
-    std::string nid = self->pending_remove_nid;
-    self->pending_remove_nid.clear();
+    std::string ssid = self->pending_remove_ssid;
+    self->pending_remove_ssid.clear();
     lv_msgbox_close(obj);
     if (!confirmed) return;
 
-    self->wpa_event.send_command(fmt::format("REMOVE_NETWORK {}", nid));
-    self->wpa_event.send_command("SAVE_CONFIG");
-    self->cur_network.clear();
-    self->selected_network.clear();
+    self->busy = true;
     self->network_detail_panel.hide();
-    lv_obj_add_flag(self->prompt_cont, LV_OBJ_FLAG_HIDDEN);
+    self->show_prompt("Forgetting " + ssid + "...");
     lv_obj_clear_flag(self->spinner, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(self->wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text(self->wifi_label, "Scanning for networks...");
-    self->wpa_event.send_command("SCAN");
+    self->ws.send_jsonrpc(WIFI_FORGET_METHOD, json{{"ssid", ssid}}, [self](json &reply) {
+      std::lock_guard<std::mutex> lock(self->lv_lock);
+      self->busy = false;
+      auto err = wifi_error_text(reply);
+      if (!err.empty()) {
+        self->show_prompt(err);
+      }
+      self->scan();
+    });
   }, LV_EVENT_VALUE_CHANGED, this);
-  pending_remove_nid = nid;
+  pending_remove_ssid = nid.empty() ? ssid : nid;
   KUtils::style_lock_mbox(mbox, 90);
-}
-
-void WifiPanel::handle_wpa_event(const std::string &event) {
-  if (entering_password) {
-    return;
-  }
-  if (event.rfind("<3>CTRL-EVENT-SCAN-RESULTS", 0) == 0) {
-    // result ready
-    spdlog::trace("got scan result event");
-    std::istringstream f(wpa_event.send_command("SCAN_RESULTS"));
-    std::string line;
-    // Networks actually reported by THIS scan - merged into wifi_name_db
-    // below rather than replacing it outright, and anything missing gets
-    // aged out gradually instead of vanishing after a single noisy scan.
-    std::map<std::string, WifiEntry> seen_this_scan;
-
-    bool found = find_current_network();
-    spdlog::trace("cur_network {}", cur_network);
-
-    std::lock_guard<std::mutex> lock(lv_lock);
-    if (!found) {
-      lv_label_set_text(wifi_label, "Please select your wifi network");
-    }
-    while (std::getline(f, line)) {
-      if (line.rfind("bss", 0) == 0) {
-        continue;
-      }
-
-      auto wifi_parts = KUtils::split(line, '\t');
-      spdlog::trace("wifi parts {}", fmt::join(wifi_parts, ", "));
-      if (wifi_parts.size() == 5) {
-        WifiEntry entry;
-        entry.signal = std::stoi(wifi_parts[2]);
-        entry.secured = wifi_parts[3].find("WPA") != std::string::npos
-                      || wifi_parts[3].find("WEP") != std::string::npos;
-        seen_this_scan[wifi_parts[4]] = entry;
-      }
-    }
-
-    for (const auto &kv : seen_this_scan) {
-      auto &e = wifi_name_db[kv.first];
-      e.signal = kv.second.signal;
-      e.secured = kv.second.secured;
-      e.missed = 0;
-    }
-    static constexpr int MAX_MISSED_SCANS = 3;
-    for (auto it = wifi_name_db.begin(); it != wifi_name_db.end();) {
-      if (seen_this_scan.count(it->first)) {
-        ++it;
-        continue;
-      }
-      if (++it->second.missed > MAX_MISSED_SCANS) {
-        it = wifi_name_db.erase(it);
-      } else {
-        ++it;
-      }
-    }
-
-    if (!cur_network.empty()) {
-      auto ip = KUtils::interface_ip(KUtils::get_wifi_interface());
-      lv_label_set_text(wifi_label, fmt::format("Connected to network {}\nIP: {}",
-        cur_network, ip).c_str());
-      lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
-    }
-
-    rebuild_wifi_rows();
-    lv_obj_scroll_to_y(wifi_list_cont, 0, LV_ANIM_OFF);
-    lv_obj_clear_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
-
-    size_t current_count = wifi_name_db.size();
-    bool grew = current_count > last_scan_count;
-    last_scan_count = current_count;
-    if (grew && rescan_budget > 0) {
-      rescan_budget--;
-      wpa_event.send_command("SCAN");
-    }
-  } else if (event.rfind("<3>CTRL-EVENT-CONNECTED", 0) == 0) {
-    if (find_current_network()) {
-      spdlog::trace("cur_network {}", cur_network);
-      std::lock_guard<std::mutex> lock(lv_lock);
-
-      lv_label_set_text(wifi_label,
-        fmt::format("Connected to {}\nGetting IP...", cur_network).c_str());
-      lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
-
-      rebuild_wifi_rows();
-      lv_obj_scroll_to_y(wifi_list_cont, 0, LV_ANIM_OFF);
-      lv_obj_clear_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
-
-      auto iface = KUtils::get_wifi_interface();
-      auto net = cur_network;
-      uint32_t gen = ++conn_gen;
-      std::thread([this, iface, net, gen]() {
-        wait_for_connectivity(iface, net, gen);
-      }).detach();
-    }
-  }
 }
 
 void WifiPanel::handle_kb_input(lv_event_t *e)
@@ -405,12 +320,11 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
     }
 
     entering_password = false;
-    // add network, set password, save wpa
-    connect(password);
+    std::string pw(password);
     lv_textarea_set_text(password_input, "");
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text(wifi_label, fmt::format("Connecting to {} ...", selected_network).c_str());
     lv_obj_clear_state(password_input, LV_STATE_FOCUSED);
+    connect(selected_network, pw);
     lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
     pw_visible = false;
     lv_textarea_set_password_mode(password_input, true);
@@ -425,28 +339,6 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
   }
 }
 
-void WifiPanel::wait_for_connectivity(const std::string &iface,
-                                       const std::string &net,
-                                       uint32_t gen) {
-  std::string gw;
-  // Poll up to 10s (40 × 250ms): first wait for the default route to appear
-  // (signals DHCP completed), then for the gateway ARP entry to complete
-  // (signals layer-3 traffic can actually flow).
-  for (int i = 0; i < 40; i++) {
-    if (conn_gen.load() != gen) return;
-    if (gw.empty())
-      gw = KUtils::gateway_ip(iface);
-    if (!gw.empty() && KUtils::gateway_in_arp(gw))
-      break;
-    std::this_thread::sleep_for(std::chrono::milliseconds(250));
-  }
-  if (conn_gen.load() != gen || entering_password) return;
-  auto ip = KUtils::interface_ip(iface);
-  std::lock_guard<std::mutex> lock(lv_lock);
-  lv_label_set_text(wifi_label,
-    fmt::format("Connected to {}\nIP: {}", net, ip).c_str());
-}
-
 void WifiPanel::handle_eye_btn(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
   lv_event_stop_bubbling(e);
@@ -456,37 +348,39 @@ void WifiPanel::handle_eye_btn(lv_event_t *e) {
                     pw_visible ? LV_SYMBOL_EYE_OPEN : LV_SYMBOL_EYE_CLOSE);
 }
 
-void WifiPanel::connect(const char *password) {
-  std::string nid = wpa_event.send_command("ADD_NETWORK");
-  spdlog::trace("add_nework {}", nid);
-  if (nid.length() > 0) {
-    wpa_event.send_command(fmt::format("SET_NETWORK {} ssid {:?}", nid, selected_network));
-    wpa_event.send_command(fmt::format("SET_NETWORK {} psk {:?}", nid, password));
-    wpa_event.send_command(fmt::format("ENABLE_NETWORK {}", nid));
-    wpa_event.send_command(fmt::format("SELECT_NETWORK {}", nid));
-    wpa_event.send_command("SAVE_CONFIG");
-  }
+// NebulaOS connects, saves the network only when it worked, and restores the
+// previous one otherwise; the reply carries the outcome and the new address.
+void WifiPanel::connect(const std::string &ssid, const std::string &password) {
+  busy = true;
+  show_prompt(fmt::format("Connecting to {} ...", ssid));
+  lv_obj_clear_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+  ws.send_jsonrpc(WIFI_CONNECT_METHOD, wifi_connect_params(ssid, password), [this, ssid](json &reply) {
+    std::lock_guard<std::mutex> lock(lv_lock);
+    busy = false;
+    lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+    auto err = wifi_error_text(reply);
+    if (err.empty()) {
+      std::string ip;
+      auto p = "/result/address"_json_pointer;
+      if (reply.contains(p) && reply[p].is_string()) ip = reply[p].template get<std::string>();
+      show_prompt("Connected to " + ssid + "\nIP: " + (ip.empty() ? "waiting for an address" : ip));
+    } else {
+      show_prompt(err);
+    }
+    scan();
+  });
 }
 
-bool WifiPanel::find_current_network() {
-  list_networks.clear();
-  std::string nets = wpa_event.send_command("LIST_NETWORKS");
-  spdlog::trace("nets = {}", nets);
-  std::istringstream f(nets);
-  std::string line;
-  bool found = false;
-  while (std::getline(f, line)) {
-    auto wifi_parts = KUtils::split(line, '\t');
-    if (wifi_parts.size() == 4 && line.find("[CURRENT]") != std::string::npos) {
-      cur_network = wifi_parts[1];
-      list_networks.insert({wifi_parts[1], wifi_parts[0]});
-      found = true;
-    }
-
-    if (wifi_parts.size() > 1) {
-      list_networks.insert({wifi_parts[1], wifi_parts[0]});
-    }
-  }
-
-  return found;
+#ifdef SIMULATOR
+void WifiPanel::sim_fill() {
+  lv_obj_move_foreground(cont);
+  show_scan(json::parse(R"({"result":{"complete":true,
+    "status":{"state":"COMPLETED","ssid":"Office_2.4Ghz","address":"192.168.0.98"},
+    "networks":[
+      {"ssid":"Office_2.4Ghz","signal":-48,"security":"psk","saved":true,"current":true},
+      {"ssid":"Workshop","signal":-63,"security":"psk","saved":true,"current":false},
+      {"ssid":"Guest","signal":-58,"security":"open","saved":false,"current":false},
+      {"ssid":"Neighbour-5G","signal":-79,"security":"psk","saved":false,"current":false},
+      {"ssid":"Corp","signal":-70,"security":"eap","saved":false,"current":false}]}})"));
 }
+#endif

@@ -15,13 +15,11 @@ echo "=== MIPS build: CROSS_COMPILE=$CROSS_COMPILE ==="
 # Backup aarch64 libraries
 cp libhv/lib/libhv.a /tmp/libhv.a.bak
 cp spdlog/build/libspdlog.a /tmp/libspdlog.a.bak
-cp wpa_supplicant/wpa_supplicant/libwpa_client.a /tmp/libwpa_client.a.bak
 
 restore_libs() {
     echo "=== Restoring original libraries ==="
     cp /tmp/libhv.a.bak libhv/lib/libhv.a
     cp /tmp/libspdlog.a.bak spdlog/build/libspdlog.a
-    cp /tmp/libwpa_client.a.bak wpa_supplicant/wpa_supplicant/libwpa_client.a
 }
 trap restore_libs EXIT
 
@@ -58,18 +56,6 @@ cmake .. \
     2>&1 | tail -5
 make -j"$JOBS" 2>&1 | tail -5
 cp libspdlog.a "$WORKDIR/spdlog/build/libspdlog.a"
-cd "$WORKDIR"
-
-# --- libwpa_client ---
-echo "=== Building libwpa_client for MIPS ==="
-cd wpa_supplicant/wpa_supplicant
-WPA_CC="${CROSS_COMPILE}gcc"
-WPA_CFLAGS="-O2 -D_GNU_SOURCE -DCONFIG_CTRL_IFACE -DCONFIG_CTRL_IFACE_UNIX -I../src -I../src/utils -I../src/common"
-$WPA_CC $WPA_CFLAGS -c ../src/common/wpa_ctrl.c -o wpa_ctrl.o
-$WPA_CC $WPA_CFLAGS -c ../src/utils/os_unix.c -o os_unix.o
-$WPA_CC $WPA_CFLAGS -c ../src/utils/common.c -o common.o
-$WPA_CC $WPA_CFLAGS -c ../src/utils/wpa_debug.c -o wpa_debug.o
-${CROSS_COMPILE}ar crs libwpa_client.a wpa_ctrl.o os_unix.o common.o wpa_debug.o
 cd "$WORKDIR"
 
 # --- guppyscreen ---

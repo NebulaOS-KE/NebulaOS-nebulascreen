@@ -9,9 +9,13 @@ const char *const BOOT_DISPLAY_STATUS_METHOD = "machine.nebulaos.boot_display.st
 const char *const BOOT_DISPLAY_MODE_METHOD = "machine.nebulaos.boot_display.mode";
 const char *const BOOT_DISPLAY_IMAGE_METHOD = "machine.nebulaos.boot_display.image";
 const char *const BOOT_DISPLAY_RESET_METHOD = "machine.nebulaos.boot_display.reset_image";
-const char *const BOOT_MODE_OPTIONS = "Logo\nBlank\nConsole";
+const char *const CLEAN_RESET_METHOD = "machine.nebulaos.system.clean_reset";
+const char *const SWAP_SLOT_METHOD = "machine.nebulaos.system.swap_slot";
+// Console was removed (D10): NebulaOS reads a saved "console" as logo.
+const char *const BOOT_MODE_OPTIONS = "Logo\nBlank";
 
-static const char *const MODES[] = {"logo", "blank", "console"};
+static const char *const MODES[] = {"logo", "blank"};
+static const int MODE_COUNT = 2;
 
 static const json &result_of(const json &reply) {
   static const json empty = json::object();
@@ -53,6 +57,8 @@ SystemInfo system_info(const json &reply) {
   std::string host = str_at(r, "/hostname"_json_pointer);
   std::string text = "NebulaOS " + (head.size() >= 7 ? head.substr(0, 7) : (head.empty() ? "unknown" : head));
   if (!date.empty()) text += "  (" + date.substr(0, 10) + ")";
+  std::string slot = str_at(r, "/slot"_json_pointer);
+  if (!slot.empty()) text += ", slot " + slot;
   if (!kernel.empty()) text += "\nKernel " + kernel;
   if (!host.empty()) text += "\nHostname " + host + " (" + host + ".local)";
 
@@ -76,13 +82,13 @@ SystemInfo system_info(const json &reply) {
 }
 
 std::string boot_mode_at(int index) {
-  if (index < 0 || index > 2) return "";
+  if (index < 0 || index >= MODE_COUNT) return "";
   return MODES[index];
 }
 
 int boot_mode_index(const json &status_reply) {
   std::string mode = str_at(result_of(status_reply), "/config/mode"_json_pointer);
-  for (int i = 0; i < 3; ++i) {
+  for (int i = 0; i < MODE_COUNT; ++i) {
     if (mode == MODES[i]) return i;
   }
   return 0;
