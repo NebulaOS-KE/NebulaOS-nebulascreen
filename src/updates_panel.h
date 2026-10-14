@@ -2,6 +2,7 @@
 #define __UPDATES_PANEL_H__
 
 #include "button_container.h"
+#include "image_panel.h"
 #include "nebulaos_settings.h"
 #include "websocket_client.h"
 #include "lvgl/lvgl.h"
@@ -14,7 +15,7 @@
 // manager - Klipper, Moonraker, Mainsail, NebulaOS extensions - one at a time
 // or all, plus Check now. Moonraker refuses updates while printing; NebulaOS's
 // update supervisor rolls a broken app update back. The NebulaOS image itself
-// (kernel, OS, GuppyScreen) is shown but updated from a computer for now.
+// (kernel, OS, GuppyScreen) is installed under System image (ImagePanel).
 class UpdatesPanel {
  public:
   UpdatesPanel(KWebSocketClient &ws, std::mutex &lock);
@@ -23,6 +24,7 @@ class UpdatesPanel {
   void foreground();
 #ifdef SIMULATOR
   void sim_fill();
+  ImagePanel &sim_image() { return image_panel; }
 #endif
 
   static void _handle_callback(lv_event_t *e) {
@@ -46,7 +48,9 @@ class UpdatesPanel {
   lv_obj_t *image_label;
   lv_obj_t *check_btn;
   lv_obj_t *all_btn;
+  lv_obj_t *image_btn;
   ButtonContainer back_btn;
+  ImagePanel image_panel;
 
   std::vector<UpdateRow> rows;
   std::vector<lv_obj_t *> row_btns;

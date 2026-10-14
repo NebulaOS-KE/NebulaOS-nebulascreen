@@ -1,4 +1,5 @@
 #include "setting_panel.h"
+#include "nebulaos_image.h"
 #include "spdlog/spdlog.h"
 
 LV_IMG_DECLARE(network_img);
@@ -127,6 +128,43 @@ void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
     {"20-mcu-failed", [this, close_dialogs]() {
       close_dialogs(); printer_panel.sim_mcu().sim_result(
         R"({"error":{"code":500,"message":"FLASH_FAILED: Could not enter bootloader: no handshake"}})"); }},
+    // System image (on-printer image updates, 2026-10-14).
+    {"21-updates", [this, close_dialogs]() {
+      close_dialogs(); updates_panel.foreground(); updates_panel.sim_fill(); }},
+    {"22-image", [this]() {
+      updates_panel.sim_image().foreground(); updates_panel.sim_image().sim_fill(); }},
+    {"23-image-confirm-nebulaos", [this]() { updates_panel.sim_image().sim_check(R"({"result":{
+      "result":"OK","file":"upload/NebulaOS-KE-2026-10-15.img","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "size":98412544,"version":"2026.10.15","system":"nebulaos","target":"A",
+      "slots":{"running":"B","A":{"kernel":"Linux-4.4.94","system":"creality"},
+               "B":{"kernel":"Linux-6.6.157-rt79","system":"nebulaos"}}}})"); }},
+    {"24-image-confirm-creality", [this, close_dialogs]() {
+      close_dialogs(); updates_panel.sim_image().sim_check(R"({"result":{
+      "result":"OK","file":"usb/sda1/Ender-3_V3_KE_F005_ota_img_V1.1.0.12.img","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "size":112283648,"version":"1.1.0.12","system":"creality","target":"A",
+      "slots":{"running":"B","A":{"kernel":"Linux-6.6.157-rt79","system":"nebulaos"},
+               "B":{"kernel":"Linux-6.6.157-rt79","system":"nebulaos"}}}})"); }},
+    {"25-image-refused", [this, close_dialogs]() {
+      close_dialogs(); updates_panel.sim_image().sim_check(
+        R"J({"error":{"code":400,"message":"INVALID_IMAGE: not a KE update package (no ota_update.in)"}})J"); }},
+    {"26-image-writing", [this, close_dialogs]() {
+      close_dialogs(); updates_panel.sim_image().sim_progress(
+        R"({"result":{"job":{"state":"running","phase":"writing","percent":57}}})"); }},
+    {"27-image-restarting", [this]() { updates_panel.sim_image().sim_progress(
+        R"({"result":{"job":{"state":"restarting","phase":"restarting","percent":100,"target":"A"}}})"); }},
+    {"28-image-failed", [this]() { updates_panel.sim_image().sim_progress(
+        R"({"result":{"job":{"state":"failed","phase":"failed","error":"INVALID_IMAGE",
+           "message":"rootfs.squashfs chunk 41 is damaged","target_cleared":true}}})"); }},
+    {"29-image-rolled-back", [close_dialogs]() {
+      close_dialogs();
+      auto l = image_last(json::parse(R"({"result":{"last":{"result":"ROLLED_BACK","version":"2026.10.15",
+        "system":"nebulaos","from":"B","to":"A","note":"Klipper or the screen did not come up within 300 s"}}})"));
+      SettingsUi::notice(l.title.c_str(), l.text.c_str()); }},
+    {"30-swap-confirm-nebulaos", [this, close_dialogs]() {
+      close_dialogs(); reset_panel.foreground();
+      reset_panel.sim_slots(R"({"result":{"slots":{"running":"B","A":{"kernel":"Linux-6.6.157-rt79","system":"nebulaos"},
+        "B":{"kernel":"Linux-6.6.157-rt79","system":"nebulaos"}}}})");
+      reset_panel.sim_tap(3); }},
   };
   lv_timer_create([](lv_timer_t *timer) {
     auto *t = (SimTour *)timer->user_data;

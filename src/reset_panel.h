@@ -2,6 +2,7 @@
 #define __RESET_PANEL_H__
 
 #include "button_container.h"
+#include "hv/json.hpp"
 #include "websocket_client.h"
 #include "lvgl/lvgl.h"
 
@@ -13,7 +14,8 @@
 //   Clean NebulaOS reset     machine.nebulaos.system.clean_reset: wipes all
 //                            NebulaOS data at the next boot (red)
 //   Swap boot slot (A/B)     machine.nebulaos.system.swap_slot: the other slot
-//                            starts next (orange)
+//                            starts next (orange); the text says what that
+//                            slot holds (machine.nebulaos.image.status)
 // The last two are refused while printing and reboot at once.
 class ResetPanel {
  public:
@@ -24,6 +26,7 @@ class ResetPanel {
 #ifdef SIMULATOR
   // Taps tile 0-3 (screenshots of the confirmations).
   void sim_tap(int tile);
+  void sim_slots(const char *status_json) { image_status = nlohmann::json::parse(status_json); }
 #endif
 
   static void _handle_callback(lv_event_t *e) {
@@ -46,6 +49,8 @@ class ResetPanel {
   ButtonContainer clean_btn;
   ButtonContainer swap_btn;
   ButtonContainer back_btn;
+  // machine.nebulaos.image.status: what the other slot holds, for the swap text.
+  nlohmann::json image_status;
 };
 
 #endif // __RESET_PANEL_H__

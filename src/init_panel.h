@@ -24,12 +24,17 @@ class InitPanel {
 #endif
 
  private:
+  void image_result(int tries);
+
   lv_obj_t *cont;
   lv_obj_t *label;
   MainPanel &main_panel;
   BedMeshPanel &bedmesh_panel;
   FilamentRunoutPanel &filament_runout_panel;
   std::mutex &lv_lock;
+  KWebSocketClient *ws = NULL;   // for image_result's retries
+  lv_timer_t *image_timer = NULL;
+  int image_tries = 0;
 };
 
 #endif // __INIT_PANEL_H__

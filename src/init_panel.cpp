@@ -1,4 +1,5 @@
 #include "init_panel.h"
+#include "nebulaos_image.h"
 #include "nebulaos_system.h"
 #include "settings_ui.h"
 #include "utils.h"
@@ -82,6 +83,10 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	  }
 	  ws.send_jsonrpc(ACK_CLEAN_RESET_METHOD, json::object(), [](json &) {});
 	});
+
+	// Once after a system image install: what the trial boot found.
+	this->ws = &ws;
+	image_result(40);
 
 	// console
 	this->main_panel.subscribe();
@@ -175,4 +180,30 @@ void InitPanel::sim_hide() {
 
 void InitPanel::set_message(const char *message) {
 	lv_label_set_text(label, message);
+}
+
+// Once after a system image install: what the trial boot found (confirmed, or
+// went back to the previous slot), then acknowledge it. The trial decides only
+// after Klipper and this screen are up, usually after the first connect, so
+// while it is pending ask again every 10 s (`tries` times, ~7 minutes).
+void InitPanel::image_result(int tries) {
+  ws->send_jsonrpc(IMAGE_STATUS_METHOD, json::object(), [this, tries](json &j) {
+    auto last = image_last(j);
+    std::lock_guard<std::mutex> lock(this->lv_lock);
+    if (last.show) {
+      SettingsUi::notice(last.title.c_str(), last.text.c_str());
+      ws->send_jsonrpc(IMAGE_ACK_METHOD, json::object(), [](json &) {});
+      return;
+    }
+    if (!image_trial_pending(j) || tries <= 0 || image_timer != NULL) {
+      return;
+    }
+    image_timer = lv_timer_create([](lv_timer_t *t) {
+      auto *self = (InitPanel *)t->user_data;
+      lv_timer_del(t);
+      self->image_timer = NULL;
+      self->image_result(self->image_tries);
+    }, 10000, this);
+    image_tries = tries - 1;
+  });
 }

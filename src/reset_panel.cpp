@@ -1,6 +1,7 @@
 #include "reset_panel.h"
 #include "config.h"
 #include "nebulaos_display.h"
+#include "nebulaos_image.h"
 #include "nebulaos_system.h"
 #include "settings_ui.h"
 #include "utils.h"
@@ -62,6 +63,10 @@ ResetPanel::~ResetPanel() {
 
 void ResetPanel::foreground() {
   lv_obj_move_foreground(cont);
+  ws.send_jsonrpc(IMAGE_STATUS_METHOD, json::object(), [this](json &reply) {
+    std::lock_guard<std::mutex> lock(lv_lock);
+    image_status = reply;
+  });
 }
 
 void ResetPanel::restart_gui() {
@@ -162,12 +167,7 @@ void ResetPanel::handle_callback(lv_event_t *e) {
       KUtils::notify_locked();
       return;
     }
-    SettingsUi::confirm("Swap boot slot (A/B)",
-      "The printer restarts into the other boot slot (A/B).\n"
-      "Coming back needs SSH on that system (see the NebulaOS docs on switching "
-      "slots) or USB recovery.\n"
-      "Do not switch the printer off and on while the other slot runs: its "
-      "firmware can re-flash the printer board.",
+    SettingsUi::confirm("Swap boot slot (A/B)", swap_confirm_text(image_status).c_str(),
       "Swap & restart", Tone::Warning,
       [this]() { system_call(SWAP_SLOT_METHOD, "Swap boot slot"); });
   }

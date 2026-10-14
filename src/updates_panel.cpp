@@ -8,12 +8,14 @@
 LV_IMG_DECLARE(back);
 LV_IMG_DECLARE(refresh_img);
 LV_IMG_DECLARE(update_img);
+LV_IMG_DECLARE(sd_img);
 
 UpdatesPanel::UpdatesPanel(KWebSocketClient &c, std::mutex &lock)
   : ws(c)
   , lv_lock(lock)
   , cont(SettingsUi::page("Updates", &body))
   , back_btn(cont, &back, "Back", &UpdatesPanel::_handle_callback, this)
+  , image_panel(c, lock)
 {
   lv_obj_t *left = SettingsUi::column(body, 68);
   lv_obj_t *right = SettingsUi::column(body, 29);
@@ -27,11 +29,12 @@ UpdatesPanel::UpdatesPanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_scroll_dir(list, LV_DIR_VER);
 
   status_label = SettingsUi::hint(left, "");
-  image_label = SettingsUi::hint(left, "NebulaOS image: installed from a computer for now.");
+  image_label = SettingsUi::hint(left, "");
 
   check_btn = SettingsUi::icon_button(right, &refresh_img, "Check now", &UpdatesPanel::_handle_callback, this);
   all_btn = SettingsUi::icon_button(right, &update_img, "Update all", &UpdatesPanel::_handle_callback, this);
   lv_obj_add_state(all_btn, LV_STATE_DISABLED);
+  image_btn = SettingsUi::icon_button(right, &sd_img, "System image", &UpdatesPanel::_handle_callback, this);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
   lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
@@ -75,8 +78,8 @@ void UpdatesPanel::foreground() {
     auto info = system_info(reply);
     std::string first = info.text.substr(0, info.text.find('\n'));
     std::lock_guard<std::mutex> lock(lv_lock);
-    lv_label_set_text(image_label, (first + ". Image updates are installed from a "
-                                    "computer for now.").c_str());
+    lv_label_set_text(image_label, (first + ". New versions of NebulaOS itself: "
+                                    "System image.").c_str());
   });
 }
 
@@ -225,6 +228,8 @@ void UpdatesPanel::handle_callback(lv_event_t *e) {
     refresh(true);
   } else if (obj == all_btn) {
     upgrade("", "");
+  } else if (obj == image_btn) {
+    image_panel.foreground();
   } else {
     size_t i = (size_t)(uintptr_t)lv_obj_get_user_data(obj);
     if (i < rows.size()) {
@@ -240,7 +245,7 @@ void UpdatesPanel::sim_fill() {
     "moonraker":{"version":"v0.9.3-12","remote_version":"v0.9.3-15","is_valid":true,"commits_behind_count":3},
     "mainsail":{"version":"v2.13.0","remote_version":"v2.14.0"},
     "nebulaos-klipper-extensions":{"version":"8f86925","remote_version":"8f86925","is_valid":true,"commits_behind_count":0}}}})"));
-  lv_label_set_text(image_label, "NebulaOS df415dc  (2026-10-11), slot B. Image updates are "
-                                 "installed from a computer for now.");
+  lv_label_set_text(image_label, "NebulaOS df415dc  (2026-10-11), slot B. New versions of "
+                                 "NebulaOS itself: System image.");
 }
 #endif
