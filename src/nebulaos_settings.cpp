@@ -416,7 +416,7 @@ McuStatusView mcu_status_view(const json &status_reply) {
   } else if (cls == "NATIVE_CANDIDATE_001") {
     v.running = "NebulaOS firmware";
   } else if (cls == "KNOWN_STOCK") {
-    v.running = "Creality stock firmware";
+    v.running = "Creality firmware";
   } else if (cls == "UNKNOWN_APPLICATION") {
     v.running = "custom firmware" + (ident.empty() || ident == "unknown" ? "" : " (" + ident + ")");
   } else {
