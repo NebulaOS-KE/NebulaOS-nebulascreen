@@ -121,6 +121,15 @@ TEST(BootLogo, power_on_result) {
   ASSERT_TRUE(power_on_result(json{{"error", {{"message", "PRINTING: no"}}}}).find("PRINTING") != std::string::npos);
 }
 
+TEST(Updates, os_note) {
+  ASSERT_EQ(updates_os_note("NebulaOS 701a888  (2026-10-15), slot B\nKernel 6.6"),
+            std::string("This list updates Klipper, Moonraker and Mainsail.\n"
+                        "NebulaOS itself (build 701a888, 2026-10-15) is updated in System image."));
+  ASSERT_EQ(updates_os_note("System information unavailable."),
+            std::string("This list updates Klipper, Moonraker and Mainsail.\n"
+                        "NebulaOS itself is updated in System image."));
+}
+
 TEST(Logs, wifi_lines) {
   std::string log =
     "Oct 15 08:20:01 buildroot daemon.notice wpa_supplicant[300]: wlan0: CTRL-EVENT-CONNECTED - Connection to aa:bb completed\n"

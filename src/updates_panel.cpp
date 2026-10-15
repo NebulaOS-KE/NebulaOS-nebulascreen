@@ -86,10 +86,9 @@ void UpdatesPanel::shown() {
   refresh(false);
   ws.send_jsonrpc(SYSTEM_INFO_METHOD, json::object(), [this](json &reply) {
     auto info = system_info(reply);
-    std::string first = info.text.substr(0, info.text.find('\n'));
+    std::string text = updates_os_note(info.text);
     std::lock_guard<std::mutex> lock(lv_lock);
-    lv_label_set_text(image_label, (first + ". New versions of NebulaOS itself: "
-                                    "System image.").c_str());
+    lv_label_set_text(image_label, text.c_str());
   });
 }
 
@@ -265,7 +264,6 @@ void UpdatesPanel::sim_fill() {
     "moonraker":{"version":"v0.9.3-12","remote_version":"v0.9.3-15","is_valid":true,"commits_behind_count":3},
     "mainsail":{"version":"v2.13.0","remote_version":"v2.14.0"},
     "nebulaos-klipper-extensions":{"version":"8f86925","remote_version":"8f86925","is_valid":true,"commits_behind_count":0}}}})"));
-  lv_label_set_text(image_label, "NebulaOS df415dc  (2026-10-11), slot B. New versions of "
-                                 "NebulaOS itself: System image.");
+  lv_label_set_text(image_label, updates_os_note("NebulaOS df415dc  (2026-10-11), slot B").c_str());
 }
 #endif

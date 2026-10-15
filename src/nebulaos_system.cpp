@@ -219,3 +219,21 @@ std::string power_on_result(const json &reply) {
   return "The boot screen changed, but the power-on logo did not" +
          (msg.empty() ? std::string(".") : ": " + msg + ".");
 }
+
+std::string updates_os_note(const std::string &system_info_text) {
+  std::string first = system_info_text.substr(0, system_info_text.find('\n'));
+  std::string build, date;
+  if (first.rfind("NebulaOS ", 0) == 0) {
+    build = first.substr(9, first.find(' ', 9) == std::string::npos ? std::string::npos
+                                                                     : first.find(' ', 9) - 9);
+    auto open = first.find('('), close = first.find(')');
+    if (open != std::string::npos && close != std::string::npos && close > open) {
+      date = first.substr(open + 1, close - open - 1);
+    }
+  }
+  std::string text = "This list updates Klipper, Moonraker and Mainsail.\nNebulaOS itself";
+  if (!build.empty() && build != "unknown") {
+    text += " (build " + build + (date.empty() ? "" : ", " + date) + ")";
+  }
+  return text + " is updated in System image.";
+}

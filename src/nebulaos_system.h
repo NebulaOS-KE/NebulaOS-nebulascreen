@@ -69,6 +69,11 @@ std::string power_on_result(const json &reply);
 // *.log.N, sorted by name.
 std::vector<std::string> log_files(const json &files_reply);
 
+// Updates page note under the app list: what the list covers and where
+// NebulaOS itself is updated, from system_info()'s text (first line
+// "NebulaOS 701a888  (2026-10-15), slot B").
+std::string updates_os_note(const std::string &system_info_text);
+
 // The last `max_bytes` of a text, starting at a line boundary.
 std::string tail_text(const std::string &content, size_t max_bytes);
 
