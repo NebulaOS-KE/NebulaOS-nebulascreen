@@ -180,6 +180,7 @@ void WifiPanel::handle_back_btn(lv_event_t *e) {
     lv_obj_add_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_background(cont);
+    if (on_changed) on_changed();
   }
 }
 
@@ -284,6 +285,7 @@ void WifiPanel::confirm_remove_network(const std::string &ssid, const std::strin
         self->show_prompt(err);
         self->holding_result = true;
       }
+      if (self->on_changed) self->on_changed();
       self->scan();
     });
   }, LV_EVENT_VALUE_CHANGED, this);
@@ -370,6 +372,7 @@ void WifiPanel::connect(const std::string &ssid, const std::string &password) {
       show_prompt(err);
     }
     holding_result = true;
+    if (on_changed) on_changed();
     scan();
   });
 }

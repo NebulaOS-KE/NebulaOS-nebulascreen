@@ -10,6 +10,7 @@
 #include "lvgl/lvgl.h"
 #include <mutex>
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -26,6 +27,9 @@ public:
   ~WifiPanel();
 
   void foreground();
+  // G55: called (LVGL lock held) when the panel closes and after a connect
+  // or forget finishes, so the page underneath can show the new network.
+  std::function<void()> on_changed;
   void handle_back_btn(lv_event_t *event);
 #ifdef SIMULATOR
   void sim_fill();

@@ -18,6 +18,8 @@ ConnectionsPanel::ConnectionsPanel(KWebSocketClient &c, std::mutex &lock, Spoolm
   , cont(SettingsUi::page("Connections", &body))
   , back_btn(cont, &back, "Back", &ConnectionsPanel::_handle_callback, this)
 {
+  wifi_panel.on_changed = [this]() { refresh(); };
+
   lv_obj_t *left = SettingsUi::column(body, 60);
   wifi_value = SettingsUi::info_line(left, "Wi-Fi");
   address_value = SettingsUi::info_line(left, "Address");
