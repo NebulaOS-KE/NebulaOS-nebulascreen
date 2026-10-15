@@ -72,24 +72,38 @@ ImageSlots image_slots(const json &slots) {
   s.running = str_at(slots, "/running"_json_pointer);
   s.known = s.running == "A" || s.running == "B";
   if (s.known) s.other = s.running == "A" ? "B" : "A";
-  s.a.system = str_at(slots, "/A/system"_json_pointer);
-  s.a.kernel = str_at(slots, "/A/kernel"_json_pointer);
-  s.b.system = str_at(slots, "/B/system"_json_pointer);
-  s.b.kernel = str_at(slots, "/B/kernel"_json_pointer);
+  for (auto *pair : {&s.a, &s.b}) {
+    std::string k = pair == &s.a ? "/A" : "/B";
+    pair->system = str_at(slots, json::json_pointer(k + "/system"));
+    pair->kernel = str_at(slots, json::json_pointer(k + "/kernel"));
+    pair->build = str_at(slots, json::json_pointer(k + "/build"));
+    pair->date = str_at(slots, json::json_pointer(k + "/date"));
+    pair->version = str_at(slots, json::json_pointer(k + "/version"));
+  }
   return s;
 }
 
 std::string image_system_text(const std::string &system) {
   if (system == "nebulaos") return "NebulaOS";
-  if (system == "creality") return "Creality firmware";
+  if (system == "creality") return "other system";
   return "unknown system";
+}
+
+std::string image_identity_text(const std::string &system, const std::string &build,
+                                const std::string &date, const std::string &version) {
+  if (!build.empty()) {
+    return "NebulaOS build " + build + (date.empty() ? "" : " (" + date + ")");
+  }
+  std::string text = image_system_text(system);
+  if (!version.empty()) text += ", version " + version;
+  return text;
 }
 
 std::string image_slot_line(const ImageSlots &s, const std::string &slot) {
   const ImageSlot &sl = s.of(slot);
-  std::string text = "Slot " + slot + ": " +
-    (sl.kernel.empty() ? std::string("no system") : image_system_text(sl.system));
-  if (s.known && s.running == slot) text += " (running)";
+  std::string text = "Slot " + slot + ": " + (sl.kernel.empty() ? std::string("empty") :
+    image_identity_text(sl.system, sl.build, sl.date, sl.version));
+  if (s.known && s.running == slot) text += ", running";
   return text;
 }
 
@@ -117,8 +131,16 @@ ImageFiles image_files(const json &list_reply) {
       i.name = str_at(f, "/name"_json_pointer);
       i.source = str_at(f, "/source"_json_pointer);
       i.size = long_at(f, "/size"_json_pointer);
+      i.build = str_at(f, "/build"_json_pointer);
+      i.date = str_at(f, "/date"_json_pointer);
+      i.version = str_at(f, "/version"_json_pointer);
       if (i.id.empty()) continue;
       i.detail = (i.source == "usb" ? "USB stick, " : "Uploaded, ") + megabytes(i.size);
+      if (!i.build.empty()) {
+        i.detail += " - " + image_identity_text("nebulaos", i.build, i.date, "");
+      } else if (!i.version.empty()) {
+        i.detail += " - version " + i.version;
+      }
       out.files.push_back(i);
     }
   }
@@ -183,24 +205,26 @@ ImageCheck image_check(const json &check_reply) {
   c.sha256 = str_at(r, "/sha256"_json_pointer);
   c.system = str_at(r, "/system"_json_pointer);
   std::string version = str_at(r, "/version"_json_pointer);
-  std::string what = image_system_text(c.system) + (version.empty() ? "" : " " + version);
+  std::string what = image_identity_text(c.system, str_at(r, "/build"_json_pointer),
+                                         str_at(r, "/date"_json_pointer), version);
   const ImageSlot &now = s.of(target);
   std::string replaces = now.kernel.empty() ? "" :
-    " It replaces the " + image_system_text(now.system) + " in slot " + target + ".";
+    " It replaces " + image_identity_text(now.system, now.build, now.date, now.version) +
+    " in slot " + target + ".";
   std::string keep = "The printer keeps running from slot " + s.running +
                      " while it installs (a few minutes), then restarts into slot " + target + ".";
 
   if (c.system == "creality") {
-    c.title = "Install Creality firmware";
+    c.title = "Install other system";
     c.text = "Installs " + what + " into slot " + target + "." + replaces + "\n" + keep + "\n"
-      "There is no automatic way back: to return to NebulaOS, install a NebulaOS .img "
-      "with Creality's own updater.\n"
-      "Creality's firmware re-flashes the printer board (MCU) when it starts. "
+      "This image is not NebulaOS: there is no automatic way back. To return, install a "
+      "NebulaOS .img with that system's own updater, or use USB recovery.\n"
+      "That system may re-flash the printer board (MCU) when it starts. "
       "Do not switch the printer off while it does.";
   } else {
     c.title = c.system == "nebulaos" ? "Install NebulaOS image" : "Install unknown system";
     c.text = (c.system == "nebulaos" ? "" :
-               "This image is neither NebulaOS nor Creality's firmware.\n") +
+               "This image is not NebulaOS, and its system is unknown.\n") +
       std::string("Installs ") + what + " into slot " + target + "." + replaces + "\n" + keep +
       "\nIf Klipper or the screen does not come up there, the printer goes back to "
       "slot " + s.running + " once, by itself.\n"
@@ -306,15 +330,17 @@ std::string swap_confirm_text(const json &status_reply) {
   ImageSlots s = image_slots(r.contains("slots") ? r["slots"] : json());
   if (s.known) {
     const ImageSlot &o = s.of(s.other);
+    std::string what = image_identity_text(o.system, o.build, o.date, o.version);
     if (o.system == "nebulaos") {
-      return "The printer restarts into slot " + s.other + " (NebulaOS).\n"
+      return "The printer restarts into slot " + s.other + " (" + what + ").\n"
              "Come back the same way: Settings > Reset > Swap boot slot there.";
     }
     if (o.system == "creality") {
-      return "The printer restarts into slot " + s.other + " (Creality firmware).\n"
-             "Coming back needs SSH on that system (see the NebulaOS docs on switching "
-             "slots) or installing a NebulaOS .img with Creality's updater.\n"
-             "Do not switch the printer off and on while Creality's firmware runs: it can "
+      return "The printer restarts into slot " + s.other + " (" + what + ").\n"
+             "It is not NebulaOS: coming back needs SSH on that system (see the NebulaOS "
+             "docs on switching slots), installing a NebulaOS .img with its own updater, "
+             "or USB recovery.\n"
+             "Do not switch the printer off and on while that system runs: it can "
              "re-flash the printer board.";
     }
   }

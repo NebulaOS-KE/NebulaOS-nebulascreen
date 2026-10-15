@@ -40,10 +40,18 @@ TEST(Slots, lines_and_other) {
   auto s = image_slots(slots("B", "creality", "nebulaos"));
   ASSERT_TRUE(s.known);
   ASSERT_EQ(s.other, std::string("A"));
-  ASSERT_EQ(image_slot_line(s, "A"), std::string("Slot A: Creality firmware"));
-  ASSERT_EQ(image_slot_line(s, "B"), std::string("Slot B: NebulaOS (running)"));
+  ASSERT_EQ(image_slot_line(s, "A"), std::string("Slot A: other system"));
+  ASSERT_EQ(image_slot_line(s, "B"), std::string("Slot B: NebulaOS, running"));
   auto empty = image_slots(slots("A", "nebulaos", ""));
-  ASSERT_EQ(image_slot_line(empty, "B"), std::string("Slot B: no system"));
+  ASSERT_EQ(image_slot_line(empty, "B"), std::string("Slot B: empty"));
+  // G46/G48: the build or version each slot holds
+  json j = slots("B", "creality", "nebulaos");
+  j["A"]["version"] = "1.1.0.12";
+  j["B"]["build"] = "14a9280";
+  j["B"]["date"] = "2026-10-15";
+  auto v = image_slots(j);
+  ASSERT_EQ(image_slot_line(v, "A"), std::string("Slot A: other system, version 1.1.0.12"));
+  ASSERT_EQ(image_slot_line(v, "B"), std::string("Slot B: NebulaOS build 14a9280 (2026-10-15), running"));
   ASSERT_FALSE(image_slots(json{{"running", nullptr}}).known);
 }
 
@@ -51,11 +59,17 @@ TEST(Files, list) {
   auto f = image_files(json{{"result", {
     {"files", {{{"id", "upload/a.img"}, {"source", "upload"}, {"name", "a.img"}, {"size", 98400000}},
                {{"id", "usb/sda1/KE.img"}, {"source", "usb"}, {"name", "KE.img"}, {"size", 112000000}},
+               {{"id", "usb/sda1/N.img"}, {"source", "usb"}, {"name", "N.img"}, {"size", 104000000},
+                {"version", "0.9"}, {"build", "14a9280"}, {"date", "2026-10-15"}},
+               {{"id", "usb/sda1/O.img"}, {"source", "usb"}, {"name", "O.img"}, {"size", 104000000},
+                {"version", "1.1.0.12"}},
                {{"name", "no-id.img"}}}},
     {"usb", {"sda1"}}, {"slots", slots("B", "creality", "nebulaos")}}}});
   ASSERT_TRUE(f.ok);
   ASSERT_TRUE(f.usb_present);
-  ASSERT_EQ(f.files.size(), (size_t)2);
+  ASSERT_EQ(f.files.size(), (size_t)4);
+  ASSERT_EQ(f.files[2].detail, std::string("USB stick, 104 MB - NebulaOS build 14a9280 (2026-10-15)"));
+  ASSERT_EQ(f.files[3].detail, std::string("USB stick, 104 MB - version 1.1.0.12"));
   ASSERT_EQ(f.files[0].detail, std::string("Uploaded, 98 MB"));
   ASSERT_EQ(f.files[1].detail, std::string("USB stick, 112 MB"));
   ASSERT_EQ(f.slots.running, std::string("B"));
@@ -68,8 +82,8 @@ TEST(Check, nebulaos_over_creality) {
   auto c = image_check(check_reply("nebulaos", "B", "creality", "nebulaos"));
   ASSERT_TRUE(c.ok);
   ASSERT_EQ(c.title, std::string("Install NebulaOS image"));
-  ASSERT_TRUE(has(c.text, "Installs NebulaOS 1.2 into slot A."));
-  ASSERT_TRUE(has(c.text, "replaces the Creality firmware in slot A"));
+  ASSERT_TRUE(has(c.text, "Installs NebulaOS, version 1.2 into slot A."));
+  ASSERT_TRUE(has(c.text, "replaces other system in slot A"));
   ASSERT_TRUE(has(c.text, "keeps running from slot B"));
   ASSERT_TRUE(has(c.text, "goes back to slot B once"));
   auto p = image_install_params(c);
@@ -80,17 +94,46 @@ TEST(Check, nebulaos_over_creality) {
 TEST(Check, creality_has_no_fallback) {
   auto c = image_check(check_reply("creality", "A", "nebulaos", "nebulaos"));
   ASSERT_TRUE(c.ok);
-  ASSERT_EQ(c.title, std::string("Install Creality firmware"));
+  ASSERT_EQ(c.title, std::string("Install other system"));
   ASSERT_TRUE(has(c.text, "into slot B"));
-  ASSERT_TRUE(has(c.text, "no automatic way back"));
-  ASSERT_TRUE(has(c.text, "re-flashes the printer board"));
+  ASSERT_TRUE(has(c.text, "not NebulaOS: there is no automatic way back"));
+  ASSERT_TRUE(has(c.text, "re-flash the printer board"));
   ASSERT_FALSE(has(c.text, "once, by itself"));
 }
 
 TEST(Check, unknown_system_warns) {
   auto c = image_check(check_reply("unknown", "B", "nebulaos", "nebulaos"));
   ASSERT_TRUE(c.ok);
-  ASSERT_TRUE(has(c.text, "neither NebulaOS nor Creality"));
+  ASSERT_TRUE(has(c.text, "not NebulaOS, and its system is unknown"));
+}
+
+TEST(Check, names_the_builds) {
+  auto r = check_reply("nebulaos", "B", "nebulaos", "nebulaos");
+  r["result"]["build"] = "14a9280";
+  r["result"]["date"] = "2026-10-15";
+  r["result"]["slots"]["A"]["build"] = "cba8c3b";
+  r["result"]["slots"]["A"]["date"] = "2026-10-14";
+  auto c = image_check(r);
+  ASSERT_TRUE(has(c.text, "Installs NebulaOS build 14a9280 (2026-10-15) into slot A."));
+  ASSERT_TRUE(has(c.text, "replaces NebulaOS build cba8c3b (2026-10-14) in slot A"));
+}
+
+TEST(Wording, never_names_the_vendor) {
+  // G57: the screen talks about NebulaOS and boot slots A/B, nothing else
+  std::vector<std::string> texts = {
+    image_slot_line(image_slots(slots("B", "creality", "nebulaos")), "A"),
+    image_check(check_reply("creality", "A", "nebulaos", "nebulaos")).text,
+    image_check(check_reply("creality", "A", "nebulaos", "nebulaos")).title,
+    image_check(check_reply("nebulaos", "B", "creality", "nebulaos")).text,
+    image_check(check_reply("unknown", "B", "creality", "nebulaos")).text,
+    swap_confirm_text(json{{"result", {{"slots", slots("B", "creality", "nebulaos")}}}}),
+    swap_confirm_text(json()),
+  };
+  for (const auto &t : texts) {
+    ASSERT_FALSE(has(t, "Creality"));
+    ASSERT_FALSE(has(t, "creality"));
+    ASSERT_FALSE(has(t, "stock"));
+  }
 }
 
 TEST(Check, refusals) {
@@ -166,8 +209,8 @@ TEST(Swap, text_from_the_other_slot) {
     return json{{"result", {{"slots", slots(running, a, b)}}}};
   };
   ASSERT_TRUE(has(swap_confirm_text(st("B", "nebulaos", "nebulaos")), "Come back the same way"));
-  ASSERT_TRUE(has(swap_confirm_text(st("B", "creality", "nebulaos")), "Creality firmware"));
-  ASSERT_TRUE(has(swap_confirm_text(st("A", "nebulaos", "creality")), "slot B (Creality"));
+  ASSERT_TRUE(has(swap_confirm_text(st("B", "creality", "nebulaos")), "It is not NebulaOS"));
+  ASSERT_TRUE(has(swap_confirm_text(st("A", "nebulaos", "creality")), "slot B (other system)"));
   ASSERT_TRUE(has(swap_confirm_text(json()), "other boot slot (A/B)"));
 }
 

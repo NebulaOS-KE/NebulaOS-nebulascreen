@@ -28,6 +28,9 @@ extern const char *const IMAGE_ACK_METHOD;      // machine.nebulaos.image.ack
 struct ImageSlot {
   std::string system;     // "nebulaos" | "creality" | "unknown"
   std::string kernel;     // uImage name, "" when unreadable
+  std::string build;      // NebulaOS build commit (7 hex), "" when unknown
+  std::string date;       // its build date (YYYY-MM-DD)
+  std::string version;    // another system's own version, "" when unknown
 };
 
 struct ImageSlots {
@@ -40,9 +43,14 @@ struct ImageSlots {
 
 // From the "slots" object of image.list / image.status / image.check.
 ImageSlots image_slots(const json &slots);
-// "NebulaOS" / "Creality firmware" / "unknown system".
+// "NebulaOS" / "other system" / "unknown system". G57: the screen never
+// names the other vendor - it talks about NebulaOS and boot slots A/B.
 std::string image_system_text(const std::string &system);
-// "Slot A: NebulaOS (running)" - one line per slot.
+// G46/G48: "NebulaOS build 14a9280 (2026-10-15)", "other system, version
+// 1.1.0.12", "NebulaOS" - as much as is known.
+std::string image_identity_text(const std::string &system, const std::string &build,
+                                const std::string &date, const std::string &version);
+// "Slot A: NebulaOS build 14a9280 (2026-10-15), running" - one line per slot.
 std::string image_slot_line(const ImageSlots &s, const std::string &slot);
 
 struct ImageFile {
@@ -50,7 +58,10 @@ struct ImageFile {
   std::string name;
   std::string source;     // "upload" | "usb"
   long size = 0;
-  std::string detail;     // "USB stick, 112 MB"
+  std::string build;      // from the .img's NebulaOS build record
+  std::string date;
+  std::string version;    // ota_version of the package
+  std::string detail;     // "USB stick, 112 MB - NebulaOS build 14a9280 (2026-10-15)"
 };
 
 struct ImageFiles {

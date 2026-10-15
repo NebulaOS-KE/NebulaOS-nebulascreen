@@ -36,7 +36,7 @@ ImagePanel::ImagePanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_scroll_dir(list, LV_DIR_VER);
 
-  SettingsUi::hint(left, "Put a KE .img (NebulaOS or Creality) on a USB stick, or upload it "
+  SettingsUi::hint(left, "Put a KE .img on a USB stick, or upload it "
                          "in Mainsail (Machine > config > firmware/os), then tap Refresh.");
 
   refresh_btn = SettingsUi::icon_button(right, &refresh_img, "Refresh",
