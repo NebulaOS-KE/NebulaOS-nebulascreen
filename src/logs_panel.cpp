@@ -8,6 +8,7 @@
 LV_IMG_DECLARE(back);
 
 static const size_t LOG_TAIL_BYTES = 12 * 1024;
+static const char *WIFI_ENTRY = "Wi-Fi";
 
 LogsPanel::LogsPanel(KWebSocketClient &c, std::mutex &lock)
   : ws(c)
@@ -56,6 +57,8 @@ void LogsPanel::foreground() {
     std::lock_guard<std::mutex> lock(lv_lock);
     files = names;
     lv_obj_clean(list);
+    lv_obj_t *w = lv_list_add_btn(list, LV_SYMBOL_WIFI, WIFI_ENTRY);
+    lv_obj_add_event_cb(w, &LogsPanel::_handle_callback, LV_EVENT_CLICKED, this);
     if (files.empty()) {
       lv_label_set_text(text, "No log files found.");
       return;
@@ -93,6 +96,34 @@ void LogsPanel::show_file(const std::string &name) {
   lv_obj_scroll_to_y(text_cont, LV_COORD_MAX, LV_ANIM_OFF);
 }
 
+// G59: the Wi-Fi and DHCP lines of system.log.0 and system.log, newest last.
+void LogsPanel::show_wifi() {
+  if (!KUtils::is_running_local()) {
+    lv_label_set_text(text, "Logs can be viewed on the printer's own screen, or in Mainsail.");
+    return;
+  }
+  std::string root = KUtils::get_root_path("logs");
+  std::string all;
+  for (const char *name : {"system.log.0", "system.log"}) {
+    std::ifstream f(root + "/" + name, std::ios::binary);
+    if (!root.empty() && f) {
+      all.append((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    }
+  }
+  std::string lines = wifi_log_lines(all);
+  if (lines.empty()) {
+    lv_label_set_text(text, "No Wi-Fi events in system.log yet.");
+    return;
+  }
+  std::string shown = tail_text(lines, LOG_TAIL_BYTES);
+  if (shown.size() < lines.size()) {
+    shown = "... (last " + std::to_string(LOG_TAIL_BYTES / 1024) + " KB of the Wi-Fi lines)\n" + shown;
+  }
+  lv_label_set_text(text, shown.c_str());
+  lv_obj_update_layout(text_cont);
+  lv_obj_scroll_to_y(text_cont, LV_COORD_MAX, LV_ANIM_OFF);
+}
+
 void LogsPanel::handle_callback(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
     return;
@@ -103,7 +134,9 @@ void LogsPanel::handle_callback(lv_event_t *e) {
     return;
   }
   const char *name = lv_list_get_btn_text(list, btn);
-  if (name != nullptr) {
+  if (name != nullptr && std::string(name) == WIFI_ENTRY) {
+    show_wifi();
+  } else if (name != nullptr) {
     show_file(name);
   }
 }

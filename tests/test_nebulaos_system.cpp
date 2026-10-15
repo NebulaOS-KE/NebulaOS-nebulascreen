@@ -91,6 +91,28 @@ TEST(Logs, tail_starts_at_a_line) {
   ASSERT_EQ(tail_text("line one\nline two\nline three\n", 15), std::string("line three\n"));
 }
 
+TEST(Logs, wifi_lines) {
+  std::string log =
+    "Oct 15 08:20:01 buildroot daemon.notice wpa_supplicant[300]: wlan0: CTRL-EVENT-CONNECTED - Connection to aa:bb completed\n"
+    "Oct 15 08:20:02 buildroot daemon.info udhcpc[310]: lease of 192.168.0.98 obtained, lease time 86400\n"
+    "Oct 15 08:20:03 buildroot cron.info crond[1273]: time disparity\n"
+    "Oct 15 08:21:00 buildroot user.notice nebulaos-osconfig: wifi connect ssid=office ok result=connected\n"
+    "Oct 15 08:21:01 buildroot user.notice nebulaos-osconfig: display set level=5 ok\n"
+    "Oct 15 08:21:02 buildroot daemon.debug wpa_supplicant[300]: wlan0: PSK=secret\n"
+    "Oct 15 08:21:03 buildroot user.notice nebulaos-osconfig: network set mode=dhcp ok\n"
+    "Oct 15 08:21:04 buildroot daemon.notice wpa_supplicant[300]: wlan0: WRONG_KEY";
+  std::string w = wifi_log_lines(log);
+  ASSERT_TRUE(w.find("CTRL-EVENT-CONNECTED") != std::string::npos);
+  ASSERT_TRUE(w.find("lease of 192.168.0.98") != std::string::npos);
+  ASSERT_TRUE(w.find("wifi connect ssid=office") != std::string::npos);
+  ASSERT_TRUE(w.find("network set mode=dhcp") != std::string::npos);
+  ASSERT_TRUE(w.find("WRONG_KEY\n") != std::string::npos);
+  ASSERT_TRUE(w.find("crond") == std::string::npos);
+  ASSERT_TRUE(w.find("display set") == std::string::npos);
+  ASSERT_TRUE(w.find("secret") == std::string::npos);
+  ASSERT_EQ(wifi_log_lines("Oct 15 crond: nothing\n"), std::string(""));
+}
+
 TEST(Info, after_clean_reset) {
   ASSERT_FALSE(after_clean_reset(info_reply()));
   json j = info_reply();

@@ -170,3 +170,24 @@ std::string tail_text(const std::string &content, size_t max_bytes) {
   if (nl != std::string::npos && nl + 1 < content.size()) start = nl + 1;
   return content.substr(start);
 }
+
+std::string wifi_log_lines(const std::string &system_log) {
+  std::string out;
+  size_t pos = 0;
+  while (pos < system_log.size()) {
+    size_t nl = system_log.find('\n', pos);
+    size_t end = nl == std::string::npos ? system_log.size() : nl;
+    std::string line = system_log.substr(pos, end - pos);
+    pos = end + 1;
+    bool wifi = line.find("wpa_supplicant") != std::string::npos
+      || line.find("udhcpc") != std::string::npos
+      || (line.find("nebulaos-osconfig") != std::string::npos
+          && (line.find(": wifi ") != std::string::npos || line.find(": network ") != std::string::npos));
+    if (!wifi) continue;
+    std::string lower = line;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    if (lower.find("psk") != std::string::npos || lower.find("passw") != std::string::npos) continue;
+    out += line + "\n";
+  }
+  return out;
+}

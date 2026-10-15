@@ -11,7 +11,8 @@
 
 // Read-only log viewer (decision D9): lists the files in Moonraker's "logs"
 // root and shows the end of the selected one. The file is read from the local
-// logs directory, so viewing works on the printer's own screen.
+// logs directory, so viewing works on the printer's own screen. A "Wi-Fi"
+// entry first shows only the Wi-Fi and DHCP lines of system.log (G59).
 class LogsPanel {
  public:
   LogsPanel(KWebSocketClient &ws, std::mutex &lock);
@@ -26,6 +27,7 @@ class LogsPanel {
  private:
   void handle_callback(lv_event_t *e);
   void show_file(const std::string &name);
+  void show_wifi();
 
   KWebSocketClient &ws;
   std::mutex &lv_lock;

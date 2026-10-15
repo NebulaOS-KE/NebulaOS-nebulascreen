@@ -62,4 +62,9 @@ std::vector<std::string> log_files(const json &files_reply);
 // The last `max_bytes` of a text, starting at a line boundary.
 std::string tail_text(const std::string &content, size_t max_bytes);
 
+// G59: the Wi-Fi lines of system.log - wpa_supplicant, udhcpc (DHCP) and the
+// nebulaos-osconfig wifi/network changes. A line naming a psk or password is
+// dropped, whatever its source.
+std::string wifi_log_lines(const std::string &system_log);
+
 #endif // __NEBULAOS_SYSTEM_H__
