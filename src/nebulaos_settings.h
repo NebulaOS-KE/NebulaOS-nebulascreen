@@ -154,9 +154,10 @@ struct McuFiles {
 McuFiles mcu_files(const json &files_reply);
 
 struct McuStatusView {
-  std::string running;    // "NebulaOS firmware" / "custom firmware" / ...
+  std::string running;    // "built-in MCU firmware (NebulaOS)" / "custom firmware" / ...
+  std::string reported;   // G47: the version the firmware reports about itself
   std::string ownership;  // "Auto-restore on" / "Custom firmware, auto-restore off"
-  std::string last;       // "Last install: x.bin, OK" / ""
+  std::string last;       // "x.bin, installed 2026-10-15, SHA-256 abcd1234..." / ""
 };
 
 McuStatusView mcu_status_view(const json &status_reply);

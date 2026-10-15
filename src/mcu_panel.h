@@ -52,6 +52,7 @@ class McuPanel {
   lv_obj_t *body;   // set by SettingsUi::page() while cont is built
   lv_obj_t *cont;
   lv_obj_t *running_value;
+  lv_obj_t *reported_value;
   lv_obj_t *owner_value;
   lv_obj_t *list;
   lv_obj_t *refresh_btn;

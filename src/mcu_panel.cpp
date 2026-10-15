@@ -23,6 +23,7 @@ McuPanel::McuPanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_t *right = SettingsUi::column(body, 29);
 
   running_value = SettingsUi::info_line(left, "Running");
+  reported_value = SettingsUi::info_line(left, "Version");
   owner_value = SettingsUi::info_line(left, "Owner");
 
   list = lv_obj_create(left);
@@ -38,7 +39,7 @@ McuPanel::McuPanel(KWebSocketClient &c, std::mutex &lock)
 
   refresh_btn = SettingsUi::icon_button(right, &refresh_img, "Refresh",
                                         &McuPanel::_handle_callback, this);
-  native_btn = SettingsUi::icon_button(right, &chip_img, "Reinstall NebulaOS firmware",
+  native_btn = SettingsUi::icon_button(right, &chip_img, "Reinstall built-in MCU firmware",
                                        &McuPanel::_handle_callback, this);
   lv_obj_set_height(native_btn, 52);
   lv_obj_add_state(native_btn, LV_STATE_DISABLED);
@@ -84,6 +85,7 @@ void McuPanel::refresh() {
 void McuPanel::show_status(const json &status_reply) {
   auto v = mcu_status_view(status_reply);
   lv_label_set_text(running_value, v.running.c_str());
+  lv_label_set_text(reported_value, v.reported.c_str());
   std::string owner = v.ownership + (v.last.empty() ? "" : "\nLast install: " + v.last);
   lv_label_set_text(owner_value, owner.c_str());
 }
@@ -156,7 +158,7 @@ void McuPanel::install(const McuFile &f) {
     return;
   }
   McuFile chosen = f;
-  SettingsUi::confirm(f.native ? "Reinstall NebulaOS firmware" : "Install MCU firmware",
+  SettingsUi::confirm(f.native ? "Reinstall built-in MCU firmware" : "Install MCU firmware",
     mcu_confirm_text(f).c_str(), "Install", SettingsUi::Tone::Danger, [this, chosen]() {
       if (KUtils::is_printing()) {   // a print may have started meanwhile
         KUtils::notify_locked();
@@ -244,7 +246,7 @@ void McuPanel::sim_fill() {
     "application_class":"NATIVE_CANDIDATE_001","application_identity":"v0.13.0-742-g01a9c2f92"},
     "last_flash":null}})"));
   show_files(json::parse(R"({"result":{"usb":["sda1"],
-    "builtin":{"id":"builtin/candidate-001.bin","source":"builtin","name":"NebulaOS firmware",
+    "builtin":{"id":"builtin/candidate-001.bin","source":"builtin","name":"Built-in MCU firmware",
       "sha256":")" + c + R"(","native":true,"size":40048,"valid":true,"kind":"packed"},
     "files":[
       {"id":"upload/klipper.bin","source":"upload","name":"klipper.bin","size":40112,
@@ -252,7 +254,7 @@ void McuPanel::sim_fill() {
        "klipper_version":"v0.13.0-118-g1a2b3c4d"},
       {"id":"upload/printer.cfg.bin","source":"upload","name":"printer.cfg.bin","size":4096,
        "valid":false,"sha256":")" + b + R"(","native":false,
-       "problem":"not firmware for this printer's mainboard: no Creality header and no NebulaOS placeholder at 0x200"},
+       "problem":"not firmware for this printer's mainboard: no vendor header and no NebulaOS placeholder at 0x200"},
       {"id":"usb/sda1/firmware/ke-klipper-v0.13.bin","source":"usb","name":"firmware/ke-klipper-v0.13.bin",
        "size":40210,"valid":true,"kind":"packed","sha256":")" + a + R"(","native":false,
        "klipper_version":"v0.12.0-301-gbeef0011",

@@ -181,7 +181,7 @@ TEST(Hostname, reply) {
 static json mcu_files_reply() {
   std::string sha(64, 'a');
   return json::parse(R"({"result":{"usb":["sda1"],"upload_dir":"/x",
-    "builtin":{"id":"builtin/candidate-001.bin","source":"builtin","name":"NebulaOS firmware",
+    "builtin":{"id":"builtin/candidate-001.bin","source":"builtin","name":"Built-in MCU firmware",
                "sha256":")" + std::string(64, 'c') + R"(","native":true,"size":40048,"valid":true,"kind":"packed"},
     "files":[
       {"id":"upload/junk.bin","source":"upload","name":"junk.bin","size":4096,"valid":false,
@@ -202,12 +202,12 @@ TEST(Mcu, files) {
   ASSERT_FALSE(f.files[0].valid);
   ASSERT_EQ(f.files[0].detail, std::string("Uploaded  -  4.0 KB  -  not firmware for this printer's mainboard"));
   ASSERT_EQ(f.files[1].detail, std::string("Uploaded  -  39.1 KB  -  ready (raw build, packed on install)"));
-  ASSERT_EQ(f.files[2].detail, std::string("USB  -  39.1 KB  -  NebulaOS firmware"));
+  ASSERT_EQ(f.files[2].detail, std::string("USB  -  39.1 KB  -  built-in MCU firmware"));
   auto p = mcu_flash_params(f.files[1]);
   ASSERT_EQ(p["file"].get<std::string>(), std::string("upload/klipper.bin"));
   ASSERT_EQ(p["sha256"].get<std::string>(), std::string(64, 'a'));
   ASSERT_TRUE(mcu_confirm_text(f.files[1]).find("another Klipper version") != std::string::npos);
-  ASSERT_TRUE(mcu_confirm_text(f.builtin).find("the NebulaOS firmware") != std::string::npos);
+  ASSERT_TRUE(mcu_confirm_text(f.builtin).find("the built-in MCU firmware (NebulaOS)") != std::string::npos);
   ASSERT_TRUE(mcu_files(json{{"error", {{"message", "x"}}}}).files.empty());
   ASSERT_EQ(human_size(512), std::string("512 B"));
 }
@@ -217,11 +217,25 @@ TEST(Mcu, status) {
     "application_class":"UNKNOWN_APPLICATION","application_identity":"v0.13.0-99"},
     "last_flash":{"file":"usb/sda1/KE.BIN","ok":true}}})");
   auto v = mcu_status_view(st);
-  ASSERT_EQ(v.running, std::string("custom firmware (v0.13.0-99)"));
+  ASSERT_EQ(v.running, std::string("custom firmware"));
+  ASSERT_EQ(v.reported, std::string("v0.13.0-99 (as the firmware reports itself)"));
   ASSERT_EQ(v.ownership, std::string("you (custom firmware)"));
   ASSERT_EQ(v.last, std::string("KE.BIN, installed"));
   auto n = mcu_status_view(json::parse(R"({"result":{"managed":true,"guard":null,"last_flash":null}})"));
   ASSERT_EQ(n.running, std::string("not checked yet this boot"));
+  ASSERT_EQ(n.reported, std::string("-"));
+  // G47/G53: the built-in firmware by name; the installed file with day and hash
+  auto b = mcu_status_view(json::parse(R"({"result":{"managed":true,"guard":{"result":"OK",
+    "application_class":"NATIVE_CANDIDATE_001","application_identity":"v0.13.0-118-g1a2b3c4d"},
+    "last_flash":{"file":"builtin/candidate-001.bin","ok":true,"time":1791500000,
+    "sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}}})"));
+  ASSERT_EQ(b.running, std::string("built-in MCU firmware (NebulaOS)"));
+  ASSERT_TRUE(b.last.find("candidate-001.bin, installed 2026-") == 0);
+  ASSERT_TRUE(b.last.find(", SHA-256 0123456789ab...") != std::string::npos);
+  auto o = mcu_status_view(json::parse(R"({"result":{"managed":true,"guard":{"result":"OK",
+    "application_class":"KNOWN_STOCK","application_identity":"x"}}})"));
+  ASSERT_EQ(o.running, std::string("original MCU firmware"));
+  ASSERT_TRUE(o.running.find("Creality") == std::string::npos);
   ASSERT_EQ(n.last, std::string(""));
   ASSERT_EQ(mcu_status_view(json()).running, std::string("unknown (no answer)"));
 }

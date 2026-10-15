@@ -373,7 +373,7 @@ static McuFile mcu_file(const json &f) {
   if (!m.valid) {
     state = m.problem.empty() ? "cannot be installed" : m.problem;
   } else if (m.native) {
-    state = "NebulaOS firmware";
+    state = "built-in MCU firmware";
   } else {
     state = m.kind == "raw" ? "ready (raw build, packed on install)" : "ready";
   }
@@ -414,14 +414,19 @@ McuStatusView mcu_status_view(const json &status_reply) {
   } else if (!r.contains("guard") || r["guard"].is_null()) {
     v.running = "not checked yet this boot";
   } else if (cls == "NATIVE_CANDIDATE_001") {
-    v.running = "NebulaOS firmware";
+    v.running = "built-in MCU firmware (NebulaOS)";
   } else if (cls == "KNOWN_STOCK") {
-    v.running = "Creality firmware";
+    v.running = "original MCU firmware";
   } else if (cls == "UNKNOWN_APPLICATION") {
-    v.running = "custom firmware" + (ident.empty() || ident == "unknown" ? "" : " (" + ident + ")");
+    v.running = "custom firmware";
   } else {
     v.running = "unknown";
   }
+  // G47: there is no fingerprint of what runs on the board, only the
+  // version string the firmware reports - always shown, and said so.
+  bool checked = r.contains("guard") && r["guard"].is_object();
+  v.reported = !checked ? "-" : (ident.empty() || ident == "unknown")
+    ? "not reported" : ident + " (as the firmware reports itself)";
   bool managed = bool_at(r, "/managed"_json_pointer, true);
   v.ownership = managed ? "NebulaOS (auto-restore on)" : "you (custom firmware)";
   if (r.contains("last_flash") && r["last_flash"].is_object()) {
@@ -431,6 +436,13 @@ McuStatusView mcu_status_view(const json &status_reply) {
     if (slash != std::string::npos) file = file.substr(slash + 1);
     bool ok = bool_at(l, "/ok"_json_pointer, false);
     v.last = file + (ok ? ", installed" : ", failed: " + str_at(l, "/error"_json_pointer));
+    if (l.contains("time") && l["time"].is_number_integer()) {
+      time_t t = (time_t)l["time"].template get<long>();
+      char day[16];
+      if (strftime(day, sizeof(day), "%Y-%m-%d", localtime(&t)) > 0) v.last += " " + std::string(day);
+    }
+    std::string sha = str_at(l, "/sha256"_json_pointer);
+    if (ok && sha.size() == 64) v.last += ", SHA-256 " + sha.substr(0, 12) + "...";
   }
   return v;
 }
@@ -440,7 +452,7 @@ json mcu_flash_params(const McuFile &f) {
 }
 
 std::string mcu_confirm_text(const McuFile &f) {
-  std::string what = f.native ? "the NebulaOS firmware" : f.name;
+  std::string what = f.native ? "the built-in MCU firmware (NebulaOS)" : f.name;
   std::string text = "Install " + what + " on the printer's mainboard?\n\n"
     "Klipper stops for about a minute. Do not switch the printer off.";
   if (!f.native) {
@@ -451,7 +463,7 @@ std::string mcu_confirm_text(const McuFile &f) {
       text += "\nWarning: " + f.version_note + ".";
     } else {
       text += " Firmware built from another Klipper version leaves Klipper unable to "
-              "connect - then reinstall the NebulaOS firmware here.";
+              "connect - then reinstall the built-in MCU firmware here.";
     }
   }
   return text;
@@ -466,9 +478,9 @@ McuFlashResult mcu_flash_result(const json &reply) {
     if (res.ok) {
       res.title = "Firmware installed";
       res.text = bool_at(r, "/native"_json_pointer, false)
-        ? "The NebulaOS firmware is installed and Klipper is restarting."
+        ? "The built-in MCU firmware is installed and Klipper is restarting."
         : "The firmware is installed and Klipper is restarting. If Klipper reports an "
-          "MCU error, reinstall the NebulaOS firmware here.";
+          "MCU error, reinstall the built-in MCU firmware here.";
       return res;
     }
     res.title = "Install failed";
@@ -493,7 +505,7 @@ McuFlashResult mcu_flash_result(const json &reply) {
     res.text = after_code(msg) + ".";
   } else {
     res.text = after_code(msg) + "\n\nKlipper was restarted. If it cannot reach the "
-      "mainboard, reinstall the NebulaOS firmware here.";
+      "mainboard, reinstall the built-in MCU firmware here.";
   }
   return res;
 }
