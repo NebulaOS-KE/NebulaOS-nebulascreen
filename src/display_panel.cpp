@@ -118,8 +118,8 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
   };
   set_nebulaos_btn = small_btn("Set NebulaOS logo");
   restore_btn = small_btn("Restore Creality logo");
-  SettingsUi::hint(right, "Upload PNG or BMP images in Mainsail (folder nebulaos_boot). "
-                          "Shown from the next start.");
+  SettingsUi::hint(right, "Upload a PNG, BMP or JPEG (max 4 MB) in Mainsail, folder "
+                          "nebulaos_boot. Best: 480 x 272, landscape. Shown from the next start.");
 
   for (lv_obj_t *w : {brightness_dd, sleep_dd, theme_dd, beep_sw, image_dd}) {
     lv_obj_add_event_cb(w, &DisplayPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
@@ -308,12 +308,13 @@ void DisplayPanel::handle_callback(lv_event_t *e) {
 // LVGL thread; the reply arrives on the websocket thread.
 void DisplayPanel::boot_logo_action(const char *method, const json &params, const char *what) {
   ws.send_jsonrpc(method, params, [this, what](json &reply) {
-    report_error(reply, what);
-    std::string msg = jsonrpc_error_message(reply).empty() ? power_on_result(reply) : "";
+    std::string err = jsonrpc_error_message(reply);
+    std::string msg = err.empty() ? power_on_result(reply) : boot_logo_error_text(err);
     {
       std::lock_guard<std::mutex> lock(lv_lock);
       if (!msg.empty()) {
-        KUtils::notify_toast(msg, 8000);
+        // a dialog, not a toast: it stays until read
+        SettingsUi::notice(what, msg.c_str());
       }
       refresh_boot_display();
     }

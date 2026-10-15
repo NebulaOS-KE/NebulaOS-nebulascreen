@@ -130,6 +130,18 @@ TEST(Updates, os_note) {
                         "NebulaOS itself is updated in System image."));
 }
 
+TEST(BootLogo, jpeg_listed_and_plain_errors) {
+  json files = {{"result", json::array({{{"path", "photo.JPG"}}, {{"path", "a.jpeg"}},
+                                        {{"path", "x.gif"}}})}};
+  auto imgs = boot_images(files);
+  ASSERT_EQ(imgs.size(), (size_t)2);
+  auto t = boot_logo_error_text("IMAGE_TOO_LARGE: the file is larger than 4 MB");
+  ASSERT_TRUE(t.find("This image cannot be used: the file is larger than 4 MB.") == 0);
+  ASSERT_TRUE(t.find("PNG, BMP or JPEG") != std::string::npos);
+  ASSERT_EQ(boot_logo_error_text("PRINTING: not possible while a print is active"),
+            std::string("Not possible while a print is active."));
+}
+
 TEST(Logs, wifi_lines) {
   std::string log =
     "Oct 15 08:20:01 buildroot daemon.notice wpa_supplicant[300]: wlan0: CTRL-EVENT-CONNECTED - Connection to aa:bb completed\n"

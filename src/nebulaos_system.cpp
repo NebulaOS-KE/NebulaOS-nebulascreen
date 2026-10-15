@@ -95,7 +95,8 @@ static bool image_name(const std::string &path) {
     std::string s(suffix);
     return lower.size() > s.size() && lower.compare(lower.size() - s.size(), s.size(), s) == 0;
   };
-  return path.find('/') == std::string::npos && (ends(".png") || ends(".bmp"));
+  return path.find('/') == std::string::npos && (ends(".png") || ends(".bmp") ||
+                                                  ends(".jpg") || ends(".jpeg"));
 }
 
 static std::vector<std::string> paths_of(const json &files_reply) {
@@ -236,4 +237,17 @@ std::string updates_os_note(const std::string &system_info_text) {
     text += " (build " + build + (date.empty() ? "" : ", " + date) + ")";
   }
   return text + " is updated in System image.";
+}
+
+std::string boot_logo_error_text(const std::string &message) {
+  // "CODE: text" from the helper; the text is already plain words.
+  auto pos = message.find(": ");
+  std::string code = pos == std::string::npos ? "" : message.substr(0, pos);
+  std::string text = pos == std::string::npos ? message : message.substr(pos + 2);
+  if (code == "PRINTING") return "Not possible while a print is active.";
+  if (code.rfind("IMAGE_", 0) == 0) {
+    return "This image cannot be used: " + text + ".\n\nUse a PNG, BMP or JPEG of at most "
+           "4 MB and 2048 x 2048 pixels. Best: 480 x 272, landscape.";
+  }
+  return text.empty() ? message : text;
 }

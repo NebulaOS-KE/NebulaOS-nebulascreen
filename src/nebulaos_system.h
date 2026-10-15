@@ -64,6 +64,9 @@ PowerOnView power_on_view(const json &status_reply);
 // After set-image / reset-image / restore: "" when the power-on logo was
 // written (or already right), else what to tell the user.
 std::string power_on_result(const json &reply);
+// A refused boot logo change ("IMAGE_FORMAT: this file is not ...") in
+// plain words, with what is accepted.
+std::string boot_logo_error_text(const std::string &message);
 
 // Log files from a server.files.list {"root":"logs"} reply: *.log and rotated
 // *.log.N, sorted by name.
