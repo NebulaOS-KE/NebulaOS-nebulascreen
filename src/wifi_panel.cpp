@@ -123,6 +123,7 @@ void WifiPanel::foreground() {
   spdlog::trace("wifi panel fg");
   lv_obj_move_foreground(cont);
   lv_obj_clear_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+  holding_result = false;
   show_prompt("Scanning for networks...");
   // A second scan picks up access points that answered late.
   rescans_left = 1;
@@ -160,7 +161,7 @@ void WifiPanel::show_scan(const json &reply) {
   auto current = wifi_current(reply);
   cur_network = current.ssid;
   cur_address = current.address;
-  if (!busy && !entering_password) {
+  if (!busy && !entering_password && !holding_result) {
     show_prompt(cur_network.empty()
       ? std::string("Please select your Wi-Fi network")
       : "Connected to\n" + cur_network + "\nIP: " + (cur_address.empty() ? "-" : cur_address));
@@ -223,6 +224,7 @@ void WifiPanel::handle_row_activated(const std::string &ssid) {
   if (busy) {
     return;
   }
+  holding_result = false;
   auto it = std::find_if(networks.begin(), networks.end(),
     [&ssid](const WifiNetwork &n) { return n.ssid == ssid; });
   if (it == networks.end()) {
@@ -280,6 +282,7 @@ void WifiPanel::confirm_remove_network(const std::string &ssid, const std::strin
       auto err = wifi_error_text(reply);
       if (!err.empty()) {
         self->show_prompt(err);
+        self->holding_result = true;
       }
       self->scan();
     });
@@ -366,6 +369,7 @@ void WifiPanel::connect(const std::string &ssid, const std::string &password) {
     } else {
       show_prompt(err);
     }
+    holding_result = true;
     scan();
   });
 }

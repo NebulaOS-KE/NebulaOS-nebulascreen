@@ -91,6 +91,9 @@ private:
   bool entering_password = false;
   bool pw_visible = false;
   bool busy = false;          // a connect or forget is running
+  // A connect/forget result stays on screen until the next action; the scan
+  // that follows updates only the list (P9: the error flashed by, 2026-10-15).
+  bool holding_result = false;
   int rescans_left = 0;
   StaticIpPanel static_ip_panel;
   NetworkDetailPanel network_detail_panel;
