@@ -49,6 +49,7 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
   , cont(SettingsUi::page("Display", &body))
   , back_btn(cont, &back, "Back", &DisplayPanel::_handle_callback, this)
 {
+  SettingsUi::on_shown(cont, [this]() { shown(); });
   Config *conf = Config::get_instance();
   lv_obj_t *left = SettingsUi::column(body, 50);
   lv_obj_t *right = SettingsUi::column(body, 47);
@@ -112,6 +113,10 @@ DisplayPanel::~DisplayPanel() {
 
 void DisplayPanel::foreground() {
   lv_obj_move_foreground(cont);
+}
+
+// Every time the page comes on top (SettingsUi::on_shown).
+void DisplayPanel::shown() {
   refresh_brightness();
   refresh_boot_display();
 }

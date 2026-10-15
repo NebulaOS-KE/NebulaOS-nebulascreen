@@ -28,6 +28,7 @@ SystemPanel::SystemPanel(KWebSocketClient &c, std::mutex &lock)
   , back_btn(cont, &back, "Back", &SystemPanel::_handle_callback, this)
   , logs_panel(c, lock)
 {
+  SettingsUi::on_shown(cont, [this]() { shown(); });
   lv_obj_t *left = SettingsUi::column(body, 60);
   lv_obj_t *right = SettingsUi::column(body, 37);
 
@@ -83,6 +84,10 @@ SystemPanel::~SystemPanel() {
 
 void SystemPanel::foreground() {
   lv_obj_move_foreground(cont);
+}
+
+// Every time the page comes on top (SettingsUi::on_shown).
+void SystemPanel::shown() {
   refresh();
 }
 

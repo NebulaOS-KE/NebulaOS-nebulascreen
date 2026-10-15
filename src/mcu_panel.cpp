@@ -17,6 +17,7 @@ McuPanel::McuPanel(KWebSocketClient &c, std::mutex &lock)
   , cont(SettingsUi::page("MCU firmware", &body))
   , back_btn(cont, &back, "Back", &McuPanel::_handle_callback, this)
 {
+  SettingsUi::on_shown(cont, [this]() { shown(); });
   lv_obj_t *left = SettingsUi::column(body, 68);
   lv_obj_set_style_pad_row(left, 3, 0);
   lv_obj_t *right = SettingsUi::column(body, 29);
@@ -58,6 +59,10 @@ McuPanel::~McuPanel() {
 
 void McuPanel::foreground() {
   lv_obj_move_foreground(cont);
+}
+
+// Every time the page comes on top (SettingsUi::on_shown).
+void McuPanel::shown() {
   refresh();
 }
 

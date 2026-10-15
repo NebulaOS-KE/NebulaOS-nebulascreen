@@ -27,6 +27,7 @@ class PowerPanel : public NotifyConsumer {
     };
 
   private:
+  void shown();
     void create_device(json &j);
     void handle_device_callback(json &j);
 

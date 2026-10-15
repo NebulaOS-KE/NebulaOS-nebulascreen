@@ -1,4 +1,5 @@
 #include "power_panel.h"
+#include "settings_ui.h"
 #include "plr_status.h"
 #include "state.h"
 #include "utils.h"
@@ -14,6 +15,7 @@ PowerPanel::PowerPanel(KWebSocketClient &websocket_client, std::mutex &l)
   , cont(lv_obj_create(lv_scr_act()))
   , back_btn(cont, &back, "Back", &PowerPanel::_handle_callback, this)
 {
+  SettingsUi::on_shown(cont, [this]() { shown(); });
   lv_obj_move_background(cont);
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
   lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
@@ -231,7 +233,10 @@ void PowerPanel::handle_device_callback(json &j) {
 
 void PowerPanel::foreground() {
   lv_obj_move_foreground(cont);
+}
 
+// Every time the page comes on top (SettingsUi::on_shown).
+void PowerPanel::shown() {
   // Re-check for a recoverable print each time the screen is opened.
   refresh_recovery();
 

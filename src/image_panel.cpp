@@ -20,6 +20,7 @@ ImagePanel::ImagePanel(KWebSocketClient &c, std::mutex &lock)
   , cont(SettingsUi::page("System image", &body))
   , back_btn(cont, &back, "Back", &ImagePanel::_handle_callback, this)
 {
+  SettingsUi::on_shown(cont, [this]() { shown(); });
   lv_obj_t *left = SettingsUi::column(body, 68);
   lv_obj_set_style_pad_row(left, 3, 0);
   lv_obj_t *right = SettingsUi::column(body, 29);
@@ -57,6 +58,10 @@ ImagePanel::~ImagePanel() {
 
 void ImagePanel::foreground() {
   lv_obj_move_foreground(cont);
+}
+
+// Every time the page comes on top (SettingsUi::on_shown).
+void ImagePanel::shown() {
   refresh();
   // An install started before (the screen restarted meanwhile): follow it.
   if (!working) {

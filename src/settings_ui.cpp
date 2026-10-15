@@ -1,9 +1,28 @@
 #include "settings_ui.h"
 #include "utils.h"
 
+#include <map>
 #include <set>
 
 namespace SettingsUi {
+
+static std::map<lv_obj_t *, std::function<void()>> shown_pages;
+static lv_obj_t *top_page = nullptr;
+
+static void watch_top(lv_timer_t *) {
+  lv_obj_t *scr = lv_scr_act();
+  uint32_t n = lv_obj_get_child_cnt(scr);
+  lv_obj_t *top = n > 0 ? lv_obj_get_child(scr, n - 1) : nullptr;
+  if (top == top_page) return;
+  top_page = top;
+  auto it = shown_pages.find(top);
+  if (it != shown_pages.end()) it->second();
+}
+
+void on_shown(lv_obj_t *page, std::function<void()> shown) {
+  if (shown_pages.empty()) lv_timer_create(&watch_top, 200, nullptr);
+  shown_pages[page] = std::move(shown);
+}
 
 lv_obj_t *page(const char *title, lv_obj_t **body) {
   lv_obj_t *cont = lv_obj_create(lv_scr_act());

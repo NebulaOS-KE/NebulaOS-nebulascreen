@@ -34,6 +34,7 @@ class ResetPanel {
   }
 
  private:
+  void shown();
   void handle_callback(lv_event_t *e);
   void restart_gui();
   void reset_gui_settings();

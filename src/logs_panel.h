@@ -25,6 +25,7 @@ class LogsPanel {
   }
 
  private:
+  void shown();
   void handle_callback(lv_event_t *e);
   void show_file(const std::string &name);
   void show_wifi();

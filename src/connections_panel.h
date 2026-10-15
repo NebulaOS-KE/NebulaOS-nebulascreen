@@ -34,6 +34,7 @@ class ConnectionsPanel {
   }
 
  private:
+  void shown();
   void handle_callback(lv_event_t *e);
   void refresh();
   void show(const json &net_status_reply, const json &server_config_reply);

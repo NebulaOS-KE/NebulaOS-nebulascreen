@@ -18,8 +18,7 @@ ConnectionsPanel::ConnectionsPanel(KWebSocketClient &c, std::mutex &lock, Spoolm
   , cont(SettingsUi::page("Connections", &body))
   , back_btn(cont, &back, "Back", &ConnectionsPanel::_handle_callback, this)
 {
-  wifi_panel.on_changed = [this]() { refresh(); };
-
+  SettingsUi::on_shown(cont, [this]() { shown(); });
   lv_obj_t *left = SettingsUi::column(body, 60);
   wifi_value = SettingsUi::info_line(left, "Wi-Fi");
   address_value = SettingsUi::info_line(left, "Address");
@@ -65,6 +64,10 @@ void ConnectionsPanel::enable_spoolman() {
 
 void ConnectionsPanel::foreground() {
   lv_obj_move_foreground(cont);
+}
+
+// Every time the page comes on top (SettingsUi::on_shown).
+void ConnectionsPanel::shown() {
   refresh();
 }
 

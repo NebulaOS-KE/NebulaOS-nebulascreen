@@ -34,6 +34,7 @@ class ImagePanel {
   }
 
  private:
+  void shown();
   void handle_callback(lv_event_t *e);
   void refresh();
   void show_files(const json &list_reply);

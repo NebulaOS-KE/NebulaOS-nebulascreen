@@ -32,6 +32,7 @@ class UpdatesPanel {
   }
 
  private:
+  void shown();
   void handle_callback(lv_event_t *e);
   void refresh(bool check_remote);
   void show(const json &status_reply);

@@ -17,6 +17,7 @@ UpdatesPanel::UpdatesPanel(KWebSocketClient &c, std::mutex &lock)
   , back_btn(cont, &back, "Back", &UpdatesPanel::_handle_callback, this)
   , image_panel(c, lock)
 {
+  SettingsUi::on_shown(cont, [this]() { shown(); });
   lv_obj_t *left = SettingsUi::column(body, 68);
   lv_obj_t *right = SettingsUi::column(body, 29);
 
@@ -71,6 +72,10 @@ UpdatesPanel::~UpdatesPanel() {
 
 void UpdatesPanel::foreground() {
   lv_obj_move_foreground(cont);
+}
+
+// Every time the page comes on top (SettingsUi::on_shown).
+void UpdatesPanel::shown() {
   // A reply lost to a Moonraker restart must not keep the page busy forever.
   waiting_for_reply = false;
   refresh(false);

@@ -30,6 +30,7 @@ ResetPanel::ResetPanel(KWebSocketClient &c, std::mutex &lock)
   , swap_btn(cont, &swap_img, "Swap boot\nslot (A/B)", &ResetPanel::_handle_callback, this)
   , back_btn(cont, &back, "Back", &ResetPanel::_handle_callback, this)
 {
+  SettingsUi::on_shown(cont, [this]() { shown(); });
   lv_obj_move_background(cont);
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
   lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
@@ -63,6 +64,10 @@ ResetPanel::~ResetPanel() {
 
 void ResetPanel::foreground() {
   lv_obj_move_foreground(cont);
+}
+
+// Every time the page comes on top (SettingsUi::on_shown).
+void ResetPanel::shown() {
   ws.send_jsonrpc(IMAGE_STATUS_METHOD, json::object(), [this](json &reply) {
     std::lock_guard<std::mutex> lock(lv_lock);
     image_status = reply;

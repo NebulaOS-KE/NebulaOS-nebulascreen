@@ -32,6 +32,12 @@ lv_obj_t *row(lv_obj_t *parent, const char *label);
 // "Key   value" info line; returns the value label.
 lv_obj_t *info_line(lv_obj_t *parent, const char *key);
 
+// Calls `shown` every time `page` becomes the top page of the screen: when it
+// is opened, and again when a page opened over it is closed - so a page always
+// shows current state, whichever way it was reached. Runs on the LVGL thread
+// with the LVGL lock held (from an lv_timer), at most every 200 ms.
+void on_shown(lv_obj_t *page, std::function<void()> shown);
+
 // A thin divider line.
 void divider(lv_obj_t *parent);
 

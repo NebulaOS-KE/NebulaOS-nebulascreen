@@ -1,4 +1,5 @@
 #include "logs_panel.h"
+#include "settings_ui.h"
 #include "nebulaos_system.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
@@ -19,6 +20,7 @@ LogsPanel::LogsPanel(KWebSocketClient &c, std::mutex &lock)
   , text(lv_label_create(text_cont))
   , back_btn(cont, &back, "Back", &LogsPanel::_handle_callback, this)
 {
+  SettingsUi::on_shown(cont, [this]() { shown(); });
   lv_obj_move_background(cont);
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
   lv_obj_set_style_pad_all(cont, 4, 0);
@@ -51,6 +53,10 @@ LogsPanel::~LogsPanel() {
 
 void LogsPanel::foreground() {
   lv_obj_move_foreground(cont);
+}
+
+// Every time the page comes on top (SettingsUi::on_shown).
+void LogsPanel::shown() {
   json params = {{"root", "logs"}};
   ws.send_jsonrpc("server.files.list", params, [this](json &reply) {
     auto names = log_files(reply);

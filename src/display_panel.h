@@ -27,6 +27,7 @@ class DisplayPanel {
   }
 
  private:
+  void shown();
   void handle_callback(lv_event_t *e);
   void refresh_brightness();
   void refresh_boot_display();
