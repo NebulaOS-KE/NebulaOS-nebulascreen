@@ -49,13 +49,6 @@ TEST(Bytes, human) {
 }
 
 TEST(BootMode, index_and_value) {
-  ASSERT_EQ(boot_mode_index(boot_status("blank", "builtin")), 1);
-  ASSERT_EQ(boot_mode_index(boot_status("console", "builtin")), 0);  // retired (D10): logo
-  ASSERT_EQ(boot_mode_index(json()), 0);
-  ASSERT_EQ(boot_mode_at(0), std::string("logo"));
-  ASSERT_EQ(boot_mode_at(1), std::string("blank"));
-  ASSERT_EQ(boot_mode_at(2), std::string(""));
-  ASSERT_EQ(std::string(BOOT_MODE_OPTIONS), std::string("Logo\nBlank"));
 }
 
 TEST(Info, slot) {
@@ -71,7 +64,7 @@ TEST(BootImage, list_filters_and_sorts) {
   auto imgs = boot_images(files);
   ASSERT_EQ(imgs.size(), (size_t)3);
   ASSERT_EQ(imgs[0], std::string("UP.PNG"));
-  ASSERT_EQ(boot_image_options(imgs), std::string("Built-in\nUP.PNG\nlogo.png\nzz.bmp"));
+  ASSERT_EQ(boot_image_options(imgs), std::string("NebulaOS\nUP.PNG\nlogo.png\nzz.bmp"));
   ASSERT_EQ(boot_image_index(boot_status("logo", "logo.png"), imgs), 2);
   ASSERT_EQ(boot_image_index(boot_status("logo", "builtin"), imgs), 0);
 }
@@ -89,6 +82,43 @@ TEST(Logs, list) {
 TEST(Logs, tail_starts_at_a_line) {
   ASSERT_EQ(tail_text("short", 100), std::string("short"));
   ASSERT_EQ(tail_text("line one\nline two\nline three\n", 15), std::string("line three\n"));
+}
+
+TEST(BootLogo, power_on_view) {
+  auto st = [](const char *logo, bool writable, bool original) {
+    return json{{"result", {{"power_on", {{"slot", "B"}, {"logo", logo}, {"writable", writable},
+                                          {"original_available", original}}}}}};
+  };
+  auto o = power_on_view(st("original", true, true));
+  ASSERT_EQ(o.text, std::string("Power-on logo (slot B): original"));
+  ASSERT_TRUE(o.can_set_nebulaos);
+  ASSERT_FALSE(o.can_restore);
+  auto n = power_on_view(st("nebulaos", true, true));
+  ASSERT_FALSE(n.can_set_nebulaos);
+  ASSERT_TRUE(n.can_restore);
+  auto c = power_on_view(st("custom", true, false));
+  ASSERT_EQ(c.text, std::string("Power-on logo (slot B): your image"));
+  ASSERT_TRUE(c.can_set_nebulaos);
+  ASSERT_FALSE(c.can_restore);
+  json u = st("unknown", false, true);
+  u["result"]["power_on"]["reason"] = "the RTOS in this slot is not the known one; it is never changed";
+  auto x = power_on_view(u);
+  ASSERT_FALSE(x.can_set_nebulaos || x.can_restore);
+  ASSERT_TRUE(x.text.find("Cannot be changed here: the RTOS") != std::string::npos);
+  ASSERT_EQ(power_on_view(json()).text, std::string("Power-on logo: unknown"));
+  for (const auto *t : {&o.text, &n.text, &c.text, &x.text}) {
+    ASSERT_TRUE(t->find("Creality") == std::string::npos);
+  }
+}
+
+TEST(BootLogo, power_on_result) {
+  ASSERT_EQ(power_on_result(json{{"result", {{"result", "APPLIED"},
+            {"power_on", {{"result", "WRITTEN"}}}}}}), std::string(""));
+  ASSERT_EQ(power_on_result(json{{"result", {{"result", "UNCHANGED"}}}}), std::string(""));
+  auto f = power_on_result(json{{"result", {{"result", "APPLIED"}, {"power_on",
+            {{"result", "FAILED"}, {"error", "RTOS_UNKNOWN"}, {"message", "not the known one"}}}}}});
+  ASSERT_TRUE(f.find("power-on logo did not: not the known one") != std::string::npos);
+  ASSERT_TRUE(power_on_result(json{{"error", {{"message", "PRINTING: no"}}}}).find("PRINTING") != std::string::npos);
 }
 
 TEST(Logs, wifi_lines) {

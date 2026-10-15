@@ -9,6 +9,7 @@ const char *const BOOT_DISPLAY_STATUS_METHOD = "machine.nebulaos.boot_display.st
 const char *const BOOT_DISPLAY_MODE_METHOD = "machine.nebulaos.boot_display.mode";
 const char *const BOOT_DISPLAY_IMAGE_METHOD = "machine.nebulaos.boot_display.image";
 const char *const BOOT_DISPLAY_RESET_METHOD = "machine.nebulaos.boot_display.reset_image";
+const char *const BOOT_DISPLAY_RESTORE_METHOD = "machine.nebulaos.boot_display.restore_original_logo";
 const char *const CLEAN_RESET_METHOD = "machine.nebulaos.system.clean_reset";
 const char *const SWAP_SLOT_METHOD = "machine.nebulaos.system.swap_slot";
 const char *const ACK_CLEAN_RESET_METHOD = "machine.nebulaos.system.ack_clean_reset";
@@ -17,10 +18,7 @@ const char *const AFTER_RESET_TEXT =
   "Everything is back to how NebulaOS ships it, including Wi-Fi.\n\n"
   "Connect to Wi-Fi under Settings > Connections > Wi-Fi networks.";
 // Console was removed (D10): NebulaOS reads a saved "console" as logo.
-const char *const BOOT_MODE_OPTIONS = "Logo\nBlank";
 
-static const char *const MODES[] = {"logo", "blank"};
-static const int MODE_COUNT = 2;
 
 static const json &result_of(const json &reply) {
   static const json empty = json::object();
@@ -90,19 +88,6 @@ bool after_clean_reset(const json &info_reply) {
   return !str_at(result_of(info_reply), "/after_clean_reset"_json_pointer).empty();
 }
 
-std::string boot_mode_at(int index) {
-  if (index < 0 || index >= MODE_COUNT) return "";
-  return MODES[index];
-}
-
-int boot_mode_index(const json &status_reply) {
-  std::string mode = str_at(result_of(status_reply), "/config/mode"_json_pointer);
-  for (int i = 0; i < MODE_COUNT; ++i) {
-    if (mode == MODES[i]) return i;
-  }
-  return 0;
-}
-
 static bool image_name(const std::string &path) {
   std::string lower = path;
   std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -136,7 +121,7 @@ std::vector<std::string> boot_images(const json &files_reply) {
 }
 
 std::string boot_image_options(const std::vector<std::string> &images) {
-  std::string out = "Built-in";
+  std::string out = "NebulaOS";
   for (const auto &i : images) out += "\n" + i;
   return out;
 }
@@ -190,4 +175,47 @@ std::string wifi_log_lines(const std::string &system_log) {
     out += line + "\n";
   }
   return out;
+}
+
+PowerOnView power_on_view(const json &status_reply) {
+  PowerOnView v;
+  const json &r = result_of(status_reply);
+  if (!r.contains("power_on") || !r["power_on"].is_object()) {
+    v.text = "Power-on logo: unknown";
+    return v;
+  }
+  const json &p = r["power_on"];
+  std::string slot = str_at(p, "/slot"_json_pointer);
+  std::string logo = str_at(p, "/logo"_json_pointer);
+  bool writable = p.contains("writable") && p["writable"].is_boolean() && p["writable"].get<bool>();
+  bool original = p.contains("original_available") && p["original_available"].is_boolean()
+                  && p["original_available"].get<bool>();
+  std::string what = logo == "nebulaos" ? "NebulaOS" : logo == "original" ? "original"
+                   : logo == "custom" ? "your image" : "unknown";
+  v.text = "Power-on logo" + (slot.empty() ? std::string("") : " (slot " + slot + ")") + ": " + what;
+  if (!writable) {
+    std::string why = str_at(p, "/reason"_json_pointer);
+    v.text += "\nCannot be changed here" + (why.empty() ? std::string(".") : ": " + why + ".");
+    return v;
+  }
+  v.can_set_nebulaos = logo != "nebulaos";
+  v.can_restore = original && logo != "original";
+  return v;
+}
+
+std::string power_on_result(const json &reply) {
+  std::string err;
+  if (reply.is_object() && reply.contains("error")) {
+    const json &e = reply["error"];
+    err = e.is_object() && e.contains("message") && e["message"].is_string()
+      ? e["message"].get<std::string>() : e.dump();
+  }
+  if (!err.empty()) return "Power-on logo not changed: " + err;
+  const json &r = result_of(reply);
+  const json &p = r.contains("power_on") && r["power_on"].is_object() ? r["power_on"] : r;
+  std::string res = str_at(p, "/result"_json_pointer);
+  if (res == "WRITTEN" || res == "UNCHANGED") return "";
+  std::string msg = str_at(p, "/message"_json_pointer);
+  return "The boot screen changed, but the power-on logo did not" +
+         (msg.empty() ? std::string(".") : ": " + msg + ".");
 }

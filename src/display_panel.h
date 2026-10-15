@@ -34,6 +34,9 @@ class DisplayPanel {
   void show_brightness(const json &display_status_reply);
   void show_boot_display(const std::vector<std::string> &imgs, const json &status_reply);
   void report_error(json &reply, const char *what);
+  // G58: set-image / reset-image / restore, after a confirmation; reports
+  // what happened to the power-on logo and reloads the section.
+  void boot_logo_action(const char *method, const json &params, const char *what);
 
   KWebSocketClient &ws;
   std::mutex &lv_lock;
@@ -44,8 +47,10 @@ class DisplayPanel {
   lv_obj_t *sleep_dd;
   lv_obj_t *theme_dd;
   lv_obj_t *beep_sw;
-  lv_obj_t *mode_dd;
   lv_obj_t *image_dd;
+  lv_obj_t *power_label;
+  lv_obj_t *set_nebulaos_btn;
+  lv_obj_t *restore_btn;
   ButtonContainer back_btn;
 
   std::vector<int> brightness_levels;

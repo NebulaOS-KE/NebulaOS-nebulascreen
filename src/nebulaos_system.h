@@ -21,6 +21,7 @@ extern const char *const BOOT_DISPLAY_STATUS_METHOD;  // machine.nebulaos.boot_d
 extern const char *const BOOT_DISPLAY_MODE_METHOD;    // machine.nebulaos.boot_display.mode {"mode"}
 extern const char *const BOOT_DISPLAY_IMAGE_METHOD;   // machine.nebulaos.boot_display.image {"filename"}
 extern const char *const BOOT_DISPLAY_RESET_METHOD;   // machine.nebulaos.boot_display.reset_image
+extern const char *const BOOT_DISPLAY_RESTORE_METHOD; // machine.nebulaos.boot_display.restore_original_logo
 // Both refuse while printing, reboot at once, and undo themselves when the
 // reboot cannot be started (S2/S3).
 extern const char *const CLEAN_RESET_METHOD;          // machine.nebulaos.system.clean_reset
@@ -45,15 +46,24 @@ extern const char *const AFTER_RESET_TEXT;
 // "12.3 GB" / "512 MB" style.
 std::string human_bytes(double bytes);
 
-// Boot screen mode dropdown: fixed order logo, blank.
-extern const char *const BOOT_MODE_OPTIONS;   // "Logo\nBlank"
-std::string boot_mode_at(int index);          // "logo" | "blank" | ""
-int boot_mode_index(const json &status_reply); // index of config.mode (default 0)
-
-// Boot image dropdown: "Built-in" first, then uploaded PNG/BMP files (sorted).
+// Boot logo dropdown (G58: always a logo, no Blank): "NebulaOS" first, then
+// uploaded PNG/BMP files (sorted). The choice is the Linux boot screen AND the
+// power-on logo the RTOS of the running slot shows.
 std::vector<std::string> boot_images(const json &files_reply);
 std::string boot_image_options(const std::vector<std::string> &images);
 int boot_image_index(const json &status_reply, const std::vector<std::string> &images);
+
+// G58/G40: the power-on logo of the running slot (boot_display.status
+// "power_on"): a line for the page and which buttons apply.
+struct PowerOnView {
+  std::string text;              // "Power-on logo (slot B): NebulaOS"
+  bool can_set_nebulaos = false; // the RTOS is known and does not show NebulaOS's logo
+  bool can_restore = false;      // a copy of the original exists and it is not shown
+};
+PowerOnView power_on_view(const json &status_reply);
+// After set-image / reset-image / restore: "" when the power-on logo was
+// written (or already right), else what to tell the user.
+std::string power_on_result(const json &reply);
 
 // Log files from a server.files.list {"root":"logs"} reply: *.log and rotated
 // *.log.N, sorted by name.
