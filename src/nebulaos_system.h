@@ -22,6 +22,10 @@ extern const char *const BOOT_DISPLAY_MODE_METHOD;    // machine.nebulaos.boot_d
 extern const char *const BOOT_DISPLAY_IMAGE_METHOD;   // machine.nebulaos.boot_display.image {"filename"}
 extern const char *const BOOT_DISPLAY_RESET_METHOD;   // machine.nebulaos.boot_display.reset_image
 extern const char *const BOOT_DISPLAY_RESTORE_METHOD; // machine.nebulaos.boot_display.restore_original_logo
+extern const char *const BOOT_DISPLAY_IMAGES_METHOD;  // machine.nebulaos.boot_display.images
+extern const char *const BOOT_DISPLAY_PREVIEW_METHOD; // machine.nebulaos.boot_display.preview {"filename"}
+extern const char *const BOOT_DISPLAY_IMPORT_METHOD;  // machine.nebulaos.boot_display.import_usb {"file"}
+extern const char *const BOOT_DISPLAY_DELETE_METHOD;  // machine.nebulaos.boot_display.delete_image {"filename"}
 // Both refuse while printing, reboot at once, and undo themselves when the
 // reboot cannot be started (S2/S3).
 extern const char *const CLEAN_RESET_METHOD;          // machine.nebulaos.system.clean_reset
@@ -67,6 +71,26 @@ std::string power_on_result(const json &reply);
 // A refused boot logo change ("IMAGE_FORMAT: this file is not ...") in
 // plain words, with what is accepted.
 std::string boot_logo_error_text(const std::string &message);
+
+// G61 (2026-10-16): the Boot logo page. From boot_display.images: the
+// dropdown ("NebulaOS" + every image in the boot logo folder), which entry is
+// active, and the images on a USB stick for "Add from USB".
+struct UsbImage {
+  std::string id;     // "usb/sda1/pics/logo.png"
+  std::string name;
+};
+struct BootLogoList {
+  std::vector<std::string> names;   // uploads, in dropdown order after "NebulaOS"
+  std::string options;              // "NebulaOS\nlogo.png\n..."
+  int active = 0;                   // dropdown index of what is set now
+  std::vector<UsbImage> usb;
+  bool usb_present = false;
+};
+BootLogoList boot_logo_list(const json &images_reply);
+// Dropdown index of `name` (0 = NebulaOS when not found).
+int boot_logo_index(const BootLogoList &l, const std::string &name);
+// "A:/run/.../preview-x.png" for lv_img from a preview reply, "" on error.
+std::string boot_logo_preview_src(const json &preview_reply);
 
 // Log files from a server.files.list {"root":"logs"} reply: *.log and rotated
 // *.log.N, sorted by name.

@@ -142,6 +142,25 @@ TEST(BootLogo, jpeg_listed_and_plain_errors) {
             std::string("Not possible while a print is active."));
 }
 
+TEST(BootLogo, page_list) {
+  json r = json::parse(R"({"result":{"images":[{"name":"A b.png","size":1},{"name":"logo.jpg","size":2}],
+    "selected":"logo.jpg","custom_active":true,
+    "usb":[{"id":"usb/sda1/x.png","name":"x.png","size":3}],"usb_present":true}})");
+  auto l = boot_logo_list(r);
+  ASSERT_EQ(l.options, std::string("NebulaOS\nA b.png\nlogo.jpg"));
+  ASSERT_EQ(l.active, 2);
+  ASSERT_EQ(l.usb.size(), (size_t)1);
+  ASSERT_TRUE(l.usb_present);
+  ASSERT_EQ(boot_logo_index(l, "A b.png"), 1);     // auto-select after Add from USB
+  ASSERT_EQ(boot_logo_index(l, "gone.png"), 0);
+  auto none = boot_logo_list(json::parse(R"({"result":{"images":[],"selected":""}})"));
+  ASSERT_EQ(none.options, std::string("NebulaOS"));
+  ASSERT_EQ(none.active, 0);
+  ASSERT_EQ(boot_logo_preview_src(json::parse(R"({"result":{"path":"/run/nebulaos/boot-preview/p.png"}})")),
+            std::string("A:/run/nebulaos/boot-preview/p.png"));
+  ASSERT_EQ(boot_logo_preview_src(json()), std::string(""));
+}
+
 TEST(Logs, wifi_lines) {
   std::string log =
     "Oct 15 08:20:01 buildroot daemon.notice wpa_supplicant[300]: wlan0: CTRL-EVENT-CONNECTED - Connection to aa:bb completed\n"

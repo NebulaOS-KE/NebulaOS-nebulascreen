@@ -15,6 +15,7 @@
 namespace fs = std::experimental::filesystem;
 
 LV_IMG_DECLARE(back);
+LV_IMG_DECLARE(display_img);
 
 struct SleepOption {
   const char *label;
@@ -48,6 +49,7 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
   , lv_lock(lock)
   , cont(SettingsUi::page("Display", &body))
   , back_btn(cont, &back, "Back", &DisplayPanel::_handle_callback, this)
+  , boot_logo_panel(c, lock)
 {
   SettingsUi::on_shown(cont, [this]() { shown(); });
   Config *conf = Config::get_instance();
@@ -93,35 +95,12 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
 
   // G58 (2026-10-15): always a boot logo, NebulaOS's by default; the choice
   // is also the power-on logo (the RTOS of the running slot).
-  image_dd = right_dropdown(SettingsUi::row(right, "Boot logo"), "NebulaOS");
+  // G61 (2026-10-16): the boot logo has its own page (submenu rule).
+  boot_logo_btn = SettingsUi::icon_button(right, &display_img, "Boot logo",
+                                          &DisplayPanel::_handle_callback, this);
   power_label = SettingsUi::hint(right, "Power-on logo: ...");
-  lv_obj_t *btns = lv_obj_create(right);
-  lv_obj_set_size(btns, LV_PCT(100), LV_SIZE_CONTENT);
-  lv_obj_set_style_pad_all(btns, 0, 0);
-  lv_obj_set_style_pad_column(btns, 4, 0);
-  lv_obj_set_style_border_width(btns, 0, 0);
-  lv_obj_set_style_bg_opa(btns, LV_OPA_TRANSP, 0);
-  lv_obj_clear_flag(btns, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_flex_flow(btns, LV_FLEX_FLOW_ROW);
-  auto small_btn = [&](const char *text) {
-    lv_obj_t *b = lv_btn_create(btns);
-    lv_obj_set_height(b, 30);
-    lv_obj_set_flex_grow(b, 1);
-    lv_obj_t *l = lv_label_create(b);
-    lv_label_set_text(l, text);
-    lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_font(l, &lv_font_montserrat_10, 0);
-    lv_obj_center(l);
-    lv_obj_add_event_cb(b, &DisplayPanel::_handle_callback, LV_EVENT_CLICKED, this);
-    lv_obj_add_state(b, LV_STATE_DISABLED);
-    return b;
-  };
-  set_nebulaos_btn = small_btn("Set NebulaOS logo");
-  restore_btn = small_btn("Restore Creality logo");
-  SettingsUi::hint(right, "Upload a PNG, BMP or JPEG (max 4 MB) in Mainsail, folder "
-                          "nebulaos_boot. Best: 480 x 272, landscape. Shown from the next start.");
 
-  for (lv_obj_t *w : {brightness_dd, sleep_dd, theme_dd, beep_sw, image_dd}) {
+  for (lv_obj_t *w : {brightness_dd, sleep_dd, theme_dd, beep_sw}) {
     lv_obj_add_event_cb(w, &DisplayPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
   }
 
@@ -143,7 +122,10 @@ void DisplayPanel::foreground() {
 // Every time the page comes on top (SettingsUi::on_shown).
 void DisplayPanel::shown() {
   refresh_brightness();
-  refresh_boot_display();
+  ws.send_jsonrpc(BOOT_DISPLAY_STATUS_METHOD, json::object(), [this](json &status) {
+    std::lock_guard<std::mutex> lock(lv_lock);
+    lv_label_set_text(power_label, power_on_view(status).text.c_str());
+  });
 }
 
 void DisplayPanel::report_error(json &reply, const char *what) {
@@ -183,38 +165,10 @@ void DisplayPanel::show_brightness(const json &reply) {
   }
 }
 
-void DisplayPanel::refresh_boot_display() {
-  json params = {{"root", "nebulaos_boot"}};
-  ws.send_jsonrpc("server.files.list", params, [this](json &files_reply) {
-    auto imgs = boot_images(files_reply);
-    ws.send_jsonrpc(BOOT_DISPLAY_STATUS_METHOD, json::object(), [this, imgs](json &status) {
-      std::lock_guard<std::mutex> lock(lv_lock);
-      show_boot_display(imgs, status);
-    });
-  });
-}
-
-// LVGL lock held by the caller.
-void DisplayPanel::show_boot_display(const std::vector<std::string> &imgs, const json &status) {
-  images = imgs;
-  updating = true;
-  lv_dropdown_set_options(image_dd, boot_image_options(images).c_str());
-  lv_dropdown_set_selected(image_dd, boot_image_index(status, images));
-  auto p = power_on_view(status);
-  lv_label_set_text(power_label, p.text.c_str());
-  if (p.can_set_nebulaos) lv_obj_clear_state(set_nebulaos_btn, LV_STATE_DISABLED);
-  else lv_obj_add_state(set_nebulaos_btn, LV_STATE_DISABLED);
-  if (p.can_restore) lv_obj_clear_state(restore_btn, LV_STATE_DISABLED);
-  else lv_obj_add_state(restore_btn, LV_STATE_DISABLED);
-  updating = false;
-}
-
 #ifdef SIMULATOR
 void DisplayPanel::sim_fill() {
   show_brightness(json::parse(R"({"result":{"levels":[25,50,75,100],
     "config":{"brightness":100},"backlight":{"available":true}}})"));
-  show_boot_display({"nebula-dark.png"}, json::parse(R"({"result":{"config":{"mode":"logo",
-    "image":"builtin","schema":1}}})"));
 }
 #endif
 
@@ -226,22 +180,8 @@ void DisplayPanel::handle_callback(lv_event_t *e) {
     lv_obj_move_background(cont);
     return;
   }
-  if (code == LV_EVENT_CLICKED && obj == set_nebulaos_btn) {
-    SettingsUi::confirm("Set NebulaOS logo",
-      "The NebulaOS logo becomes the boot screen and the power-on logo of this boot slot "
-      "(written into its RTOS). Shown from the next start.",
-      "Set", SettingsUi::Tone::Warning, [this]() {
-        boot_logo_action(BOOT_DISPLAY_RESET_METHOD, json::object(), "Boot logo not changed");
-      });
-    return;
-  }
-  if (code == LV_EVENT_CLICKED && obj == restore_btn) {
-    SettingsUi::confirm("Restore Creality logo",
-      "The original power-on logo goes back into this boot slot's RTOS. The boot screen "
-      "after it stays as it is. Shown from the next start.",
-      "Restore", SettingsUi::Tone::Warning, [this]() {
-        boot_logo_action(BOOT_DISPLAY_RESTORE_METHOD, json::object(), "Power-on logo not changed");
-      });
+  if (code == LV_EVENT_CLICKED && obj == boot_logo_btn) {
+    boot_logo_panel.foreground();
     return;
   }
   if (code != LV_EVENT_VALUE_CHANGED || updating) {
@@ -281,42 +221,6 @@ void DisplayPanel::handle_callback(lv_event_t *e) {
     if (enabled) {
       TouchBeep::beep();  // immediate confirmation that it works
     }
-  } else if (obj == image_dd) {
-    uint16_t idx = lv_dropdown_get_selected(image_dd);
-    // Back to what is set until confirmed (confirm() has no cancel hook).
-    refresh_boot_display();
-    if (idx == 0) {
-      SettingsUi::confirm("Boot logo: NebulaOS",
-        "The NebulaOS logo becomes the boot screen and the power-on logo of this boot slot "
-        "(written into its RTOS). Shown from the next start.",
-        "Use", SettingsUi::Tone::Warning, [this]() {
-          boot_logo_action(BOOT_DISPLAY_RESET_METHOD, json::object(), "Boot logo not changed");
-        });
-    } else if ((size_t)(idx - 1) < images.size()) {
-      std::string name = images[idx - 1];
-      SettingsUi::confirm(("Boot logo: " + name).c_str(),
-        "This image becomes the boot screen and the power-on logo of this boot slot "
-        "(converted and written into its RTOS). Shown from the next start.",
-        "Use", SettingsUi::Tone::Warning, [this, name]() {
-          boot_logo_action(BOOT_DISPLAY_IMAGE_METHOD, json{{"filename", name}},
-                           "Boot logo not changed");
-        });
-    }
   }
 }
 
-// LVGL thread; the reply arrives on the websocket thread.
-void DisplayPanel::boot_logo_action(const char *method, const json &params, const char *what) {
-  ws.send_jsonrpc(method, params, [this, what](json &reply) {
-    std::string err = jsonrpc_error_message(reply);
-    std::string msg = err.empty() ? power_on_result(reply) : boot_logo_error_text(err);
-    {
-      std::lock_guard<std::mutex> lock(lv_lock);
-      if (!msg.empty()) {
-        // a dialog, not a toast: it stays until read
-        SettingsUi::notice(what, msg.c_str());
-      }
-      refresh_boot_display();
-    }
-  });
-}

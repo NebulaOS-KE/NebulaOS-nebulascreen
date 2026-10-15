@@ -10,6 +10,10 @@ const char *const BOOT_DISPLAY_MODE_METHOD = "machine.nebulaos.boot_display.mode
 const char *const BOOT_DISPLAY_IMAGE_METHOD = "machine.nebulaos.boot_display.image";
 const char *const BOOT_DISPLAY_RESET_METHOD = "machine.nebulaos.boot_display.reset_image";
 const char *const BOOT_DISPLAY_RESTORE_METHOD = "machine.nebulaos.boot_display.restore_original_logo";
+const char *const BOOT_DISPLAY_IMAGES_METHOD = "machine.nebulaos.boot_display.images";
+const char *const BOOT_DISPLAY_PREVIEW_METHOD = "machine.nebulaos.boot_display.preview";
+const char *const BOOT_DISPLAY_IMPORT_METHOD = "machine.nebulaos.boot_display.import_usb";
+const char *const BOOT_DISPLAY_DELETE_METHOD = "machine.nebulaos.boot_display.delete_image";
 const char *const CLEAN_RESET_METHOD = "machine.nebulaos.system.clean_reset";
 const char *const SWAP_SLOT_METHOD = "machine.nebulaos.system.swap_slot";
 const char *const ACK_CLEAN_RESET_METHOD = "machine.nebulaos.system.ack_clean_reset";
@@ -250,4 +254,39 @@ std::string boot_logo_error_text(const std::string &message) {
            "4 MB and 2048 x 2048 pixels. Best: 480 x 272, landscape.";
   }
   return text.empty() ? message : text;
+}
+
+BootLogoList boot_logo_list(const json &images_reply) {
+  BootLogoList l;
+  const json &r = result_of(images_reply);
+  l.options = "NebulaOS";
+  if (r.contains("images") && r["images"].is_array()) {
+    for (const auto &i : r["images"]) {
+      std::string n = str_at(i, "/name"_json_pointer);
+      if (n.empty()) continue;
+      l.names.push_back(n);
+      l.options += "\n" + n;
+    }
+  }
+  l.active = boot_logo_index(l, str_at(r, "/selected"_json_pointer));
+  if (r.contains("usb") && r["usb"].is_array()) {
+    for (const auto &u : r["usb"]) {
+      UsbImage img{str_at(u, "/id"_json_pointer), str_at(u, "/name"_json_pointer)};
+      if (!img.id.empty()) l.usb.push_back(img);
+    }
+  }
+  l.usb_present = r.contains("usb_present") && r["usb_present"].is_boolean() && r["usb_present"].get<bool>();
+  return l;
+}
+
+int boot_logo_index(const BootLogoList &l, const std::string &name) {
+  for (size_t i = 0; i < l.names.size(); ++i) {
+    if (!name.empty() && l.names[i] == name) return (int)i + 1;
+  }
+  return 0;
+}
+
+std::string boot_logo_preview_src(const json &preview_reply) {
+  std::string path = str_at(result_of(preview_reply), "/path"_json_pointer);
+  return path.empty() || path[0] != '/' ? "" : "A:" + path;
 }
