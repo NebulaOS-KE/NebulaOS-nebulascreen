@@ -89,6 +89,7 @@ struct UpdateRow {
   std::string remote;
   bool available = false;
   bool valid = true;      // false: the updater reports a problem
+  bool checking = false;  // G56: Moonraker has not read this repository yet
   std::string state;      // "up to date" / "3 new" / "v2.14 available" / problem text
 };
 

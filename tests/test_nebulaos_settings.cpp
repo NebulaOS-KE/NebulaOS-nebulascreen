@@ -212,6 +212,29 @@ TEST(Mcu, files) {
   ASSERT_EQ(human_size(512), std::string("512 B"));
 }
 
+TEST(Updates, unknown_version_is_checking) {
+  // G56: while Moonraker reads a repository it reports "?" and is_valid false
+  auto rows = update_rows(json::parse(R"({"result":{"busy":false,"version_info":{
+    "klipper":{"version":"?","remote_version":"?","is_valid":false},
+    "moonraker":{"version":"v0.10.0-31","remote_version":"v0.10.0-40","is_valid":true,
+                 "commits_behind_count":9},
+    "mainsail":{"version":"v2.14.0","remote_version":"v2.14.0","is_valid":false}}}})"));
+  ASSERT_EQ(rows.size(), (size_t)3);
+  for (const auto &r : rows) {
+    if (r.name == "klipper") {
+      ASSERT_TRUE(r.checking);
+      ASSERT_TRUE(r.valid);
+      ASSERT_FALSE(r.available);
+      ASSERT_EQ(r.state, std::string("checking..."));
+    } else if (r.name == "mainsail") {
+      ASSERT_FALSE(r.checking);
+      ASSERT_EQ(r.state, std::string("needs attention (see Mainsail)"));
+    } else {
+      ASSERT_EQ(r.state, std::string("9 new"));
+    }
+  }
+}
+
 TEST(Mcu, status) {
   json st = json::parse(R"({"result":{"managed":false,"guard":{"result":"WARN",
     "application_class":"UNKNOWN_APPLICATION","application_identity":"v0.13.0-99"},

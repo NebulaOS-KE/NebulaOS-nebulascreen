@@ -1,4 +1,6 @@
 #include "updates_panel.h"
+
+#include <algorithm>
 #include "nebulaos_display.h"
 #include "nebulaos_system.h"
 #include "settings_ui.h"
@@ -64,6 +66,9 @@ UpdatesPanel::UpdatesPanel(KWebSocketClient &c, std::mutex &lock)
 }
 
 UpdatesPanel::~UpdatesPanel() {
+  if (recheck_timer != NULL) {
+    lv_timer_del(recheck_timer);
+  }
   if (cont != NULL) {
     lv_obj_del(cont);
     cont = NULL;
@@ -171,6 +176,16 @@ void UpdatesPanel::show(const json &status_reply) {
       lv_obj_add_event_cb(b, &UpdatesPanel::_handle_callback, LV_EVENT_CLICKED, this);
       row_btns.push_back(b);
     }
+  }
+  // G56: a repository Moonraker is still reading: ask again shortly.
+  bool checking = std::any_of(rows.begin(), rows.end(), [](const UpdateRow &r) { return r.checking; });
+  if (checking && recheck_timer == NULL) {
+    recheck_timer = lv_timer_create([](lv_timer_t *t) {
+      UpdatesPanel *self = (UpdatesPanel *)t->user_data;
+      self->recheck_timer = NULL;
+      lv_timer_del(t);
+      if (!self->busy) self->refresh(false);
+    }, 10000, this);
   }
   if (updates_busy(status_reply)) {
     set_busy("An update is running...");

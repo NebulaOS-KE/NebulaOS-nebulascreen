@@ -206,8 +206,15 @@ std::vector<UpdateRow> update_rows(const json &status_reply) {
       behind = (int)v["commits_behind"].size();
     }
     bool remote_known = !row.remote.empty() && row.remote != "?";
-    row.available = valid && (behind > 0 || (remote_known && row.remote != row.version));
-    if (!valid) {
+    // G56: "?" is Moonraker's placeholder until it has read the repository
+    // (a refresh fetches Klipper for minutes on the printer) - not a fault.
+    row.checking = row.version.empty() || row.version == "?";
+    row.available = valid && !row.checking && (behind > 0 || (remote_known && row.remote != row.version));
+    if (row.checking) {
+      row.valid = true;
+      row.version = "-";
+      row.state = "checking...";
+    } else if (!valid) {
       row.state = corrupt ? "repository damaged" : "needs attention (see Mainsail)";
     } else if (behind > 0) {
       row.state = std::to_string(behind) + " new";
