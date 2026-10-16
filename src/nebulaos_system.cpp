@@ -10,6 +10,10 @@ const char *const BOOT_DISPLAY_MODE_METHOD = "machine.nebulaos.boot_display.mode
 const char *const BOOT_DISPLAY_IMAGE_METHOD = "machine.nebulaos.boot_display.image";
 const char *const BOOT_DISPLAY_RESET_METHOD = "machine.nebulaos.boot_display.reset_image";
 const char *const BOOT_DISPLAY_RESTORE_METHOD = "machine.nebulaos.boot_display.restore_original_logo";
+const char *const LOGS_STATUS_METHOD = "machine.nebulaos.logs.status";
+const char *const LOGS_LEVEL_METHOD = "machine.nebulaos.logs.level";
+const char *const LOGS_SAVE_METHOD = "machine.nebulaos.logs.save";
+const char *const LOG_LEVEL_OPTIONS = "Info\nWarning\nDebug";
 const char *const BOOT_DISPLAY_IMAGES_METHOD = "machine.nebulaos.boot_display.images";
 const char *const BOOT_DISPLAY_PREVIEW_METHOD = "machine.nebulaos.boot_display.preview";
 const char *const BOOT_DISPLAY_IMPORT_METHOD = "machine.nebulaos.boot_display.import_usb";
@@ -289,4 +293,42 @@ int boot_logo_index(const BootLogoList &l, const std::string &name) {
 std::string boot_logo_preview_src(const json &preview_reply) {
   std::string path = str_at(result_of(preview_reply), "/path"_json_pointer);
   return path.empty() || path[0] != '/' ? "" : "A:" + path;
+}
+
+static const char *const LOG_LEVELS[] = {"info", "warning", "debug"};
+
+std::string log_level_at(int index) {
+  return index >= 0 && index < 3 ? LOG_LEVELS[index] : "";
+}
+
+std::string log_level_spdlog(const std::string &level) {
+  return level == "warning" ? "warn" : level == "debug" ? "debug" : "info";
+}
+
+int log_level_index(const json &status_reply) {
+  std::string level = str_at(result_of(status_reply), "/level"_json_pointer);
+  for (int i = 0; i < 3; ++i) {
+    if (level == LOG_LEVELS[i]) return i;
+  }
+  return 0;
+}
+
+std::string logs_save_text(const json &reply, bool *ok) {
+  *ok = false;
+  if (reply.is_object() && reply.contains("error")) {
+    const json &e = reply["error"];
+    std::string msg = e.is_object() && e.contains("message") && e["message"].is_string()
+      ? e["message"].get<std::string>() : e.dump();
+    if (msg.rfind("NO_USB", 0) == 0) return "No USB stick found. Plug one in and try again.";
+    if (msg.rfind("USB_READ_ONLY", 0) == 0) return "The USB stick is read-only.";
+    auto pos = msg.find(": ");
+    return "Logs not saved: " + (pos == std::string::npos ? msg : msg.substr(pos + 2)) + ".";
+  }
+  const json &r = result_of(reply);
+  std::string file = str_at(r, "/file"_json_pointer);
+  if (file.empty()) return "Logs not saved: no answer from the printer.";
+  *ok = true;
+  long bytes = r.contains("bytes") && r["bytes"].is_number() ? r["bytes"].get<long>() : 0;
+  return "Saved to the USB stick:\n" + file + "\n(" + human_bytes((double)bytes) +
+         "). Send this file when you report a problem.";
 }

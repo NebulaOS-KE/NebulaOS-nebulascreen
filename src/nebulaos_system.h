@@ -92,6 +92,18 @@ int boot_logo_index(const BootLogoList &l, const std::string &name);
 // "A:/run/.../preview-x.png" for lv_img from a preview reply, "" on error.
 std::string boot_logo_preview_src(const json &preview_reply);
 
+// G60 (2026-10-16): the general log level. Dropdown order Info, Warning,
+// Debug; NebulaOS's names and the screen's own spdlog names for each.
+extern const char *const LOGS_STATUS_METHOD;  // machine.nebulaos.logs.status
+extern const char *const LOGS_LEVEL_METHOD;   // machine.nebulaos.logs.level {"level"}
+extern const char *const LOGS_SAVE_METHOD;    // machine.nebulaos.logs.save
+extern const char *const LOG_LEVEL_OPTIONS;   // "Info\nWarning\nDebug"
+std::string log_level_at(int index);           // "info" | "warning" | "debug" | ""
+std::string log_level_spdlog(const std::string &level);  // "info" | "warn" | "debug"
+int log_level_index(const json &status_reply);  // index of result.level, default Info
+// After logs.save: the line for the dialog.
+std::string logs_save_text(const json &reply, bool *ok);
+
 // Log files from a server.files.list {"root":"logs"} reply: *.log and rotated
 // *.log.N, sorted by name.
 std::vector<std::string> log_files(const json &files_reply);

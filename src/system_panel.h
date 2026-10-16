@@ -46,6 +46,7 @@ class SystemPanel {
   lv_obj_t *cont;
   lv_obj_t *info_label;
   lv_obj_t *loglevel_dd;
+  bool updating_level = false;
   lv_obj_t *logs_btn;
   lv_obj_t *restart_gui_btn;
   lv_obj_t *reboot_btn;

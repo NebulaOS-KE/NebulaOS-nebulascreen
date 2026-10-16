@@ -19,7 +19,6 @@ LV_IMG_DECLARE(power_img);
 #define GS_VERSION "dev-snapshot"
 #endif
 
-static const std::vector<std::string> log_levels = {"trace", "debug", "info", "warn"};
 
 SystemPanel::SystemPanel(KWebSocketClient &c, std::mutex &lock)
   : ws(c)
@@ -39,24 +38,13 @@ SystemPanel::SystemPanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_style_text_line_space(info_label, 3, 0);
   lv_label_set_text(info_label, "Loading...");
 
-  lv_obj_t *ll_row = SettingsUi::row(left, "Screen log level");
+  // G60 (2026-10-16): one general log level for NebulaOS, Moonraker and the
+  // screen (Klipper has none); NebulaOS stores it, shown() reads it back.
+  lv_obj_t *ll_row = SettingsUi::row(left, "Log level");
   loglevel_dd = lv_dropdown_create(ll_row);
-  lv_dropdown_set_options(loglevel_dd, "Trace\nDebug\nInfo\nWarn");
-  lv_obj_set_width(loglevel_dd, 90);
+  lv_dropdown_set_options(loglevel_dd, LOG_LEVEL_OPTIONS);
+  lv_obj_set_width(loglevel_dd, 110);
   lv_obj_align(loglevel_dd, LV_ALIGN_RIGHT_MID, 0, 0);
-  Config *conf = Config::get_instance();
-  uint32_t level = 1;
-  auto df = conf->get_json("/default_printer");
-  if (!df.empty()) {
-    auto v = conf->get_json(conf->df() + "log_level");
-    if (v.is_string()) {
-      auto it = std::find(log_levels.begin(), log_levels.end(), v.template get<std::string>());
-      if (it != log_levels.end()) {
-        level = std::distance(log_levels.begin(), it);
-      }
-    }
-  }
-  lv_dropdown_set_selected(loglevel_dd, level);
   lv_obj_add_event_cb(loglevel_dd, &SystemPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
 
   logs_btn = SettingsUi::icon_button(right, &logs_img, "Logs", &SystemPanel::_handle_callback, this);
@@ -89,6 +77,13 @@ void SystemPanel::foreground() {
 // Every time the page comes on top (SettingsUi::on_shown).
 void SystemPanel::shown() {
   refresh();
+  ws.send_jsonrpc(LOGS_STATUS_METHOD, json::object(), [this](json &reply) {
+    if (reply.contains("error")) return;
+    std::lock_guard<std::mutex> lock(lv_lock);
+    updating_level = true;
+    lv_dropdown_set_selected(loglevel_dd, log_level_index(reply));
+    updating_level = false;
+  });
 }
 
 void SystemPanel::report_error(json &reply, const char *what) {
@@ -172,15 +167,20 @@ void SystemPanel::handle_callback(lv_event_t *e) {
   lv_obj_t *obj = lv_event_get_current_target(e);
 
   if (code == LV_EVENT_VALUE_CHANGED && obj == loglevel_dd) {
-    auto idx = lv_dropdown_get_selected(loglevel_dd);
-    if (idx < log_levels.size()) {
-      auto ll = spdlog::level::from_str(log_levels[idx]);
-      spdlog::set_level(ll);
-      spdlog::flush_on(ll);
-      Config *conf = Config::get_instance();
-      conf->set<std::string>(conf->df() + "log_level", log_levels[idx]);
-      conf->save();
-    }
+    if (updating_level) return;
+    std::string level = log_level_at(lv_dropdown_get_selected(loglevel_dd));
+    if (level.empty()) return;
+    // The screen's own log follows at once; NebulaOS applies the rest.
+    std::string screen = log_level_spdlog(level);
+    auto ll = spdlog::level::from_str(screen);
+    spdlog::set_level(ll);
+    spdlog::flush_on(ll);
+    Config *conf = Config::get_instance();
+    conf->set<std::string>(conf->df() + "log_level", screen);
+    conf->save();
+    ws.send_jsonrpc(LOGS_LEVEL_METHOD, json{{"level", level}}, [this](json &reply) {
+      report_error(reply, "Log level not changed");
+    });
     return;
   }
   if (code != LV_EVENT_CLICKED) {

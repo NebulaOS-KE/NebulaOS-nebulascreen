@@ -10,6 +10,7 @@ LV_IMG_DECLARE(back);
 
 static const size_t LOG_TAIL_BYTES = 12 * 1024;
 static const char *WIFI_ENTRY = "Wi-Fi";
+static const char *SAVE_ENTRY = "Save logs to USB";
 
 LogsPanel::LogsPanel(KWebSocketClient &c, std::mutex &lock)
   : ws(c)
@@ -63,6 +64,8 @@ void LogsPanel::shown() {
     std::lock_guard<std::mutex> lock(lv_lock);
     files = names;
     lv_obj_clean(list);
+    lv_obj_t *s = lv_list_add_btn(list, LV_SYMBOL_USB, SAVE_ENTRY);
+    lv_obj_add_event_cb(s, &LogsPanel::_handle_callback, LV_EVENT_CLICKED, this);
     lv_obj_t *w = lv_list_add_btn(list, LV_SYMBOL_WIFI, WIFI_ENTRY);
     lv_obj_add_event_cb(w, &LogsPanel::_handle_callback, LV_EVENT_CLICKED, this);
     if (files.empty()) {
@@ -130,6 +133,24 @@ void LogsPanel::show_wifi() {
   lv_obj_scroll_to_y(text_cont, LV_COORD_MAX, LV_ANIM_OFF);
 }
 
+// G60 (2026-10-16): every log, the state file and the config in one zip on
+// the USB stick, for a problem report.
+void LogsPanel::save_to_usb() {
+  SettingsUi::confirm("Save logs to USB",
+    "All logs, the printer's state and its config files go into one zip file on the USB "
+    "stick (passwords are left out). Takes up to a minute.",
+    "Save", SettingsUi::Tone::Normal, [this]() {
+      lv_label_set_text(text, "Saving the logs to the USB stick...");
+      ws.send_jsonrpc(LOGS_SAVE_METHOD, json::object(), [this](json &reply) {
+        bool ok = false;
+        std::string msg = logs_save_text(reply, &ok);
+        std::lock_guard<std::mutex> lock(lv_lock);
+        lv_label_set_text(text, msg.c_str());
+        SettingsUi::notice(ok ? "Logs saved" : "Logs not saved", msg.c_str());
+      });
+    });
+}
+
 void LogsPanel::handle_callback(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
     return;
@@ -140,7 +161,9 @@ void LogsPanel::handle_callback(lv_event_t *e) {
     return;
   }
   const char *name = lv_list_get_btn_text(list, btn);
-  if (name != nullptr && std::string(name) == WIFI_ENTRY) {
+  if (name != nullptr && std::string(name) == SAVE_ENTRY) {
+    save_to_usb();
+  } else if (name != nullptr && std::string(name) == WIFI_ENTRY) {
     show_wifi();
   } else if (name != nullptr) {
     show_file(name);

@@ -161,6 +161,22 @@ TEST(BootLogo, page_list) {
   ASSERT_EQ(boot_logo_preview_src(json()), std::string(""));
 }
 
+TEST(Logs, level_and_save) {
+  ASSERT_EQ(std::string(LOG_LEVEL_OPTIONS), std::string("Info\nWarning\nDebug"));
+  ASSERT_EQ(log_level_at(1), std::string("warning"));
+  ASSERT_EQ(log_level_at(3), std::string(""));
+  ASSERT_EQ(log_level_spdlog("warning"), std::string("warn"));
+  ASSERT_EQ(log_level_spdlog("debug"), std::string("debug"));
+  ASSERT_EQ(log_level_index(json::parse(R"({"result":{"level":"debug"}})")), 2);
+  ASSERT_EQ(log_level_index(json()), 0);
+  bool ok = false;
+  auto t = logs_save_text(json::parse(R"({"result":{"result":"SAVED","file":"nebulaos-logs-x.zip","bytes":2500000}})"), &ok);
+  ASSERT_TRUE(ok);
+  ASSERT_TRUE(t.find("nebulaos-logs-x.zip") != std::string::npos);
+  ASSERT_TRUE(logs_save_text(json::parse(R"({"error":{"message":"NO_USB: no USB stick found"}})"), &ok).find("No USB stick") == 0);
+  ASSERT_FALSE(ok);
+}
+
 TEST(Logs, wifi_lines) {
   std::string log =
     "Oct 15 08:20:01 buildroot daemon.notice wpa_supplicant[300]: wlan0: CTRL-EVENT-CONNECTED - Connection to aa:bb completed\n"
