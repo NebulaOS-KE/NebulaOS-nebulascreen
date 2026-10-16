@@ -90,6 +90,15 @@ TEST(Wifi, errors) {
   ASSERT_EQ(wifi_error_text(json{{"result", {{"result", "CONNECTED"}}}}), std::string(""));
   auto p = wifi_connect_params("Home", "pa\"ss");
   ASSERT_EQ(p["password"].get<std::string>(), std::string("pa\"ss"));
+  ASSERT_FALSE(p.contains("hidden"));
+  // G10: a hidden network, typed in
+  auto h = wifi_connect_params("Attic", "", true);
+  ASSERT_TRUE(h["hidden"].get<bool>());
+  json wpa3 = {{"error", {{"code", 400}, {"message",
+    "UNSUPPORTED_SECURITY: this network only allows WPA3, which this printer's Wi-Fi does not support"}}}};
+  ASSERT_TRUE(wifi_error_text(wpa3).find("WPA2/WPA3 (mixed)") != std::string::npos);
+  json wep = {{"error", {{"code", 400}, {"message", "UNSUPPORTED_SECURITY: this network uses WEP security"}}}};
+  ASSERT_EQ(wifi_error_text(wep), std::string("The printer cannot join this type of network."));
 }
 
 // Shape of machine.update.status (Moonraker update_manager, git_deploy/net_deploy).

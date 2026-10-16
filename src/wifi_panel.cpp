@@ -218,6 +218,29 @@ void WifiPanel::rebuild_wifi_rows() {
     make_group_label("OTHER NETWORKS IN RANGE");
     add_rows(false);
   }
+  // G10 (2026-10-16): a hidden network does not show up in the scan.
+  lv_obj_t *other = lv_btn_create(wifi_list_cont);
+  lv_obj_set_size(other, LV_PCT(100), 40);
+  lv_obj_set_style_bg_opa(other, LV_OPA_TRANSP, 0);
+  lv_obj_t *ol = lv_label_create(other);
+  lv_label_set_text(ol, LV_SYMBOL_PLUS "  Other network (hidden)...");
+  lv_obj_align(ol, LV_ALIGN_LEFT_MID, 4, 0);
+  lv_obj_add_event_cb(other, &WifiPanel::_handle_hidden_row, LV_EVENT_CLICKED, this);
+}
+
+// G10: type the name, then the password (empty for an open network).
+void WifiPanel::start_hidden_network() {
+  if (busy) return;
+  holding_result = false;
+  hidden_stage = 1;
+  entering_password = true;
+  selected_network.clear();
+  lv_textarea_set_text(password_input, "");
+  lv_textarea_set_password_mode(password_input, false);
+  lv_label_set_text(wifi_label, "Name of the hidden network");
+  lv_obj_clear_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
+  lv_event_send(password_input, LV_EVENT_FOCUSED, NULL);
 }
 
 void WifiPanel::handle_row_activated(const std::string &ssid) {
@@ -307,6 +330,7 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
     lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_DEFOCUSED || code == LV_EVENT_CANCEL) {
     entering_password = false;
+    hidden_stage = 0;
     lv_keyboard_set_textarea(kb, NULL);
     lv_label_set_text(wifi_label, "Please select your wifi network");
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
@@ -318,16 +342,28 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
     lv_obj_clear_flag(back_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_READY) {
     const char *password = lv_textarea_get_text(password_input);
-    if (password == NULL || password[0] == 0) {
+    if (hidden_stage == 1) {               // G10: the name first
+      if (password == NULL || password[0] == 0) return;
+      selected_network = password;
+      hidden_stage = 2;
+      lv_textarea_set_text(password_input, "");
+      lv_textarea_set_password_mode(password_input, !pw_visible);
+      lv_label_set_text(wifi_label, fmt::format("Password for {} (empty if open)",
+                                                selected_network).c_str());
+      return;
+    }
+    bool hidden = hidden_stage == 2;
+    hidden_stage = 0;
+    if ((password == NULL || password[0] == 0) && !hidden) {
       return;
     }
 
     entering_password = false;
-    std::string pw(password);
+    std::string pw(password != NULL ? password : "");
     lv_textarea_set_text(password_input, "");
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_state(password_input, LV_STATE_FOCUSED);
-    connect(selected_network, pw);
+    connect(selected_network, pw, hidden);
     lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
     pw_visible = false;
     lv_textarea_set_password_mode(password_input, true);
@@ -353,11 +389,11 @@ void WifiPanel::handle_eye_btn(lv_event_t *e) {
 
 // NebulaOS connects, saves the network only when it worked, and restores the
 // previous one otherwise; the reply carries the outcome and the new address.
-void WifiPanel::connect(const std::string &ssid, const std::string &password) {
+void WifiPanel::connect(const std::string &ssid, const std::string &password, bool hidden) {
   busy = true;
   show_prompt(fmt::format("Connecting to {} ...", ssid));
   lv_obj_clear_flag(spinner, LV_OBJ_FLAG_HIDDEN);
-  ws.send_jsonrpc(WIFI_CONNECT_METHOD, wifi_connect_params(ssid, password), [this, ssid](json &reply) {
+  ws.send_jsonrpc(WIFI_CONNECT_METHOD, wifi_connect_params(ssid, password, hidden), [this, ssid](json &reply) {
     std::lock_guard<std::mutex> lock(lv_lock);
     busy = false;
     lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);

@@ -33,7 +33,11 @@ public:
   void confirm_remove_network(const std::string &ssid, const std::string &nid);
   void handle_kb_input(lv_event_t *e);
   void handle_eye_btn(lv_event_t *e);
-  void connect(const std::string &ssid, const std::string &password);
+  void connect(const std::string &ssid, const std::string &password, bool hidden = false);
+  void start_hidden_network();
+  static void _handle_hidden_row(lv_event_t *e) {
+    ((WifiPanel *)e->user_data)->start_hidden_network();
+  }
 
   // WifiRowItem calls this when its row is tapped: connects/reconnects for
   // an ordinary row, or opens NetworkDetailPanel if the row is the network
@@ -89,6 +93,9 @@ private:
   std::vector<std::unique_ptr<WifiRowItem>> wifi_rows;
 
   bool entering_password = false;
+  // G10: "Other network..." - 1 while typing the name, 2 while typing its
+  // password (empty = an open network); the name is kept in selected_network.
+  int hidden_stage = 0;
   bool pw_visible = false;
   bool busy = false;          // a connect or forget is running
   // A connect/forget result stays on screen until the next action; the scan

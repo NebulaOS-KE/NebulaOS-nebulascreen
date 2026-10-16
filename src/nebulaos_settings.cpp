@@ -145,14 +145,21 @@ std::string wifi_error_text(const json &reply) {
   if (starts("CONNECT_TIMEOUT")) return "Could not connect. The previous network is connected again.";
   if (starts("PASSWORD_REQUIRED")) return "This network needs a password.";
   if (starts("INVALID_PASSWORD")) return "A Wi-Fi password has 8 to 63 characters.";
+  if (starts("UNSUPPORTED_SECURITY") && msg.find("WPA3") != std::string::npos) {
+    // G10: the BCM43430/1 firmware has no WPA3 (SAE).
+    return "This network only allows WPA3, which the printer's Wi-Fi does not support. "
+           "Set the router to WPA2/WPA3 (mixed) mode.";
+  }
   if (starts("UNSUPPORTED_SECURITY")) return "The printer cannot join this type of network.";
   if (starts("WIFI_UNAVAILABLE")) return "Wi-Fi is not available right now.";
   if (starts("NOT_SAVED")) return "This network is not saved.";
   return msg;
 }
 
-json wifi_connect_params(const std::string &ssid, const std::string &password) {
-  return {{"ssid", ssid}, {"password", password}};
+json wifi_connect_params(const std::string &ssid, const std::string &password, bool hidden) {
+  json p = {{"ssid", ssid}, {"password", password}};
+  if (hidden) p["hidden"] = true;     // G10: typed in, not from the scan
+  return p;
 }
 
 std::string wifi_connected_text(const json &reply, const std::string &ssid, bool *ok) {

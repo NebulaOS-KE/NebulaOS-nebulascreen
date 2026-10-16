@@ -8,11 +8,12 @@
 
 #include <cstdint>
 #include <mutex>
+#include <utility>
 #include <vector>
 
 // Settings > Printer > MCU firmware (run 4, 2026-10-11): "plug in USB, pick a
 // compiled .bin, install". Lists the .bin files uploaded through Mainsail
-// (uploads/mainboard-firmware) and on a USB stick, each already checked by NebulaOS
+// (config/uploads/mainboard-firmware) and on a USB stick, each already checked by NebulaOS
 // (machine.nebulaos.mcu.files); installs one after a confirmation that names
 // the risk (machine.nebulaos.mcu.flash - refused while printing; Klipper is
 // stopped and restarted around it); "Reinstall NebulaOS firmware" puts the
@@ -45,6 +46,8 @@ class McuPanel {
   void start_busy();
   void tick_busy();
   void finish(const json &reply);
+  void check_board(const McuFlashResult &r, uint32_t since);
+  static const uint32_t BOARD_CHECK_MS = 90000;
 
   KWebSocketClient &ws;
   std::mutex &lv_lock;

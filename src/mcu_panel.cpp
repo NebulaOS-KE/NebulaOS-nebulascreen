@@ -1,4 +1,5 @@
 #include "mcu_panel.h"
+#include "nebulaos_system.h"
 #include "settings_ui.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
@@ -34,7 +35,7 @@ McuPanel::McuPanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_scroll_dir(list, LV_DIR_VER);
 
-  SettingsUi::hint(left, "Add a .bin in Mainsail (Machine > uploads > mainboard-firmware) or "
+  SettingsUi::hint(left, "Add a .bin in Mainsail (Machine > config > uploads > mainboard-firmware) or "
                          "plug in a USB stick, then tap Refresh.");
 
   refresh_btn = SettingsUi::icon_button(right, &refresh_img, "Refresh",
@@ -213,11 +214,61 @@ void McuPanel::finish(const json &reply) {
     SettingsUi::close_busy(busy_label);
     busy_label = NULL;
   }
+  auto r = mcu_flash_result(reply);
+  if (r.ok) {
+    // G34 (2026-10-16): the result says what the board runs, once Klipper
+    // has reached it again - whatever firmware it is.
+    check_board(r, lv_tick_get());
+    return;
+  }
   flashing = false;
   lv_obj_clear_state(refresh_btn, LV_STATE_DISABLED);
-  auto r = mcu_flash_result(reply);
   SettingsUi::notice(r.title.c_str(), r.text.c_str());
   refresh();
+}
+
+// LVGL lock held. Asks Klipper for the MCU's version every 3 s, up to
+// BOARD_CHECK_MS; then the result popup.
+void McuPanel::check_board(const McuFlashResult &r, uint32_t since) {
+  if (busy_label == NULL) {
+    busy_label = SettingsUi::busy("Installing MCU firmware", "Installed. Checking the board...");
+  }
+  json q = {{"objects", {{"mcu", {"mcu_version"}}}}};
+  ws.send_jsonrpc("printer.objects.query", q, [this, r, since](json &reply) {
+    std::string version = mcu_running_version(reply);
+    std::lock_guard<std::mutex> lock(lv_lock);
+    bool late = lv_tick_elaps(since) > BOARD_CHECK_MS;
+    if (version.empty() && !late) {
+      lv_timer_t *t = lv_timer_create([](lv_timer_t *t) {
+        auto *ctx = (std::pair<McuPanel *, std::pair<McuFlashResult, uint32_t>> *)t->user_data;
+        ctx->first->check_board(ctx->second.first, ctx->second.second);
+        delete ctx;
+        lv_timer_del(t);
+      }, 3000, new std::pair<McuPanel *, std::pair<McuFlashResult, uint32_t>>(this, {r, since}));
+      lv_timer_set_repeat_count(t, 1);
+      return;
+    }
+    if (busy_label != NULL) {
+      SettingsUi::close_busy(busy_label);
+      busy_label = NULL;
+    }
+    flashing = false;
+    lv_obj_clear_state(refresh_btn, LV_STATE_DISABLED);
+    refresh();
+    if (!version.empty()) {
+      SettingsUi::notice(r.title.c_str(), ("Done - the board runs " + version + ".").c_str());
+      return;
+    }
+    if (!files.has_builtin) {
+      SettingsUi::notice("Klipper can't reach the board",
+        "The firmware was written, but Klipper does not reach the mainboard.");
+      return;
+    }
+    SettingsUi::confirm("Klipper can't reach the board",
+      "The firmware was written, but Klipper does not reach the mainboard. Reinstall the "
+      "built-in MCU firmware?", "Reinstall built-in", SettingsUi::Tone::Warning,
+      [this]() { if (files.has_builtin) install(files.builtin); });
+  });
 }
 
 void McuPanel::handle_callback(lv_event_t *e) {

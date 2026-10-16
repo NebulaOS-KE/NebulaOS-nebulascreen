@@ -11,7 +11,7 @@
 
 // Settings > Updates > System image (on-printer image updates, 2026-10-14).
 // Lists the KE .img packages on a USB stick and in Mainsail's
-// uploads/system-image (machine.nebulaos.image.list) and what each boot slot
+// config/uploads/system-image (machine.nebulaos.image.list) and what each boot slot
 // (A/B) holds. Install: NebulaOS checks the package (image.check), the
 // confirmation says what it is and which slot it replaces, then NebulaOS
 // writes it into the slot that is not running (image.install) while a box

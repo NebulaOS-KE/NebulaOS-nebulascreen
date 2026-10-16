@@ -73,7 +73,16 @@ void InitPanel::connected(KWebSocketClient &ws) {
 
 	// G2: once after a clean NebulaOS reset, say that Wi-Fi has to be
 	// connected again, then tell NebulaOS the notice was shown.
+	// G65: NebulaOS's own one-time notices (e.g. config/nebulaos edits kept
+	// by an update), each shown once and acknowledged.
 	ws.send_jsonrpc(SYSTEM_INFO_METHOD, json::object(), [this, &ws](json &j) {
+	  for (const auto &n : system_notices(j)) {
+	    {
+	      std::lock_guard<std::mutex> lock(this->lv_lock);
+	      SettingsUi::notice("NebulaOS", n.text.c_str());
+	    }
+	    ws.send_jsonrpc(ACK_NOTICE_METHOD, json{{"id", n.id}}, [](json &) {});
+	  }
 	  if (!after_clean_reset(j)) {
 	    return;
 	  }

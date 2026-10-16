@@ -34,6 +34,7 @@ class BootLogoPanel {
   void show_preview();
   void apply();
   void add_from_usb();
+  void open_usb_picker();
   void close_usb_picker();
   void import_usb(const UsbImage &img);
   void delete_selected();

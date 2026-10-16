@@ -34,8 +34,8 @@ BootLogoPanel::BootLogoPanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_style_border_color(preview, lv_palette_main(LV_PALETTE_GREY), 0);
   preview_note = SettingsUi::hint(left, "");
   power_label = SettingsUi::hint(left, "Power-on logo: ...");
-  SettingsUi::hint(left, "Or upload a PNG, BMP or JPEG (max 4 MB) in Mainsail: Machine > uploads > "
-                         "boot-logo. Best: 480 x 272, landscape.");
+  SettingsUi::hint(left, "Or upload a PNG, BMP or JPEG (max 4 MB) in Mainsail: Machine > config > "
+                         "uploads > boot-logo. Best: 480 x 272, landscape.");
 
   apply_btn = SettingsUi::icon_button(right, &display_img, "Apply",
                                       &BootLogoPanel::_handle_callback, this);
@@ -159,8 +159,21 @@ void BootLogoPanel::close_usb_picker() {
   }
 }
 
-// A small modal list of the images on the stick.
+// G64 (2026-10-16): the stick is looked at again on every tap - the list
+// from when the page opened missed a stick plugged in afterwards ("no
+// picture found"). Then a small modal list of the images on it.
 void BootLogoPanel::add_from_usb() {
+  ws.send_jsonrpc(BOOT_DISPLAY_IMAGES_METHOD, json::object(), [this](json &reply) {
+    BootLogoList fresh = boot_logo_list(reply);
+    std::lock_guard<std::mutex> lock(lv_lock);
+    list.usb = fresh.usb;
+    list.usb_present = fresh.usb_present;
+    open_usb_picker();
+  });
+}
+
+// LVGL lock held by the caller.
+void BootLogoPanel::open_usb_picker() {
   if (list.usb.empty()) {
     SettingsUi::notice("Add from USB", list.usb_present
       ? "No images on the USB stick. Use PNG, BMP or JPEG files (max 4 MB, 2048 x 2048)."
