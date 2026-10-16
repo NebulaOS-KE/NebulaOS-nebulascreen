@@ -3,6 +3,8 @@
 
 #include "button_container.h"
 #include "logs_panel.h"
+#include "report_panel.h"
+#include "storage_panel.h"
 #include "lvgl/lvgl.h"
 #include "websocket_client.h"
 
@@ -11,7 +13,8 @@
 
 // Settings > System (D9 2026-10-10, S1 2026-10-11): NebulaOS build and boot
 // slot, GuppyScreen version, kernel and storage (with a warning when /usr/data
-// is read-only or its boot check failed), the screen's log level, the log
+// is read-only or its boot check failed), Report a problem (log level, save
+// logs, where to report - G69) and Storage (G66) as own pages, the log
 // viewer, Restart GUI, Reboot and Shut down (confirmed, refused while
 // printing). Data through Moonraker: machine.nebulaos.info, machine.reboot /
 // machine.shutdown, machine.services.restart.
@@ -45,14 +48,16 @@ class SystemPanel {
   lv_obj_t *body;   // set by SettingsUi::page() while cont is built
   lv_obj_t *cont;
   lv_obj_t *info_label;
-  lv_obj_t *loglevel_dd;
-  bool updating_level = false;
+  lv_obj_t *report_btn;
+  lv_obj_t *storage_btn;
   lv_obj_t *logs_btn;
   lv_obj_t *restart_gui_btn;
   lv_obj_t *reboot_btn;
   lv_obj_t *shutdown_btn;
   ButtonContainer back_btn;
   LogsPanel logs_panel;
+  ReportPanel report_panel;
+  StoragePanel storage_panel;
 };
 
 #endif // __SYSTEM_PANEL_H__

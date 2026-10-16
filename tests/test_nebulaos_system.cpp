@@ -208,6 +208,48 @@ TEST(Info, after_clean_reset) {
   ASSERT_FALSE(after_clean_reset(j));
 }
 
+TEST(Logs, save_says_safe_to_remove) {
+  bool ok = false;
+  auto t = logs_save_text(json::parse(R"({"result":{"result":"SAVED","file":"z.zip","bytes":645917,"safe_to_remove":true}})"), &ok);
+  ASSERT_TRUE(ok);
+  ASSERT_TRUE(t.find("646 KB") != std::string::npos);
+  ASSERT_TRUE(t.find("remove the stick") != std::string::npos);
+}
+
+TEST(Notices, from_info) {
+  auto n = system_notices(json::parse(R"({"result":{"notices":[{"id":"config-edits","text":"Your changes to machine.cfg were replaced."},{"id":"","text":"x"},{"id":"y"}]}})"));
+  ASSERT_EQ((int)n.size(), 1);
+  ASSERT_EQ(n[0].id, std::string("config-edits"));
+  ASSERT_TRUE(system_notices(info_reply()).empty());
+  ASSERT_EQ(std::string(ACK_NOTICE_METHOD), std::string("machine.nebulaos.system.ack_notice"));
+}
+
+TEST(Report, debug_note) {
+  ASSERT_TRUE(debug_note(json::parse(R"({"result":{"level":"debug","debug_until":1792186400}})")).find("2026-10-16") != std::string::npos);
+  ASSERT_TRUE(debug_note(json::parse(R"({"result":{"level":"info"}})")).find("24 hours") != std::string::npos);
+  ASSERT_EQ(std::string(REPORT_ISSUES_URL), std::string("https://github.com/coreflake1/NebulaOS/issues"));
+}
+
+TEST(Storage, text_and_cleanup) {
+  auto t = storage_text(json::parse(R"({"result":{"parts":[{"label":"Print files","bytes":12000000},{"label":"Creality files","bytes":2030000000}],"total_bytes":6314295296,"free_bytes":3985342464}})"));
+  ASSERT_EQ(t, std::string("Free 4.0 GB of 6.3 GB\nPrint files: 12 MB\nCreality files: 2.0 GB"));
+  auto p = cleanup_plan(json::parse(R"({"result":{"bytes":1620000000,"videos_bytes":412000000,"other_slot":"creality","items":[]}})"));
+  ASSERT_TRUE(p.ok && p.other_is_creality);
+  ASSERT_TRUE(cleanup_text(p, false).find("Frees 1.6 GB") == 0);
+  ASSERT_TRUE(cleanup_text(p, true).find("Frees 2.0 GB") == 0);
+  ASSERT_TRUE(cleanup_text(p, false).find("factory reset") != std::string::npos);
+  auto q = cleanup_plan(json::parse(R"({"result":{"bytes":0,"videos_bytes":0,"other_slot":"nebulaos"}})"));
+  ASSERT_TRUE(cleanup_text(q, true).find("no Creality files") != std::string::npos);
+  ASSERT_FALSE(cleanup_plan(json::parse(R"({"error":{"message":"x"}})")).ok);
+  ASSERT_TRUE(cleanup_result_text(json::parse(R"({"result":{"result":"CLEANED","freed_bytes":1900000000,"kept":[]}})")).find("Freed 1.9 GB") != std::string::npos);
+  ASSERT_TRUE(cleanup_result_text(json::parse(R"({"error":{"message":"refused while a print is active"}})")).find("print") != std::string::npos);
+}
+
+TEST(Mcu, running_version) {
+  ASSERT_EQ(mcu_running_version(json::parse(R"({"result":{"eventtime":1.0,"status":{"mcu":{"mcu_version":"v0.13.0-742-g01a9c2f92"}}}})")), std::string("v0.13.0-742-g01a9c2f92"));
+  ASSERT_EQ(mcu_running_version(json::parse(R"({"error":{"message":"Klippy not ready"}})")), std::string(""));
+}
+
 int main() {
   return minitest::run_all("nebulaos_system") > 0 ? 1 : 0;
 }

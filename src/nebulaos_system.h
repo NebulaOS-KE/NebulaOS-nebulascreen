@@ -11,7 +11,7 @@ using json = nlohmann::json;
 // Pure, LVGL-free logic for the System, Display and Logs screens (decision D9,
 // 2026-10-10; settings layout S1, 2026-10-11): system info and storage from
 // machine.nebulaos.info, boot screen mode/image from
-// machine.nebulaos.boot_display.status and the uploads/boot-logo folder, and log
+// machine.nebulaos.boot_display.status and the config/uploads/boot-logo folder, and log
 // files from the logs root (Moonraker server.files.list).
 //
 // This file may be distributed under the terms of the GNU GPLv3 license.
@@ -103,6 +103,45 @@ std::string log_level_spdlog(const std::string &level);  // "info" | "warn" | "d
 int log_level_index(const json &status_reply);  // index of result.level, default Info
 // After logs.save: the line for the dialog.
 std::string logs_save_text(const json &reply, bool *ok);
+
+// G65 (2026-10-16): one-line messages NebulaOS leaves for the screen (info
+// "notices", e.g. "Your changes to machine.cfg were replaced ..."), shown
+// once each and acknowledged with ACK_NOTICE_METHOD {"id"}.
+struct SystemNotice {
+  std::string id;
+  std::string text;
+};
+extern const char *const ACK_NOTICE_METHOD;   // machine.nebulaos.system.ack_notice
+std::vector<SystemNotice> system_notices(const json &info_reply);
+
+// G69 (2026-10-16): System > Report a problem.
+extern const char *const REPORT_ISSUES_URL;   // github.com/coreflake1/NebulaOS/issues
+// "Detailed logging switches back to Info at 14:05 (UTC)." while Debug is
+// on (logs.status "debug_until"), else the standing rule.
+std::string debug_note(const json &status_reply);
+
+// G66 (2026-10-16): System > Storage and "Clean up Creality files".
+extern const char *const STORAGE_METHOD;           // machine.nebulaos.storage
+extern const char *const CLEANUP_PLAN_METHOD;      // machine.nebulaos.cleanup.plan {"videos"}
+extern const char *const CLEANUP_CREALITY_METHOD;  // machine.nebulaos.cleanup.creality {"videos"}
+// "Free 3.7 GB of 6.3 GB\nPrint files  12 MB\n..." from a storage reply.
+std::string storage_text(const json &reply);
+struct CleanupPlan {
+  bool ok = false;
+  std::string error;            // why there is no plan
+  double bytes = 0;             // what the cleanup frees (videos excluded)
+  double videos_bytes = 0;      // Creality's timelapse videos, opt-in
+  bool other_is_creality = false;
+};
+CleanupPlan cleanup_plan(const json &plan_reply);
+// The popup text for the plan, with or without the videos.
+std::string cleanup_text(const CleanupPlan &p, bool videos);
+// After cleanup.creality: the line for the dialog.
+std::string cleanup_result_text(const json &reply);
+
+// G34 (2026-10-16): after an MCU flash, what the board runs - from a
+// printer.objects.query {"mcu": ["mcu_version"]} reply. Empty when unknown.
+std::string mcu_running_version(const json &objects_reply);
 
 // Log files from a server.files.list {"root":"logs"} reply: *.log and rotated
 // *.log.N, sorted by name.

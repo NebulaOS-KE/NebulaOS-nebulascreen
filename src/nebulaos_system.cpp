@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <ctime>
 
 const char *const SYSTEM_INFO_METHOD = "machine.nebulaos.info";
 const char *const BOOT_DISPLAY_STATUS_METHOD = "machine.nebulaos.boot_display.status";
@@ -13,6 +14,11 @@ const char *const BOOT_DISPLAY_RESTORE_METHOD = "machine.nebulaos.boot_display.r
 const char *const LOGS_STATUS_METHOD = "machine.nebulaos.logs.status";
 const char *const LOGS_LEVEL_METHOD = "machine.nebulaos.logs.level";
 const char *const LOGS_SAVE_METHOD = "machine.nebulaos.logs.save";
+const char *const ACK_NOTICE_METHOD = "machine.nebulaos.system.ack_notice";
+const char *const REPORT_ISSUES_URL = "https://github.com/coreflake1/NebulaOS/issues";
+const char *const STORAGE_METHOD = "machine.nebulaos.storage";
+const char *const CLEANUP_PLAN_METHOD = "machine.nebulaos.cleanup.plan";
+const char *const CLEANUP_CREALITY_METHOD = "machine.nebulaos.cleanup.creality";
 const char *const LOG_LEVEL_OPTIONS = "Info\nWarning\nDebug";
 const char *const BOOT_DISPLAY_IMAGES_METHOD = "machine.nebulaos.boot_display.images";
 const char *const BOOT_DISPLAY_PREVIEW_METHOD = "machine.nebulaos.boot_display.preview";
@@ -329,6 +335,109 @@ std::string logs_save_text(const json &reply, bool *ok) {
   if (file.empty()) return "Logs not saved: no answer from the printer.";
   *ok = true;
   long bytes = r.contains("bytes") && r["bytes"].is_number() ? r["bytes"].get<long>() : 0;
-  return "Saved to the USB stick:\n" + file + "\n(" + human_bytes((double)bytes) +
-         "). Send this file when you report a problem.";
+  std::string size = bytes < 1000000 ? std::to_string((bytes + 999) / 1000) + " KB"
+                                     : human_bytes((double)bytes);
+  return "Saved to the USB stick:\n" + file + " (" + size + ").\nYou can remove the stick now.";
+}
+
+std::vector<SystemNotice> system_notices(const json &info_reply) {
+  std::vector<SystemNotice> out;
+  const json &r = result_of(info_reply);
+  if (!r.is_object() || !r.contains("notices") || !r["notices"].is_array()) return out;
+  for (const auto &n : r["notices"]) {
+    if (!n.is_object()) continue;
+    SystemNotice sn;
+    sn.id = str_at(n, "/id"_json_pointer);
+    sn.text = str_at(n, "/text"_json_pointer);
+    if (!sn.id.empty() && !sn.text.empty()) out.push_back(sn);
+  }
+  return out;
+}
+
+std::string debug_note(const json &status_reply) {
+  const json &r = result_of(status_reply);
+  if (r.is_object() && r.contains("debug_until") && r["debug_until"].is_number()) {
+    time_t t = (time_t)r["debug_until"].get<long>();
+    struct tm tmv;
+    char buf[32];
+    gmtime_r(&t, &tmv);
+    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &tmv);
+    return std::string("Detailed logging switches back to Info on ") + buf + " (UTC).";
+  }
+  return "Debug switches back to Info by itself after 24 hours.";
+}
+
+static double num_at(const json &j, const char *key) {
+  return j.is_object() && j.contains(key) && j[key].is_number() ? j[key].get<double>() : 0;
+}
+
+std::string storage_text(const json &reply) {
+  const json &r = result_of(reply);
+  if (!r.is_object() || !r.contains("parts") || !r["parts"].is_array()) {
+    std::string err = reply.is_object() && reply.contains("error") ? "no answer" : "unknown";
+    return "Storage: " + err + ".";
+  }
+  std::string out = "Free " + human_bytes(num_at(r, "free_bytes")) + " of " +
+                    human_bytes(num_at(r, "total_bytes"));
+  for (const auto &p : r["parts"]) {
+    std::string label = str_at(p, "/label"_json_pointer);
+    if (label.empty()) continue;
+    out += "\n" + label + ": " + human_bytes(num_at(p, "bytes"));
+  }
+  return out;
+}
+
+CleanupPlan cleanup_plan(const json &plan_reply) {
+  CleanupPlan p;
+  if (plan_reply.is_object() && plan_reply.contains("error")) {
+    p.error = "The printer could not check the files.";
+    return p;
+  }
+  const json &r = result_of(plan_reply);
+  if (!r.is_object() || !r.contains("bytes")) {
+    p.error = "No answer from the printer.";
+    return p;
+  }
+  p.ok = true;
+  p.bytes = num_at(r, "bytes");
+  p.videos_bytes = num_at(r, "videos_bytes");
+  p.other_is_creality = str_at(r, "/other_slot"_json_pointer) == "creality";
+  return p;
+}
+
+std::string cleanup_text(const CleanupPlan &p, bool videos) {
+  if (!p.ok) return p.error;
+  double total = p.bytes + (videos ? p.videos_bytes : 0);
+  if (total <= 0) return "There are no Creality files on this printer.";
+  std::string out = "Frees " + human_bytes(total) + ".\n\n";
+  if (p.other_is_creality) {
+    out += "The other slot still contains the Creality system. After this cleanup:\n"
+           "- Creality's settings, calibration and data are deleted\n"
+           "- Creality will start like after a factory reset\n"
+           "- NebulaOS and your NebulaOS settings are not affected";
+  } else {
+    out += "Deletes the Creality system's files and the helper script's add-ons from the "
+           "data drive. NebulaOS, your print files and your settings are not affected.";
+  }
+  return out;
+}
+
+std::string cleanup_result_text(const json &reply) {
+  if (reply.is_object() && reply.contains("error")) {
+    const json &e = reply["error"];
+    std::string msg = e.is_object() && e.contains("message") && e["message"].is_string()
+      ? e["message"].get<std::string>() : "";
+    if (msg.find("print") != std::string::npos) return "Not while a print is running.";
+    return "The cleanup did not finish. Nothing NebulaOS needs was touched.";
+  }
+  const json &r = result_of(reply);
+  std::string out = "Done. Freed " + human_bytes(num_at(r, "freed_bytes")) + ".";
+  if (r.is_object() && r.contains("kept") && r["kept"].is_array() && !r["kept"].empty()) {
+    out += "\nSome files were left in place (in use or on another drive).";
+  }
+  return out;
+}
+
+std::string mcu_running_version(const json &objects_reply) {
+  return str_at(result_of(objects_reply), "/status/mcu/mcu_version"_json_pointer);
 }

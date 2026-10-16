@@ -12,6 +12,8 @@ LV_IMG_DECLARE(back);
 LV_IMG_DECLARE(logs_img);
 LV_IMG_DECLARE(refresh_img);
 LV_IMG_DECLARE(power_img);
+LV_IMG_DECLARE(info_img);
+LV_IMG_DECLARE(sd_img);
 
 #ifdef GUPPYSCREEN_VERSION
 #define GS_VERSION GUPPYSCREEN_VERSION
@@ -26,6 +28,8 @@ SystemPanel::SystemPanel(KWebSocketClient &c, std::mutex &lock)
   , cont(SettingsUi::page("System", &body))
   , back_btn(cont, &back, "Back", &SystemPanel::_handle_callback, this)
   , logs_panel(c, lock)
+  , report_panel(c, lock)
+  , storage_panel(c, lock)
 {
   SettingsUi::on_shown(cont, [this]() { shown(); });
   lv_obj_t *left = SettingsUi::column(body, 60);
@@ -38,14 +42,23 @@ SystemPanel::SystemPanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_style_text_line_space(info_label, 3, 0);
   lv_label_set_text(info_label, "Loading...");
 
-  // G60 (2026-10-16): one general log level for NebulaOS, Moonraker and the
-  // screen (Klipper has none); NebulaOS stores it, shown() reads it back.
-  lv_obj_t *ll_row = SettingsUi::row(left, "Log level");
-  loglevel_dd = lv_dropdown_create(ll_row);
-  lv_dropdown_set_options(loglevel_dd, LOG_LEVEL_OPTIONS);
-  lv_obj_set_width(loglevel_dd, 110);
-  lv_obj_align(loglevel_dd, LV_ALIGN_RIGHT_MID, 0, 0);
-  lv_obj_add_event_cb(loglevel_dd, &SystemPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
+  // G69/G66 (2026-10-16): own pages, side by side under the info (the log
+  // level moved to Report a problem).
+  lv_obj_t *pages = lv_obj_create(left);
+  lv_obj_set_size(pages, LV_PCT(100), LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_all(pages, 0, 0);
+  lv_obj_set_style_border_width(pages, 0, 0);
+  lv_obj_set_style_bg_opa(pages, LV_OPA_TRANSP, 0);
+  lv_obj_clear_flag(pages, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_flex_flow(pages, LV_FLEX_FLOW_ROW);
+  lv_obj_set_style_pad_column(pages, 6, 0);
+  report_btn = SettingsUi::icon_button(pages, &info_img, "Report a problem",
+                                       &SystemPanel::_handle_callback, this);
+  storage_btn = SettingsUi::icon_button(pages, &sd_img, "Storage", &SystemPanel::_handle_callback, this);
+  for (lv_obj_t *b : {report_btn, storage_btn}) {
+    lv_obj_set_width(b, LV_PCT(48));
+    lv_obj_set_height(b, 34);
+  }
 
   logs_btn = SettingsUi::icon_button(right, &logs_img, "Logs", &SystemPanel::_handle_callback, this);
   restart_gui_btn = SettingsUi::icon_button(right, &refresh_img, "Restart GUI",
@@ -77,13 +90,6 @@ void SystemPanel::foreground() {
 // Every time the page comes on top (SettingsUi::on_shown).
 void SystemPanel::shown() {
   refresh();
-  ws.send_jsonrpc(LOGS_STATUS_METHOD, json::object(), [this](json &reply) {
-    if (reply.contains("error")) return;
-    std::lock_guard<std::mutex> lock(lv_lock);
-    updating_level = true;
-    lv_dropdown_set_selected(loglevel_dd, log_level_index(reply));
-    updating_level = false;
-  });
 }
 
 void SystemPanel::report_error(json &reply, const char *what) {
@@ -166,23 +172,6 @@ void SystemPanel::handle_callback(lv_event_t *e) {
   lv_event_code_t code = lv_event_get_code(e);
   lv_obj_t *obj = lv_event_get_current_target(e);
 
-  if (code == LV_EVENT_VALUE_CHANGED && obj == loglevel_dd) {
-    if (updating_level) return;
-    std::string level = log_level_at(lv_dropdown_get_selected(loglevel_dd));
-    if (level.empty()) return;
-    // The screen's own log follows at once; NebulaOS applies the rest.
-    std::string screen = log_level_spdlog(level);
-    auto ll = spdlog::level::from_str(screen);
-    spdlog::set_level(ll);
-    spdlog::flush_on(ll);
-    Config *conf = Config::get_instance();
-    conf->set<std::string>(conf->df() + "log_level", screen);
-    conf->save();
-    ws.send_jsonrpc(LOGS_LEVEL_METHOD, json{{"level", level}}, [this](json &reply) {
-      report_error(reply, "Log level not changed");
-    });
-    return;
-  }
   if (code != LV_EVENT_CLICKED) {
     return;
   }
@@ -190,6 +179,10 @@ void SystemPanel::handle_callback(lv_event_t *e) {
     lv_obj_move_background(cont);
   } else if (obj == logs_btn) {
     logs_panel.foreground();
+  } else if (obj == report_btn) {
+    report_panel.foreground();
+  } else if (obj == storage_btn) {
+    storage_panel.foreground();
   } else if (obj == restart_gui_btn) {
     restart_gui();
   } else if (obj == reboot_btn) {

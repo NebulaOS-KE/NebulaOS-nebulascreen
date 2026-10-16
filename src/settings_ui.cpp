@@ -2,6 +2,7 @@
 #include "utils.h"
 
 #include <map>
+#include <memory>
 #include <set>
 
 namespace SettingsUi {
@@ -258,6 +259,48 @@ static void choice(const char *title, const char *text, const char *cancel_label
 void confirm(const char *title, const char *text, const char *confirm_label,
              Tone tone, const std::function<void()> &on_confirm) {
   choice(title, text, "Cancel", confirm_label, tone, on_confirm);
+}
+
+struct OptionCtx {
+  lv_obj_t *check;
+  lv_obj_t *text;
+  std::function<std::string(bool)> text_for;
+};
+
+static void option_toggled(lv_event_t *e) {
+  auto *o = (OptionCtx *)lv_event_get_user_data(e);
+  std::string t = o->text_for(lv_obj_has_state(o->check, LV_STATE_CHECKED));
+  lv_label_set_text(o->text, t.c_str());
+}
+
+static void option_deleted(lv_event_t *e) {
+  delete (OptionCtx *)lv_event_get_user_data(e);
+}
+
+void confirm_option(const char *title, const std::function<std::string(bool)> &text_for,
+                    const char *option, const char *confirm_label, Tone tone,
+                    const std::function<void(bool)> &on_confirm) {
+  lv_obj_t *check = NULL;
+  // The checkbox is read when confirmed; it lives in the dialog, which
+  // confirm_clicked deletes asynchronously - after the callback has run.
+  auto checked = std::make_shared<lv_obj_t *>(nullptr);
+  choice(title, text_for(false).c_str(), "Cancel", confirm_label, tone, [checked, on_confirm]() {
+    bool ticked = *checked != NULL && lv_obj_has_state(*checked, LV_STATE_CHECKED);
+    on_confirm(ticked);
+  });
+  if (option == NULL) return;
+  // choice() built: overlay (last child of the top layer) -> box -> [title, text, buttons].
+  lv_obj_t *overlay = lv_obj_get_child(lv_layer_top(), lv_obj_get_child_cnt(lv_layer_top()) - 1);
+  lv_obj_t *box = lv_obj_get_child(overlay, 0);
+  lv_obj_t *text = lv_obj_get_child(box, 1);
+  check = lv_checkbox_create(box);
+  lv_checkbox_set_text(check, option);
+  lv_obj_set_style_text_font(check, &lv_font_montserrat_12, 0);
+  lv_obj_move_to_index(check, 2);
+  *checked = check;
+  auto *o = new OptionCtx{check, text, text_for};
+  lv_obj_add_event_cb(check, option_toggled, LV_EVENT_VALUE_CHANGED, o);
+  lv_obj_add_event_cb(check, option_deleted, LV_EVENT_DELETE, o);
 }
 
 void notice(const char *title, const char *text) {

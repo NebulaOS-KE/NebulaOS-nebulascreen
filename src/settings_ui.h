@@ -4,6 +4,7 @@
 #include "lvgl/lvgl.h"
 
 #include <functional>
+#include <string>
 
 // Shared building blocks for the Settings pages (S1, 2026-10-11), so every page
 // has the same title, row spacing, buttons and confirmation dialog:
@@ -58,6 +59,14 @@ void set_tone(lv_obj_t *obj, Tone tone);
 // `on_confirm` runs on the LVGL thread when confirmed.
 void confirm(const char *title, const char *text, const char *confirm_label,
              Tone tone, const std::function<void()> &on_confirm);
+
+// G66 (2026-10-16): like confirm(), with one checkbox (`option`, unticked)
+// between the text and the buttons; the text comes from `text_for(ticked)` and
+// follows the checkbox. `option` NULL: no checkbox. `on_confirm(ticked)` runs
+// on the LVGL thread when confirmed.
+void confirm_option(const char *title, const std::function<std::string(bool)> &text_for,
+                    const char *option, const char *confirm_label, Tone tone,
+                    const std::function<void(bool)> &on_confirm);
 
 // Closes every open confirmation as if Cancel was tapped.
 void dismiss_confirms();
