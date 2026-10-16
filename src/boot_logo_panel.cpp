@@ -34,6 +34,8 @@ BootLogoPanel::BootLogoPanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_style_border_color(preview, lv_palette_main(LV_PALETTE_GREY), 0);
   preview_note = SettingsUi::hint(left, "");
   power_label = SettingsUi::hint(left, "Power-on logo: ...");
+  SettingsUi::hint(left, "Or upload a PNG, BMP or JPEG (max 4 MB) in Mainsail: Machine > uploads > "
+                         "boot-logo. Best: 480 x 272, landscape.");
 
   apply_btn = SettingsUi::icon_button(right, &display_img, "Apply",
                                       &BootLogoPanel::_handle_callback, this);

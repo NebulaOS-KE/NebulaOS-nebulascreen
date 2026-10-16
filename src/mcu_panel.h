@@ -12,7 +12,7 @@
 
 // Settings > Printer > MCU firmware (run 4, 2026-10-11): "plug in USB, pick a
 // compiled .bin, install". Lists the .bin files uploaded through Mainsail
-// (config/firmware/mcu) and on a USB stick, each already checked by NebulaOS
+// (uploads/mainboard-firmware) and on a USB stick, each already checked by NebulaOS
 // (machine.nebulaos.mcu.files); installs one after a confirmation that names
 // the risk (machine.nebulaos.mcu.flash - refused while printing; Klipper is
 // stopped and restarted around it); "Reinstall NebulaOS firmware" puts the

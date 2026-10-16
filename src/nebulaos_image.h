@@ -12,7 +12,7 @@ using json = nlohmann::json;
 // image updates, decided 2026-10-14). machine.nebulaos.image.* is
 // nebulaos_osconfig/image.py: a KE .img (NebulaOS or Creality, the same
 // package format Creality's own updater takes) from a USB stick or
-// config/firmware/os is written into the boot slot (A/B) that is NOT running,
+// uploads/system-image is written into the boot slot (A/B) that is NOT running,
 // then the printer restarts into it. After a NebulaOS image the new slot gets
 // one trial boot: if Klipper and the screen do not come up, NebulaOS goes back
 // to the previous slot once. Only offered on the touchscreen.

@@ -37,7 +37,7 @@ ImagePanel::ImagePanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_scroll_dir(list, LV_DIR_VER);
 
   SettingsUi::hint(left, "Put a KE .img on a USB stick, or upload it "
-                         "in Mainsail (Machine > config > firmware/os), then tap Refresh.");
+                         "in Mainsail (Machine > uploads > system-image), then tap Refresh.");
 
   refresh_btn = SettingsUi::icon_button(right, &refresh_img, "Refresh",
                                         &ImagePanel::_handle_callback, this);
@@ -266,7 +266,7 @@ void ImagePanel::handle_callback(lv_event_t *e) {
 
 #ifdef SIMULATOR
 void ImagePanel::sim_fill() {
-  show_files(json::parse(R"({"result":{"usb":["sda1"],"upload_dir":"/opt/printer_data/config/firmware/os",
+  show_files(json::parse(R"({"result":{"usb":["sda1"],"upload_dir":"/opt/printer_data/uploads/system-image",
     "slots":{"running":"B","A":{"kernel":"Linux-4.4.94","system":"creality"},
              "B":{"kernel":"Linux-6.6.157-rt79","system":"nebulaos"}},
     "files":[

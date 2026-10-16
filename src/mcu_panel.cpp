@@ -34,7 +34,7 @@ McuPanel::McuPanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_scroll_dir(list, LV_DIR_VER);
 
-  SettingsUi::hint(left, "Add a .bin in Mainsail (Machine > config > firmware/mcu) or "
+  SettingsUi::hint(left, "Add a .bin in Mainsail (Machine > uploads > mainboard-firmware) or "
                          "plug in a USB stick, then tap Refresh.");
 
   refresh_btn = SettingsUi::icon_button(right, &refresh_img, "Refresh",

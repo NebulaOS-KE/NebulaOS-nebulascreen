@@ -11,7 +11,7 @@ using json = nlohmann::json;
 // Pure, LVGL-free logic for the System, Display and Logs screens (decision D9,
 // 2026-10-10; settings layout S1, 2026-10-11): system info and storage from
 // machine.nebulaos.info, boot screen mode/image from
-// machine.nebulaos.boot_display.status and the nebulaos_boot file root, and log
+// machine.nebulaos.boot_display.status and the uploads/boot-logo folder, and log
 // files from the logs root (Moonraker server.files.list).
 //
 // This file may be distributed under the terms of the GNU GPLv3 license.
