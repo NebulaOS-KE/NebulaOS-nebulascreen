@@ -58,18 +58,24 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	ws.send_jsonrpc("printer.info",
 			[](json& j) { State::get_instance()->set_data("printer_info", j, "/result"); });
 	
-	json h = {
-	  { "namespace", "fluidd" },
-	  { "key", "console" }
-	};
-	ws.send_jsonrpc("server.database.get_item", h,
-			[](json& j) { State::get_instance()->set_data("console", j, "/result/value"); });
-
-	h = {
-	  { "namespace", "guppyscreen" }
-	};
-	ws.send_jsonrpc("server.database.get_item", h,
-			[](json& j) { State::get_instance()->set_data("guppysettings", j, "/result/value"); });	
+	// S2 (2026-10-16): only read namespaces that exist - asking for a missing
+	// one put a JSON-RPC error into moonraker.log at every start.
+	ws.send_jsonrpc("server.database.list", [&ws](json& l) {
+	  if (database_has_namespace(l, "fluidd")) {
+	    json h = {{ "namespace", "fluidd" }};
+	    ws.send_jsonrpc("server.database.get_item", h, [](json& j) {
+	      if (j.contains("/result/value/console"_json_pointer)) {
+	        json c = {{"result", {{"value", j["/result/value/console"_json_pointer]}}}};
+	        State::get_instance()->set_data("console", c, "/result/value");
+	      }
+	    });
+	  }
+	  if (database_has_namespace(l, "guppyscreen")) {
+	    json h = {{ "namespace", "guppyscreen" }};
+	    ws.send_jsonrpc("server.database.get_item", h,
+	      [](json& j) { State::get_instance()->set_data("guppysettings", j, "/result/value"); });
+	  }
+	});
 
 	// G2: once after a clean NebulaOS reset, say that Wi-Fi has to be
 	// connected again, then tell NebulaOS the notice was shown.

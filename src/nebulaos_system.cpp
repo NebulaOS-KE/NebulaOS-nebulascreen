@@ -438,6 +438,15 @@ std::string cleanup_result_text(const json &reply) {
   return out;
 }
 
+bool database_has_namespace(const json &list_reply, const std::string &ns) {
+  const json &r = result_of(list_reply);
+  if (!r.is_object() || !r.contains("namespaces") || !r["namespaces"].is_array()) return false;
+  for (const auto &n : r["namespaces"]) {
+    if (n.is_string() && n.get<std::string>() == ns) return true;
+  }
+  return false;
+}
+
 std::string mcu_running_version(const json &objects_reply) {
   return str_at(result_of(objects_reply), "/status/mcu/mcu_version"_json_pointer);
 }

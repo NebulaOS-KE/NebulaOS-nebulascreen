@@ -250,6 +250,13 @@ TEST(Mcu, running_version) {
   ASSERT_EQ(mcu_running_version(json::parse(R"({"error":{"message":"Klippy not ready"}})")), std::string(""));
 }
 
+TEST(Database, has_namespace) {
+  auto l = json::parse(R"({"result":{"namespaces":["mainsail","moonraker","fluidd"],"backups":[]}})");
+  ASSERT_TRUE(database_has_namespace(l, "fluidd"));
+  ASSERT_FALSE(database_has_namespace(l, "guppyscreen"));
+  ASSERT_FALSE(database_has_namespace(json::parse(R"({"error":{"message":"x"}})"), "fluidd"));
+}
+
 int main() {
   return minitest::run_all("nebulaos_system") > 0 ? 1 : 0;
 }

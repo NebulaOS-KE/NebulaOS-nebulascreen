@@ -143,6 +143,9 @@ std::string cleanup_result_text(const json &reply);
 // printer.objects.query {"mcu": ["mcu_version"]} reply. Empty when unknown.
 std::string mcu_running_version(const json &objects_reply);
 
+// S2: whether a server.database.list reply names `ns`.
+bool database_has_namespace(const json &list_reply, const std::string &ns);
+
 // Log files from a server.files.list {"root":"logs"} reply: *.log and rotated
 // *.log.N, sorted by name.
 std::vector<std::string> log_files(const json &files_reply);
