@@ -84,6 +84,7 @@ void UpdatesPanel::shown() {
   // A reply lost to a Moonraker restart must not keep the page busy forever.
   waiting_for_reply = false;
   refresh(false);
+  read_readiness(false);
   ws.send_jsonrpc(SYSTEM_INFO_METHOD, json::object(), [this](json &reply) {
     auto info = system_info(reply);
     std::string text = updates_os_note(info.text);
@@ -123,6 +124,8 @@ void UpdatesPanel::refresh(bool check_remote) {
         std::lock_guard<std::mutex> lock(lv_lock);
         show(status);
       });
+      // G73: Moonraker may now know newer versions - can they be installed?
+      read_readiness(true);
     });
     return;
   }
@@ -132,9 +135,35 @@ void UpdatesPanel::refresh(bool check_remote) {
   });
 }
 
+// G73: NebulaOS's check whether a pending Klipper/Moonraker update can be
+// installed from the package index (advisory). check_now runs the check
+// (pip --dry-run on the printer, may take minutes); otherwise the last result.
+void UpdatesPanel::read_readiness(bool check_now) {
+  ws.send_jsonrpc(check_now ? UPDATE_CHECK_READINESS_METHOD : UPDATE_READINESS_METHOD,
+                  json::object(), [this, check_now](json &reply) {
+    if (check_now && !jsonrpc_error_message(reply).empty()) {
+      return;
+    }
+    const json &r = reply.contains("result") ? reply["result"] : reply;
+    std::string result = r.is_object() && r.contains("result") && r["result"].is_string()
+      ? r["result"].get<std::string>() : "";
+    // BUSY/PRINTING/UNCHANGED/RUNNING: the stored result still stands.
+    if (check_now && result != "NOT_READY" && result != "READY" && result != "NO_UPDATES"
+        && result != "UNKNOWN") {
+      read_readiness(false);
+      return;
+    }
+    std::lock_guard<std::mutex> lock(lv_lock);
+    readiness = reply;
+    if (!last_status.is_null()) show(last_status);
+  });
+}
+
 // LVGL lock held by the caller.
 void UpdatesPanel::show(const json &status_reply) {
+  last_status = status_reply;
   rows = update_rows(status_reply);
+  std::string waiting_text = apply_readiness(rows, readiness);
   row_btns.clear();
   lv_obj_clean(list);
   int available = 0;
@@ -193,7 +222,8 @@ void UpdatesPanel::show(const json &status_reply) {
     set_busy("");
     lv_label_set_text(status_label, "Update finished.");
   } else if (!busy) {
-    lv_label_set_text(status_label, available ? "" : (rows.empty() ? "" : "Everything is up to date."));
+    lv_label_set_text(status_label, !waiting_text.empty() ? waiting_text.c_str()
+                                    : available ? "" : (rows.empty() ? "" : "Everything is up to date."));
   }
   if (available > 0 && !busy) {
     lv_obj_clear_state(all_btn, LV_STATE_DISABLED);
@@ -213,6 +243,13 @@ void UpdatesPanel::upgrade(const std::string &name, const std::string &label) {
     : "Install the " + label + " update now?" +
       (name == "klipper" || name == "nebulaos-klipper-extensions"
          ? " Klipper stops during the update." : "");
+  bool waiting = std::any_of(rows.begin(), rows.end(), [&name](const UpdateRow &r) {
+    return r.waiting && (name.empty() || r.name == name);
+  });
+  if (waiting) {
+    text += "\n\nThe NebulaOS package index does not have everything this version needs yet. "
+            "The update will probably fail and be undone.";
+  }
   SettingsUi::confirm(name.empty() ? "Update all" : ("Update " + label).c_str(), text.c_str(),
     "Update", SettingsUi::Tone::Normal, [this, name, label]() {
       set_busy("Updating " + (name.empty() ? std::string("everything") : label) +

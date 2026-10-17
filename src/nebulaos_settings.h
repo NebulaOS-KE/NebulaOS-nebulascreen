@@ -92,12 +92,21 @@ struct UpdateRow {
   bool valid = true;      // false: the updater reports a problem
   bool checking = false;  // G56: Moonraker has not read this repository yet
   std::string state;      // "up to date" / "3 new" / "v2.14 available" / problem text
+  bool waiting = false;   // G73: the package index cannot install this update yet
 };
 
 // From machine.update.status; the OS ("system") updater is left out - NebulaOS
 // updates the OS as a whole image.
 std::vector<UpdateRow> update_rows(const json &status_reply);
 bool updates_busy(const json &status_reply);
+// G73: NebulaOS's readiness check (machine.nebulaos.updates.readiness /
+// check_readiness): a pending Klipper/Moonraker update whose packages (or
+// Klipper's compiled helper) the NebulaOS package index does not have yet is
+// marked "waiting for packages". Advisory - the Update button stays.
+// Returns the check's message when something waits, else "".
+extern const char *const UPDATE_READINESS_METHOD;        // last result
+extern const char *const UPDATE_CHECK_READINESS_METHOD;  // check now
+std::string apply_readiness(std::vector<UpdateRow> &rows, const json &readiness_reply);
 // One notify_update_response notification (params[0] {application, message,
 // complete}): the line for the screen and whether the update has finished (G6).
 struct UpdateProgress {

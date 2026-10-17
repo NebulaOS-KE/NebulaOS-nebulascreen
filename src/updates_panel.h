@@ -58,6 +58,9 @@ class UpdatesPanel {
   bool busy = false;
   lv_timer_t *recheck_timer = NULL;
   bool waiting_for_reply = false;  // an upgrade request is still open
+  json last_status;                // the last machine.update.status reply
+  json readiness;                  // G73: the last readiness result
+  void read_readiness(bool check_now);
 };
 
 #endif // __UPDATES_PANEL_H__

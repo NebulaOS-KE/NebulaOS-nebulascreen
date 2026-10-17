@@ -10,6 +10,8 @@ const char *const WIFI_FORGET_METHOD = "machine.nebulaos.wifi.forget";
 const char *const UPDATE_STATUS_METHOD = "machine.update.status";
 const char *const UPDATE_REFRESH_METHOD = "machine.update.refresh";
 const char *const UPDATE_UPGRADE_METHOD = "machine.update.upgrade";
+const char *const UPDATE_READINESS_METHOD = "machine.nebulaos.updates.readiness";
+const char *const UPDATE_CHECK_READINESS_METHOD = "machine.nebulaos.updates.check_readiness";
 const char *const HOSTNAME_METHOD = "machine.nebulaos.network.hostname";
 const char *const SERVICE_RESTART_METHOD = "machine.services.restart";
 const char *const MCU_STATUS_METHOD = "machine.nebulaos.mcu.status";
@@ -257,6 +259,25 @@ UpdateProgress update_progress(const json &notification) {
   p.valid = !msg.empty() || p.complete;
   p.text = (app.empty() ? "" : update_label(app) + ": ") + (msg.empty() ? "done" : msg);
   return p;
+}
+
+std::string apply_readiness(std::vector<UpdateRow> &rows, const json &readiness_reply) {
+  const json &r = result_of(readiness_reply);
+  if (!r.is_object() || str_at(r, "/result"_json_pointer) != "NOT_READY") return "";
+  if (!r.contains("apps") || !r["apps"].is_object()) return "";
+  bool any = false;
+  for (auto &row : rows) {
+    if (!row.available || !r["apps"].contains(row.name)) continue;
+    const json &a = r["apps"][row.name];
+    if (!a.is_object() || !a.contains("ready") || !a["ready"].is_boolean() || a["ready"].get<bool>()) {
+      continue;
+    }
+    row.waiting = true;
+    row.valid = false;
+    row.state += " - waiting for packages";
+    any = true;
+  }
+  return any ? str_at(r, "/message"_json_pointer) : "";
 }
 
 bool updates_busy(const json &status_reply) {

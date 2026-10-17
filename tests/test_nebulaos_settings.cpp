@@ -322,6 +322,25 @@ TEST(Updates, progress) {
   ASSERT_FALSE(update_progress(json::object()).valid);
 }
 
+TEST(Updates, readiness_waiting_for_packages) {
+  auto rows = update_rows(update_reply());
+  json not_ready = json::parse(R"({"result":{"result":"NOT_READY","message":"Moonraker update: wait",
+    "apps":{"moonraker":{"ready":false,"packages":"missing"},"klipper":{"ready":false}}}})");
+  ASSERT_EQ(apply_readiness(rows, not_ready), std::string("Moonraker update: wait"));
+  ASSERT_TRUE(rows[2].waiting);
+  ASSERT_FALSE(rows[2].valid);
+  ASSERT_EQ(rows[2].state, std::string("3 new - waiting for packages"));
+  ASSERT_TRUE(rows[2].available);               // advisory: still installable
+  ASSERT_FALSE(rows[0].waiting);                // Klipper has no update pending
+  auto fresh = update_rows(update_reply());
+  json ready = json::parse(R"({"result":{"result":"READY","apps":{"moonraker":{"ready":true}}}})");
+  ASSERT_EQ(apply_readiness(fresh, ready), std::string(""));
+  ASSERT_FALSE(fresh[2].waiting);
+  ASSERT_EQ(apply_readiness(fresh, json()), std::string(""));
+  json unknown = json::parse(R"({"result":{"result":"NOT_READY","apps":{"moonraker":{"ready":null}}}})");
+  ASSERT_EQ(apply_readiness(fresh, unknown), std::string(""));
+}
+
 TEST(Mcu, version_shown_and_warned) {
   json files = json::parse(R"({"result":{"files":[
     {"id":"usb/sda1/old.bin","name":"old.bin","source":"usb","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
