@@ -257,6 +257,13 @@ TEST(Database, has_namespace) {
   ASSERT_FALSE(database_has_namespace(json::parse(R"({"error":{"message":"x"}})"), "fluidd"));
 }
 
+TEST(BootLogo, import_has_no_power_on_message) {
+  ASSERT_EQ(power_on_result(json::parse(R"({"result":{"result":"IMPORTED","name":"a.png"}})")), std::string(""));
+  ASSERT_EQ(power_on_result(json::parse(R"({"result":{"result":"DELETED"}})")), std::string(""));
+  ASSERT_EQ(power_on_result(json::parse(R"({"result":{"result":"APPLIED","power_on":{"result":"WRITTEN"}}})")), std::string(""));
+  ASSERT_TRUE(power_on_result(json::parse(R"({"error":{"message":"RTOS_UNKNOWN: x; nothing was changed"}})")).find("not changed") != std::string::npos);
+}
+
 int main() {
   return minitest::run_all("nebulaos_system") > 0 ? 1 : 0;
 }

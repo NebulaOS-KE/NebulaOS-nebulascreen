@@ -230,6 +230,9 @@ std::string power_on_result(const json &reply) {
   const json &p = r.contains("power_on") && r["power_on"].is_object() ? r["power_on"] : r;
   std::string res = str_at(p, "/result"_json_pointer);
   if (res == "WRITTEN" || res == "UNCHANGED") return "";
+  // Run 10 test: an import or a delete changes neither logo - no power-on
+  // message for those (it said "the boot screen changed ..." after Add from USB).
+  if (!r.contains("power_on") && res != "FAILED") return "";
   std::string msg = str_at(p, "/message"_json_pointer);
   return "The boot screen changed, but the power-on logo did not" +
          (msg.empty() ? std::string(".") : ": " + msg + ".");
