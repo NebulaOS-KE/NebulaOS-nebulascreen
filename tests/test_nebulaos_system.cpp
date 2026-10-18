@@ -22,6 +22,9 @@ TEST(Info, live_reply) {
   ASSERT_TRUE(s.ok);
   ASSERT_FALSE(s.storage_warning);  // REPAIRED is a normal outcome, not a warning
   ASSERT_TRUE(s.text.find("NebulaOS 3580378  (2026-10-10)") != std::string::npos);
+  json v = info_reply();
+  v["result"]["build"]["nebulaos_version"] = "0.9.0";
+  ASSERT_TRUE(system_info(v).text.find("NebulaOS v0.9.0  (3580378, 2026-10-10)") != std::string::npos);
   ASSERT_TRUE(s.text.find("Kernel 6.6.157-rt79") != std::string::npos);
   ASSERT_TRUE(s.text.find("Storage 1.8 GB free of 6.3 GB") != std::string::npos);
   ASSERT_TRUE(s.text.find("nebulaos.local") != std::string::npos);
@@ -125,6 +128,9 @@ TEST(Updates, os_note) {
   ASSERT_EQ(updates_os_note("NebulaOS 701a888  (2026-10-15), slot B\nKernel 6.6"),
             std::string("This list updates Klipper, Moonraker and Mainsail.\n"
                         "NebulaOS itself (build 701a888, 2026-10-15) is updated in System image."));
+  ASSERT_EQ(updates_os_note("NebulaOS v0.9.0  (93d55f9, 2026-10-18), slot B\nKernel 6.6"),
+            std::string("This list updates Klipper, Moonraker and Mainsail.\n"
+                        "NebulaOS itself (v0.9.0, build 93d55f9, 2026-10-18) is updated in System image."));
   ASSERT_EQ(updates_os_note("System information unavailable."),
             std::string("This list updates Klipper, Moonraker and Mainsail.\n"
                         "NebulaOS itself is updated in System image."));

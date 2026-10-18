@@ -72,8 +72,19 @@ SystemInfo system_info(const json &reply) {
   std::string date = str_at(r, "/build/build_date"_json_pointer);
   std::string kernel = str_at(r, "/kernel/release"_json_pointer);
   std::string host = str_at(r, "/hostname"_json_pointer);
-  std::string text = "NebulaOS " + (head.size() >= 7 ? head.substr(0, 7) : (head.empty() ? "unknown" : head));
-  if (!date.empty()) text += "  (" + date.substr(0, 10) + ")";
+  std::string version = str_at(r, "/build/nebulaos_version"_json_pointer);
+  std::string build = head.size() >= 7 ? head.substr(0, 7) : (head.empty() ? "unknown" : head);
+  std::string text;
+  if (!version.empty()) {
+    // G81: the release version, then the build it came from.
+    text = "NebulaOS v" + version + "  (" + build;
+    if (!date.empty()) text += ", " + date.substr(0, 10);
+    text += ")";
+  } else {
+    // An image from before G81 has no version: the build alone.
+    text = "NebulaOS " + build;
+    if (!date.empty()) text += "  (" + date.substr(0, 10) + ")";
+  }
   std::string slot = str_at(r, "/slot"_json_pointer);
   if (!slot.empty()) text += ", slot " + slot;
   if (!kernel.empty()) text += "\nKernel " + kernel;
@@ -250,7 +261,10 @@ std::string updates_os_note(const std::string &system_info_text) {
     }
   }
   std::string text = "This list updates Klipper, Moonraker and Mainsail.\nNebulaOS itself";
-  if (!build.empty() && build != "unknown") {
+  if (!build.empty() && build[0] == 'v') {
+    // "NebulaOS v0.9.0  (93d55f9, 2026-10-18)"
+    text += " (" + build + (date.empty() ? "" : ", build " + date) + ")";
+  } else if (!build.empty() && build != "unknown") {
     text += " (build " + build + (date.empty() ? "" : ", " + date) + ")";
   }
   return text + " is updated in System image.";
