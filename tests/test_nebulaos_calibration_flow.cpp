@@ -123,6 +123,42 @@ TEST(View, other_flows_state_does_not_leak) {
   ASSERT_TRUE(cal_view(CalFlow::INPUT_SHAPER, s, false).can_start);
 }
 
+TEST(LoadCell, commands_and_input) {
+  ASSERT_EQ(cal_start_command(CalFlow::LOAD_CELL), std::string("NEBULAOS_LOAD_CELL_CALIBRATE"));
+  ASSERT_EQ(cal_cancel_command(CalFlow::LOAD_CELL), std::string("_NEBULAOS_LOAD_CELL_CANCEL"));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "1500"),
+            std::string("NEBULAOS_LOAD_CELL_CALIBRATE GRAMS=1500.0"));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "49"), std::string(""));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "30000"), std::string(""));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "abc"), std::string(""));
+  ASSERT_EQ(cal_input_command(CalFlow::ESTEPS, "98.5"),
+            std::string("NEBULAOS_ESTEPS_CALIBRATE MEASURED=98.50"));
+  ASSERT_EQ(cal_input_command(CalFlow::INPUT_SHAPER, "5"), std::string(""));
+  ASSERT_EQ(std::string(cal_input_hint(CalFlow::LOAD_CELL)), std::string("weight in grams"));
+}
+
+TEST(LoadCell, steps) {
+  json s = idle();
+  auto v = cal_view(CalFlow::LOAD_CELL, s, false);
+  ASSERT_EQ(v.title, std::string("Load Cell"));
+  ASSERT_TRUE(v.can_start);
+  ASSERT_TRUE(v.text.find("1 kg") != std::string::npos);
+  s["load_cell_state"] = "awaiting_tare";
+  v = cal_view(CalFlow::LOAD_CELL, s, false);
+  ASSERT_TRUE(v.text.find("Tare") != std::string::npos);
+  ASSERT_TRUE(v.can_cancel);
+  ASSERT_FALSE(v.needs_measurement);
+  s["load_cell_state"] = "awaiting_weight";
+  v = cal_view(CalFlow::LOAD_CELL, s, false);
+  ASSERT_TRUE(v.needs_measurement);
+  ASSERT_TRUE(v.text.find("front-left") != std::string::npos);
+  s["load_cell_state"] = "complete";
+  s["load_cell_counts_per_gram"] = 85.721;
+  v = cal_view(CalFlow::LOAD_CELL, s, false);
+  ASSERT_TRUE(v.text.find("85.721 counts per gram") != std::string::npos);
+  ASSERT_FALSE(cal_view(CalFlow::ESTEPS, s, false).needs_measurement);
+}
+
 int main() {
   return minitest::run_all("nebulaos_calibration_flow") > 0 ? 1 : 0;
 }

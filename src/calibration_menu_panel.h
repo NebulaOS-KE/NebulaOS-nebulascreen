@@ -73,6 +73,7 @@ class CalibrationMenuPanel {
   lv_obj_t *wizard_row;
   lv_obj_t *inputshaper_row;
   lv_obj_t *esteps_row;
+  lv_obj_t *load_cell_row;
   lv_obj_t *skew_row;
   lv_obj_t *tmc_tune_row;
   // unordered utility section
@@ -87,6 +88,7 @@ class CalibrationMenuPanel {
   // show their state and offer Cancel / the E-steps measurement.
   GuidedCalibrationPanel auto_calibrate_panel;
   GuidedCalibrationPanel esteps_panel;
+  GuidedCalibrationPanel load_cell_panel;
   GuidedCalibrationPanel input_shaper_panel;
   BedMeshPanel &bedmesh_panel;
   AxisTwistPanel &axis_twist_panel;

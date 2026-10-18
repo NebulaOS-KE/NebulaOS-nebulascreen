@@ -118,6 +118,7 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   , highlight_index(-1)
   , auto_calibrate_panel(websocket_client, l, CalFlow::AUTO_CALIBRATE)
   , esteps_panel(websocket_client, l, CalFlow::ESTEPS)
+  , load_cell_panel(websocket_client, l, CalFlow::LOAD_CELL)
   , input_shaper_panel(websocket_client, l, CalFlow::INPUT_SHAPER)
   , bedmesh_panel(bedmesh)
   , axis_twist_panel(axis_twist)
@@ -168,16 +169,17 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
 
   make_section_label(list_cont, "IN ORDER");
   axis_twist_row  = make_row(list_cont, &layers_img,      "Axis Twist",              &CalibrationMenuPanel::_handle_callback, this, "1");
-  wizard_row      = make_row(list_cont, &home_z,          "Z-Offset & Bed Mesh",     &CalibrationMenuPanel::_handle_callback, this, "2");
-  inputshaper_row = make_row(list_cont, &inputshaper_img, "Input Shaper",            &CalibrationMenuPanel::_handle_callback, this, "3");
-  esteps_row      = make_row(list_cont, &extrude_img,     "E-Steps Calibration",     &CalibrationMenuPanel::_handle_callback, this, "4");
-  skew_row        = make_row(list_cont, &skew_img,        "Skew Correction",         &CalibrationMenuPanel::_handle_callback, this, "5");
-  tmc_tune_row    = make_row(list_cont, &motor_img,       "TMC Autotune (optional)", &CalibrationMenuPanel::_handle_callback, this, "6");
+  load_cell_row   = make_row(list_cont, &home_z,          "Load Cell",               &CalibrationMenuPanel::_handle_callback, this, "2");
+  wizard_row      = make_row(list_cont, &home_z,          "Z-Offset & Bed Mesh",     &CalibrationMenuPanel::_handle_callback, this, "3");
+  inputshaper_row = make_row(list_cont, &inputshaper_img, "Input Shaper",            &CalibrationMenuPanel::_handle_callback, this, "4");
+  esteps_row      = make_row(list_cont, &extrude_img,     "E-Steps Calibration",     &CalibrationMenuPanel::_handle_callback, this, "5");
+  skew_row        = make_row(list_cont, &skew_img,        "Skew Correction",         &CalibrationMenuPanel::_handle_callback, this, "6");
+  tmc_tune_row    = make_row(list_cont, &motor_img,       "TMC Autotune (optional)", &CalibrationMenuPanel::_handle_callback, this, "7");
 
   make_section_label(list_cont, "OTHER");
   bedmesh_row = make_row(list_cont, &bedmesh_img, "Bed Mesh", &CalibrationMenuPanel::_handle_callback, this);
 
-  rows = {axis_twist_row, wizard_row, inputshaper_row, esteps_row, skew_row, tmc_tune_row, bedmesh_row};
+  rows = {axis_twist_row, load_cell_row, wizard_row, inputshaper_row, esteps_row, skew_row, tmc_tune_row, bedmesh_row};
 
   // Right-side nav column - same construction as macros_panel.cpp's nav_cont
   // (Up/OK/Down). Back moved up to the header row (grid_cell above, level
@@ -337,6 +339,13 @@ void CalibrationMenuPanel::activate_row(lv_obj_t *row) {
   if (row == inputshaper_row) {
     if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
     input_shaper_panel.foreground();
+    return;
+  }
+
+  if (row == load_cell_row) {
+    // No motion or heat, but it ends in a SAVE_CONFIG restart; never mid-print.
+    if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
+    load_cell_panel.foreground();
     return;
   }
 

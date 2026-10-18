@@ -57,7 +57,7 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   }
 
   lv_textarea_set_one_line(measure_ta, true);
-  lv_textarea_set_placeholder_text(measure_ta, "mm the mark moved");
+  lv_textarea_set_placeholder_text(measure_ta, cal_input_hint(flow));
   lv_textarea_set_accepted_chars(measure_ta, "0123456789.");
   lv_textarea_set_max_length(measure_ta, 6);
   lv_obj_set_flex_grow(measure_ta, 2);
@@ -147,7 +147,8 @@ void GuidedCalibrationPanel::send(const std::string &gcode, const char *what) {
 }
 
 void GuidedCalibrationPanel::confirm_start() {
-  if (flow == CalFlow::ESTEPS) {
+  // E-steps and the load cell start with a prompt of their own; nothing moves yet.
+  if (flow == CalFlow::ESTEPS || flow == CalFlow::LOAD_CELL) {
     send(cal_start_command(flow), "Start failed");
     return;
   }
@@ -170,9 +171,11 @@ void GuidedCalibrationPanel::confirm_start() {
 }
 
 void GuidedCalibrationPanel::submit_measurement() {
-  std::string cmd = cal_measure_command(lv_textarea_get_text(measure_ta));
+  std::string cmd = cal_input_command(flow, lv_textarea_get_text(measure_ta));
   if (cmd.empty()) {
-    KUtils::notify_toast("Enter the distance in mm, e.g. 98.5", 3000);
+    KUtils::notify_toast(flow == CalFlow::LOAD_CELL
+                           ? "Enter the weight in grams (50 or more), e.g. 1500"
+                           : "Enter the distance in mm, e.g. 98.5", 3000);
     return;
   }
   lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);

@@ -22,6 +22,7 @@ enum class CalFlow {
   ESTEPS,          // NEBULAOS_ESTEPS_CALIBRATE: heat, mark, extrude, measure, confirm
   AUTO_CALIBRATE,  // NEBULAOS_AUTO_CALIBRATE: nozzle clean, Z offset, bed mesh, one SAVE_CONFIG
   INPUT_SHAPER,    // NEBULAOS_INPUT_SHAPER_CALIBRATE: sensor on toolhead (X), then bed (Y)
+  LOAD_CELL,       // NEBULAOS_LOAD_CELL_CALIBRATE: tare, known weight, grams, save (G83a)
 };
 
 struct CalView {
@@ -30,7 +31,7 @@ struct CalView {
   std::string text;                // description when idle, otherwise the live state
   bool can_start = false;
   bool can_cancel = false;
-  bool needs_measurement = false;  // E-steps: show the measured-length entry
+  bool needs_measurement = false;  // E-steps: measured length; load cell: grams
 };
 
 CalView cal_view(CalFlow flow, const json &status, bool printing);
@@ -41,5 +42,11 @@ std::string cal_cancel_command(CalFlow flow);
 // E-steps measurement: "" when the text is not a usable length in mm (0 < mm <= 500),
 // otherwise the command that submits it.
 std::string cal_measure_command(const std::string &text);
+
+// The one number a flow asks for: E-steps mm (above), load cell grams
+// (50 <= g <= 25000). "" when not usable or the flow takes no number.
+std::string cal_input_command(CalFlow flow, const std::string &text);
+// Placeholder / hint for that entry field.
+const char *cal_input_hint(CalFlow flow);
 
 #endif // __NEBULAOS_CALIBRATION_FLOW_H__
