@@ -14,7 +14,7 @@
 
 // Entry point for every calibration flow, reached from the Tune tab's single
 // "Calibration" button. Mirrors wiki/Calibration-Explained.md's own
-// recommended order as a numbered, scrollable list - Axis Twist through TMC
+// recommended order as a numbered, scrollable list - Bed Tramming through TMC
 // Autotune - so the on-screen menu and the docs never drift apart. Axis Twist
 // comes before Auto Calibration deliberately, not just cosmetically: Klipper
 // applies its correction to every probe call from then on (patched into
@@ -57,6 +57,7 @@ class CalibrationMenuPanel {
   void move_highlight(int delta);
   void set_highlight(int idx);
   void activate_row(lv_obj_t *row);
+  void confirm_bed_tram();
 
   KWebSocketClient &ws;
 
@@ -69,6 +70,7 @@ class CalibrationMenuPanel {
   lv_obj_t *back_btn;
 
   // numbered, in recommended order
+  lv_obj_t *bed_tram_row;
   lv_obj_t *axis_twist_row;
   lv_obj_t *wizard_row;
   lv_obj_t *inputshaper_row;

@@ -168,18 +168,21 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   lv_obj_set_scrollbar_mode(list_cont, LV_SCROLLBAR_MODE_AUTO);
 
   make_section_label(list_cont, "IN ORDER");
-  axis_twist_row  = make_row(list_cont, &layers_img,      "Axis Twist",              &CalibrationMenuPanel::_handle_callback, this, "1");
-  load_cell_row   = make_row(list_cont, &home_z,          "Load Cell",               &CalibrationMenuPanel::_handle_callback, this, "2");
-  wizard_row      = make_row(list_cont, &home_z,          "Z-Offset & Bed Mesh",     &CalibrationMenuPanel::_handle_callback, this, "3");
-  inputshaper_row = make_row(list_cont, &inputshaper_img, "Input Shaper",            &CalibrationMenuPanel::_handle_callback, this, "4");
-  esteps_row      = make_row(list_cont, &extrude_img,     "E-Steps Calibration",     &CalibrationMenuPanel::_handle_callback, this, "5");
-  skew_row        = make_row(list_cont, &skew_img,        "Skew Correction",         &CalibrationMenuPanel::_handle_callback, this, "6");
-  tmc_tune_row    = make_row(list_cont, &motor_img,       "TMC Autotune (optional)", &CalibrationMenuPanel::_handle_callback, this, "7");
+  // G87: tramming first - shimming the front-left corner changes the load
+  // cell mounting, so the load cell and Z offset come after it.
+  bed_tram_row    = make_row(list_cont, &bedmesh_img,     "Bed Tramming",            &CalibrationMenuPanel::_handle_callback, this, "1");
+  axis_twist_row  = make_row(list_cont, &layers_img,      "Axis Twist",              &CalibrationMenuPanel::_handle_callback, this, "2");
+  load_cell_row   = make_row(list_cont, &home_z,          "Load Cell",               &CalibrationMenuPanel::_handle_callback, this, "3");
+  wizard_row      = make_row(list_cont, &home_z,          "Z-Offset & Bed Mesh",     &CalibrationMenuPanel::_handle_callback, this, "4");
+  inputshaper_row = make_row(list_cont, &inputshaper_img, "Input Shaper",            &CalibrationMenuPanel::_handle_callback, this, "5");
+  esteps_row      = make_row(list_cont, &extrude_img,     "E-Steps Calibration",     &CalibrationMenuPanel::_handle_callback, this, "6");
+  skew_row        = make_row(list_cont, &skew_img,        "Skew Correction",         &CalibrationMenuPanel::_handle_callback, this, "7");
+  tmc_tune_row    = make_row(list_cont, &motor_img,       "TMC Autotune (optional)", &CalibrationMenuPanel::_handle_callback, this, "8");
 
   make_section_label(list_cont, "OTHER");
   bedmesh_row = make_row(list_cont, &bedmesh_img, "Bed Mesh", &CalibrationMenuPanel::_handle_callback, this);
 
-  rows = {axis_twist_row, load_cell_row, wizard_row, inputshaper_row, esteps_row, skew_row, tmc_tune_row, bedmesh_row};
+  rows = {bed_tram_row, axis_twist_row, load_cell_row, wizard_row, inputshaper_row, esteps_row, skew_row, tmc_tune_row, bedmesh_row};
 
   // Right-side nav column - same construction as macros_panel.cpp's nav_cont
   // (Up/OK/Down). Back moved up to the header row (grid_cell above, level
@@ -328,6 +331,13 @@ void CalibrationMenuPanel::activate_row(lv_obj_t *row) {
     return;
   }
 
+  if (row == bed_tram_row) {
+    // Homes and probes the four corners; never mid-print.
+    if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
+    confirm_bed_tram();
+    return;
+  }
+
   if (row == wizard_row) {
     // The wizard inside probes the bed and ends in a SAVE_CONFIG restart;
     // never mid-print.
@@ -384,4 +394,24 @@ void CalibrationMenuPanel::activate_row(lv_obj_t *row) {
     bedmesh_panel.foreground();
     return;
   }
+}
+
+// G87: the tramming wizard runs in Klipper (NEBULAOS_BED_TRAM) and talks to
+// the operator through the prompt panel, the same as in Mainsail.
+void CalibrationMenuPanel::confirm_bed_tram() {
+  static const char *btns[] = {"Cancel", "Start", ""};
+  lv_obj_t *mbox = lv_msgbox_create(NULL, NULL,
+    "The printer will home and measure the four bed corners, then tell you "
+    "which corner to adjust, one at a time.\n\nThe bed must be empty.",
+    btns, false);
+  lv_obj_add_event_cb(mbox, [](lv_event_t *e) {
+    lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(e));
+    auto *panel = (CalibrationMenuPanel *)lv_event_get_user_data(e);
+    bool start = lv_msgbox_get_active_btn(obj) == 1;
+    lv_msgbox_close(obj);
+    if (start) {
+      panel->ws.gcode_script("NEBULAOS_BED_TRAM");
+    }
+  }, LV_EVENT_VALUE_CHANGED, this);
+  KUtils::style_lock_mbox(mbox, 90);
 }
