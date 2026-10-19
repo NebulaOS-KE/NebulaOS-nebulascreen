@@ -126,10 +126,12 @@ TEST(View, other_flows_state_does_not_leak) {
 TEST(LoadCell, commands_and_input) {
   ASSERT_EQ(cal_start_command(CalFlow::LOAD_CELL), std::string("NEBULAOS_LOAD_CELL_CALIBRATE"));
   ASSERT_EQ(cal_cancel_command(CalFlow::LOAD_CELL), std::string("_NEBULAOS_LOAD_CELL_CANCEL"));
-  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "1500"),
-            std::string("NEBULAOS_LOAD_CELL_CALIBRATE GRAMS=1500.0"));
-  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "49"), std::string(""));
-  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "30000"), std::string(""));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "1531"),
+            std::string("NEBULAOS_LOAD_CELL_CALIBRATE GRAMS=1531.0"));
+  // G86: only a weighed bottle-sized weight; a typo like 150 is refused here
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "150"), std::string(""));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "999"), std::string(""));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "5001"), std::string(""));
   ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "abc"), std::string(""));
   ASSERT_EQ(cal_input_command(CalFlow::ESTEPS, "98.5"),
             std::string("NEBULAOS_ESTEPS_CALIBRATE MEASURED=98.50"));
@@ -137,25 +139,43 @@ TEST(LoadCell, commands_and_input) {
   ASSERT_EQ(std::string(cal_input_hint(CalFlow::LOAD_CELL)), std::string("weight in grams"));
 }
 
+TEST(LoadCell, own_status_object) {
+  ASSERT_EQ(std::string(cal_status_object(CalFlow::LOAD_CELL)),
+            std::string("nebulaos_load_cell_calibration"));
+  ASSERT_EQ(std::string(cal_status_object(CalFlow::ESTEPS)),
+            std::string("nebulaos_calibration"));
+}
+
 TEST(LoadCell, steps) {
-  json s = idle();
+  json s = json::object();
+  s["state"] = "idle";
   auto v = cal_view(CalFlow::LOAD_CELL, s, false);
   ASSERT_EQ(v.title, std::string("Load Cell"));
   ASSERT_TRUE(v.can_start);
-  ASSERT_TRUE(v.text.find("1 kg") != std::string::npos);
-  s["load_cell_state"] = "awaiting_tare";
+  ASSERT_TRUE(v.text.find("1.5 L bottle") != std::string::npos);
+  const char *steps[][2] = {{"awaiting_empty", "Step 1 of 5"},
+                            {"awaiting_weight", "Step 2 of 5"},
+                            {"awaiting_replace", "Step 3 of 5"},
+                            {"awaiting_remove", "Step 4 of 5"},
+                            {"awaiting_finger", "Step 5 of 5"}};
+  for (auto &st : steps) {
+    s["state"] = st[0];
+    v = cal_view(CalFlow::LOAD_CELL, s, false);
+    ASSERT_TRUE(v.text.find(st[1]) != std::string::npos);
+    ASSERT_TRUE(v.can_cancel);
+    ASSERT_EQ(v.needs_measurement, std::string(st[0]) == "awaiting_weight");
+  }
+  s["state"] = "awaiting_weight";
+  ASSERT_TRUE(cal_view(CalFlow::LOAD_CELL, s, false).text.find("front-left screw head")
+              != std::string::npos);
+  ASSERT_TRUE(cal_view(CalFlow::LOAD_CELL, s, false).text.find("2 cm") == std::string::npos);
+  s["problem"] = "The reading is not stable.";
+  ASSERT_EQ(cal_view(CalFlow::LOAD_CELL, s, false).text.rfind("Problem: The reading", 0), 0u);
+  s["state"] = "complete";
+  s["counts_per_gram"] = 94.9;
   v = cal_view(CalFlow::LOAD_CELL, s, false);
-  ASSERT_TRUE(v.text.find("Tare") != std::string::npos);
-  ASSERT_TRUE(v.can_cancel);
-  ASSERT_FALSE(v.needs_measurement);
-  s["load_cell_state"] = "awaiting_weight";
-  v = cal_view(CalFlow::LOAD_CELL, s, false);
-  ASSERT_TRUE(v.needs_measurement);
-  ASSERT_TRUE(v.text.find("front-left") != std::string::npos);
-  s["load_cell_state"] = "complete";
-  s["load_cell_counts_per_gram"] = 85.721;
-  v = cal_view(CalFlow::LOAD_CELL, s, false);
-  ASSERT_TRUE(v.text.find("85.721 counts per gram") != std::string::npos);
+  ASSERT_TRUE(v.text.find("94.900 counts per gram") != std::string::npos);
+  ASSERT_TRUE(v.text.find("Problem") == std::string::npos);
   ASSERT_FALSE(cal_view(CalFlow::ESTEPS, s, false).needs_measurement);
 }
 

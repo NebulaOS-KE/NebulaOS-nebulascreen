@@ -36,6 +36,10 @@ struct CalView {
 
 CalView cal_view(CalFlow flow, const json &status, bool printing);
 
+// The Klipper status object a flow reports in: the load cell has its own
+// (nebulaos_load_cell_calibration, G86), the others share nebulaos_calibration.
+const char *cal_status_object(CalFlow flow);
+
 std::string cal_start_command(CalFlow flow);
 std::string cal_cancel_command(CalFlow flow);
 
@@ -44,7 +48,7 @@ std::string cal_cancel_command(CalFlow flow);
 std::string cal_measure_command(const std::string &text);
 
 // The one number a flow asks for: E-steps mm (above), load cell grams
-// (50 <= g <= 25000). "" when not usable or the flow takes no number.
+// (1000 <= g <= 5000, a weighed 1.5 L bottle). "" when not usable or the flow takes no number.
 std::string cal_input_command(CalFlow flow, const std::string &text);
 // Placeholder / hint for that entry field.
 const char *cal_input_hint(CalFlow flow);

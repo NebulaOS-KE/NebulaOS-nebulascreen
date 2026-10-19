@@ -102,7 +102,8 @@ void GuidedCalibrationPanel::foreground() {
 }
 
 void GuidedCalibrationPanel::refresh() {
-  auto status = State::get_instance()->get_data("/printer_state/nebulaos_calibration"_json_pointer);
+  auto status = State::get_instance()->get_data(
+    json::json_pointer(std::string("/printer_state/") + cal_status_object(flow)));
   CalView v = cal_view(flow, status, KUtils::is_printing());
   lv_label_set_text(title, v.title.c_str());
   lv_label_set_text(text, v.text.c_str());
@@ -121,7 +122,7 @@ void GuidedCalibrationPanel::refresh() {
 void GuidedCalibrationPanel::consume(json &j) {
   // Read-only lookups: operator[] would insert nulls into the shared notification.
   const json &n = j;
-  if (!n.contains("/params/0/nebulaos_calibration"_json_pointer)
+  if (!n.contains(json::json_pointer(std::string("/params/0/") + cal_status_object(flow)))
       && !n.contains("/params/0/print_stats/state"_json_pointer)) {
     return;
   }
@@ -174,7 +175,7 @@ void GuidedCalibrationPanel::submit_measurement() {
   std::string cmd = cal_input_command(flow, lv_textarea_get_text(measure_ta));
   if (cmd.empty()) {
     KUtils::notify_toast(flow == CalFlow::LOAD_CELL
-                           ? "Enter the weight in grams (50 or more), e.g. 1500"
+                           ? "Enter the weight from the scale in grams (1000-5000), e.g. 1531"
                            : "Enter the distance in mm, e.g. 98.5", 3000);
     return;
   }

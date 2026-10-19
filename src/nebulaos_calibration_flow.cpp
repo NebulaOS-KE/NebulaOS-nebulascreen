@@ -24,9 +24,14 @@ static std::string prefix(CalFlow flow) {
     case CalFlow::ESTEPS: return "esteps_";
     case CalFlow::AUTO_CALIBRATE: return "auto_calibrate_";
     case CalFlow::INPUT_SHAPER: return "input_shaper_";
-    case CalFlow::LOAD_CELL: return "load_cell_";
+    case CalFlow::LOAD_CELL: return "";   // own object, plain keys (G86)
   }
   return "";
+}
+
+const char *cal_status_object(CalFlow flow) {
+  return flow == CalFlow::LOAD_CELL ? "nebulaos_load_cell_calibration"
+                                    : "nebulaos_calibration";
 }
 
 std::string cal_start_command(CalFlow flow) {
@@ -66,7 +71,7 @@ std::string cal_input_command(CalFlow flow, const std::string &text) {
   if (flow != CalFlow::LOAD_CELL || text.empty()) return "";
   char *end = nullptr;
   double g = std::strtod(text.c_str(), &end);
-  if (end == text.c_str() || *end != '\0' || !std::isfinite(g) || g < 50.0 || g > 25000.0) {
+  if (end == text.c_str() || *end != '\0' || !std::isfinite(g) || g < 1000.0 || g > 5000.0) {
     return "";
   }
   char buf[64];
@@ -80,9 +85,9 @@ const char *cal_input_hint(CalFlow flow) {
 
 static const char *const DESCRIPTION_LOAD_CELL =
   "Teaches the nozzle touch sensor (load cell) how much force it measures. "
-  "Needed once before Z-offset calibration.\n"
-  "You need a known weight of about 1 kg or more (e.g. a full 1.5 L bottle "
-  "weighed on a kitchen scale). Nothing moves or heats.";
+  "Takes about 2 minutes.\n"
+  "You need a 1.5 L bottle of water and a kitchen scale. Nothing moves or "
+  "heats.";
 static const char *const DESCRIPTION_ESTEPS =
   "Checks how much filament the extruder really pushes and corrects it.\n"
   "The hotend heats; you mark the filament at the extruder entry, the printer "
@@ -124,15 +129,30 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
     v.text = stage.empty() ? std::string("Running...") : "Running: " + stage;
     // E-steps cannot be cancelled while it heats; the others can.
     v.can_cancel = flow != CalFlow::ESTEPS;
-  } else if (state == "awaiting_tare") {
-    v.text = "Remove everything from the bed (the nozzle must not touch it), "
-             "then tap Tare in the prompt.";
+  } else if (state == "awaiting_empty") {
+    v.text = "Step 1 of 5: remove everything from the bed (the nozzle must not "
+             "touch it), then tap Check in the prompt.";
     v.can_cancel = true;
   } else if (state == "awaiting_weight") {
-    v.text = "Put the known weight on the front-left of the bed (about 2 cm "
-             "from the left and front edges) and enter its weight in grams.";
+    v.text = flow == CalFlow::LOAD_CELL
+      ? "Step 2 of 5: put the weighed 1.5 L bottle with its centre roughly "
+        "above the front-left screw head of the bed, then enter the weight "
+        "from the kitchen scale (or use the buttons in the prompt)."
+      : "Enter the weight in grams.";
     v.can_cancel = true;
     v.needs_measurement = true;
+  } else if (state == "awaiting_replace") {
+    v.text = "Step 3 of 5: lift the bottle and put it back in the same place, "
+             "then tap Continue in the prompt.";
+    v.can_cancel = true;
+  } else if (state == "awaiting_remove") {
+    v.text = "Step 4 of 5: remove the bottle from the bed, then tap Continue "
+             "in the prompt.";
+    v.can_cancel = true;
+  } else if (state == "awaiting_finger") {
+    v.text = "Step 5 of 5 (optional): press the front-left corner gently with "
+             "a finger and tap Measure in the prompt, or tap Continue.";
+    v.can_cancel = true;
   } else if (state == "awaiting_continue") {
     v.text = "Mark the filament where it enters the extruder, then tap "
              "Start Extrusion in the prompt.";
@@ -158,7 +178,7 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
   } else if (state == "complete") {
     v.text = "Done - the result is saved.";
     double cpg = 0;
-    if (flow == CalFlow::LOAD_CELL && num(status, "load_cell_counts_per_gram", cpg)) {
+    if (flow == CalFlow::LOAD_CELL && num(status, "counts_per_gram", cpg)) {
       char buf[128];
       std::snprintf(buf, sizeof(buf), "Done - %.3f counts per gram, saved.", cpg);
       v.text = buf;
@@ -182,6 +202,10 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
     v.can_start = !printing;
   } else {
     v.text = "State: " + state;
+  }
+  std::string problem = str(status, p + "problem");
+  if (flow == CalFlow::LOAD_CELL && v.can_cancel && !problem.empty()) {
+    v.text = "Problem: " + problem + "\n\n" + v.text;
   }
   if (printing && (v.can_start || state.empty() || state == "idle")) {
     v.text += "\n\nNot available while printing.";
