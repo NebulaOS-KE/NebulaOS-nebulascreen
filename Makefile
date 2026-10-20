@@ -120,6 +120,7 @@ test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-th
 
 # NebulaScreen rename (Run 15): device names and the legacy-config mapping.
 test-nebulascreen-paths: libhv.a
+	@mkdir -p build
 	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
 		src/nebulascreen_paths.cpp tests/test_nebulascreen_paths.cpp \
 		-o build/test_nebulascreen_paths
