@@ -51,6 +51,13 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   lv_obj_t *btn_row;
   lv_obj_t *start_btn;
   lv_obj_t *cancel_btn;
+  // G89/G90: the current step's own buttons (CalView::actions)
+  static constexpr int kMaxActions = 2;
+  lv_obj_t *action_btns[kMaxActions];
+  std::string action_cmds[kMaxActions];
+  // G90: a page flow (no popups on the screen) comes to the front when it
+  // starts from elsewhere (the guard popup, Mainsail).
+  bool was_active = false;
   lv_obj_t *kb;
   ButtonContainer back_btn;
 };

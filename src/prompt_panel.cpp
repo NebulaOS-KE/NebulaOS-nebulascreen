@@ -1,4 +1,5 @@
 #include "prompt_panel.h"
+#include "nebulaos_calibration_flow.h"
 #include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
@@ -273,8 +274,13 @@ void PromptPanel::consume(json &j) {
   std::lock_guard<std::mutex> guard(lv_lock);
 
   if (cmd.rfind("prompt_begin", 0) == 0) {
+    hidden_prompt = cal_prompt_hidden_on_screen(cmd.substr(13));
+    if (hidden_prompt) return;
     lv_label_set_text(header, (std::string(LV_SYMBOL_WARNING) + " " + cmd.substr(13)).c_str());
     lv_label_set_text(body, "");
+
+  } else if (hidden_prompt && cmd != "prompt_end") {
+    return;
 
   } else if (cmd.rfind("prompt_text", 0) == 0) {
     // Each prompt_text is one line of the dialog (NebulaOS's guided
@@ -319,6 +325,7 @@ void PromptPanel::consume(json &j) {
     foreground();
 
   } else if (cmd == "prompt_end") {
+    hidden_prompt = false;
     lv_label_set_text(header, "");
     lv_label_set_text(body, "");
     lv_obj_clean(button_cont);

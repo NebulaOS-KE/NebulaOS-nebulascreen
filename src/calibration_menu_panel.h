@@ -57,7 +57,6 @@ class CalibrationMenuPanel {
   void move_highlight(int delta);
   void set_highlight(int idx);
   void activate_row(lv_obj_t *row);
-  void confirm_bed_tram();
 
   KWebSocketClient &ws;
 
@@ -91,6 +90,7 @@ class CalibrationMenuPanel {
   GuidedCalibrationPanel auto_calibrate_panel;
   GuidedCalibrationPanel esteps_panel;
   GuidedCalibrationPanel load_cell_panel;
+  GuidedCalibrationPanel bed_tram_panel;
   GuidedCalibrationPanel input_shaper_panel;
   BedMeshPanel &bedmesh_panel;
   AxisTwistPanel &axis_twist_panel;

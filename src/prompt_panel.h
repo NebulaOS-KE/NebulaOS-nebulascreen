@@ -28,6 +28,9 @@ class PromptPanel : public NotifyConsumer {
         KWebSocketClient &ws;
         lv_obj_t *prompt_cont;
         lv_obj_t *header;
+        // G89/G90: a prompt whose title belongs to a page flow (Load Cell,
+        // Bed Tramming) is not shown here - the flow's page shows the step.
+        bool hidden_prompt = false;
         lv_obj_t *body_cont;
         lv_obj_t *body;
         lv_obj_t *button_cont;

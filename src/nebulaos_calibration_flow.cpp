@@ -1,5 +1,6 @@
 #include "nebulaos_calibration_flow.h"
 
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -25,13 +26,23 @@ static std::string prefix(CalFlow flow) {
     case CalFlow::AUTO_CALIBRATE: return "auto_calibrate_";
     case CalFlow::INPUT_SHAPER: return "input_shaper_";
     case CalFlow::LOAD_CELL: return "";   // own object, plain keys (G86)
+    case CalFlow::BED_TRAM: return "";    // own object, plain keys (G87)
   }
   return "";
 }
 
 const char *cal_status_object(CalFlow flow) {
-  return flow == CalFlow::LOAD_CELL ? "nebulaos_load_cell_calibration"
-                                    : "nebulaos_calibration";
+  if (flow == CalFlow::LOAD_CELL) return "nebulaos_load_cell_calibration";
+  if (flow == CalFlow::BED_TRAM) return "nebulaos_bed_tram";
+  return "nebulaos_calibration";
+}
+
+bool cal_prompt_hidden_on_screen(const std::string &title) {
+  return title == "Load Cell Calibration" || title == "Bed Tramming";
+}
+
+const char *cal_input_button(CalFlow flow) {
+  return flow == CalFlow::LOAD_CELL ? "Weigh" : "Submit";
 }
 
 std::string cal_start_command(CalFlow flow) {
@@ -40,6 +51,7 @@ std::string cal_start_command(CalFlow flow) {
     case CalFlow::AUTO_CALIBRATE: return "NEBULAOS_AUTO_CALIBRATE";
     case CalFlow::INPUT_SHAPER: return "NEBULAOS_INPUT_SHAPER_CALIBRATE";
     case CalFlow::LOAD_CELL: return "NEBULAOS_LOAD_CELL_CALIBRATE";
+    case CalFlow::BED_TRAM: return "NEBULAOS_BED_TRAM";
   }
   return "";
 }
@@ -50,6 +62,7 @@ std::string cal_cancel_command(CalFlow flow) {
     case CalFlow::AUTO_CALIBRATE: return "NEBULAOS_CALIBRATION_CANCEL";
     case CalFlow::INPUT_SHAPER: return "_NEBULAOS_INPUT_SHAPER_CANCEL";
     case CalFlow::LOAD_CELL: return "_NEBULAOS_LOAD_CELL_CANCEL";
+    case CalFlow::BED_TRAM: return "_NEBULAOS_BED_TRAM_CANCEL";
   }
   return "";
 }
@@ -88,6 +101,10 @@ static const char *const DESCRIPTION_LOAD_CELL =
   "Takes about 2 minutes.\n"
   "You need a 1.5 L bottle of water and a kitchen scale. Nothing moves or "
   "heats.";
+static const char *const DESCRIPTION_BED_TRAM =
+  "Measures the four bed corners and tells you which one to correct, one "
+  "at a time: a printed shim on rigid spacers, or a screw turn on rubber or "
+  "spring mounts. The printer homes and probes; the bed must be empty.";
 static const char *const DESCRIPTION_ESTEPS =
   "Checks how much filament the extruder really pushes and corrects it.\n"
   "The hotend heats; you mark the filament at the extruder entry, the printer "
@@ -101,6 +118,81 @@ static const char *const DESCRIPTION_SHAPER =
   "(X), then on the bed (Y). Saves the result with one Klipper restart.\n"
   "Have the accelerometer ready.";
 
+static std::string fmt(const char *f, double a) {
+  char buf[96];
+  std::snprintf(buf, sizeof(buf), f, a);
+  return buf;
+}
+
+// The four corners as the bed lies in front of you (rear on top), G89.
+static std::string tram_corners(const json &st) {
+  static const char *names[] = {"Front left", "Front right", "Rear right", "Rear left"};
+  const json &dev = st.contains("deviations") ? st["deviations"] : json();
+  const json &ok = st.contains("accepted") ? st["accepted"] : json();
+  std::string target = str(st, "target");
+  if (!dev.is_array() || dev.size() != 4) return "";
+  auto lower = [](std::string x) {
+    for (auto &c : x) c = (char)std::tolower((unsigned char)c);
+    return x;
+  };
+  auto cell = [&](int i) {
+    std::string state;
+    if (ok.is_array() && ok.size() == 4 && ok[i].is_boolean() && ok[i].get<bool>()) {
+      state = "OK";
+    } else if (!target.empty()) {
+      state = lower(names[i]) == lower(target) ? "ADJUST" : "later";
+    }
+    double d = dev[i].is_number() ? dev[i].get<double>() : 0;
+    return std::string(i == 0 || i == 3 ? "left " : "right ") + fmt("%.2f", d)
+           + (state.empty() ? "" : " " + state);
+  };
+  return "Corners (mm), front = the side with the screen:\n"
+         "Rear:   " + cell(3) + "    " + cell(2) + "\n"
+         "Front:  " + cell(0) + "    " + cell(1);
+}
+
+static CalView bed_tram_view(CalView v, const json &st, bool printing) {
+  std::string state = str(st, "state");
+  std::string mount = str(st, "mount");
+  std::string message = str(st, "message");
+  const char *rigid = "NEBULAOS_BED_TRAM MOUNT=rigid";
+  const char *adjustable = "NEBULAOS_BED_TRAM MOUNT=adjustable";
+  std::string mount_line = mount == "rigid" ? "Bed mount: rigid spacers (shims)."
+    : mount == "adjustable" ? "Bed mount: rubber or springs (screw turns)." : "";
+  if (state == "awaiting_mount") {
+    v.text = "How is the bed mounted?\nRigid spacers: the stock KE (no knobs).\n"
+             "Rubber or springs: a common upgrade with screws you turn.";
+    v.actions = {{"Rigid spacers", rigid}, {"Rubber or springs", adjustable}};
+    v.can_cancel = true;
+  } else if (state == "awaiting_adjustment") {
+    v.text = tram_corners(st) + "\n\n" + message;
+    v.actions = {{"Done - measure again", "NEBULAOS_BED_TRAM CONFIRM=1"}};
+    v.can_cancel = true;
+  } else if (state == "complete" || state == "stopped") {
+    std::string head = state == "complete" ? message : "Stopped: " + message;
+    v.text = head + "\n" + tram_corners(st);
+    if (state == "complete" && st.contains("load_cell_corner_changed")
+        && st["load_cell_corner_changed"].is_boolean() && st["load_cell_corner_changed"].get<bool>()) {
+      v.text += "\nThe front-left corner (load cell) was changed: calibrate the load cell next.";
+    }
+    v.can_start = !printing;
+  } else {
+    v.text = std::string(DESCRIPTION_BED_TRAM) + (mount_line.empty() ? "" : "\n" + mount_line);
+    if (state == "cancelled") v.text = "Cancelled.\n" + v.text;
+    if (state == "error") v.text = "Failed: " + str(st, "error") + "\n" + v.text;
+    v.can_start = !printing;
+    if (!mount.empty() && !printing) {
+      // change the remembered mount (only between runs)
+      v.actions = {{mount == "rigid" ? "Switch to rubber/springs" : "Switch to rigid spacers",
+                    mount == "rigid" ? adjustable : rigid}};
+    }
+  }
+  if (printing && v.can_start) {
+    v.text += "\n\nNot available while printing.";
+  }
+  return v;
+}
+
 CalView cal_view(CalFlow flow, const json &status, bool printing) {
   CalView v;
   switch (flow) {
@@ -108,12 +200,16 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
     case CalFlow::AUTO_CALIBRATE: v.title = "Z-Offset & Bed Mesh"; break;
     case CalFlow::INPUT_SHAPER: v.title = "Input Shaper"; break;
     case CalFlow::LOAD_CELL: v.title = "Load Cell"; break;
+    case CalFlow::BED_TRAM: v.title = "Bed Tramming"; break;
   }
   if (!status.is_object()) {
     v.text = "NebulaOS calibration is not available on this printer.";
     return v;
   }
   v.available = true;
+  if (flow == CalFlow::BED_TRAM) {
+    return bed_tram_view(v, status, printing);
+  }
   const std::string p = prefix(flow);
   std::string state = str(status, p + "state");
   std::string stage = str(status, p + "stage");
@@ -202,6 +298,40 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
     v.can_start = !printing;
   } else {
     v.text = "State: " + state;
+  }
+  if (flow == CalFlow::LOAD_CELL) {
+    const char *cmd = "NEBULAOS_LOAD_CELL_CALIBRATE";
+    double a = 0, b = 0;
+    if (state == "awaiting_empty") {
+      v.actions = {{"Check", std::string(cmd) + " CHECK=1"}};
+    } else if (state == "awaiting_replace") {
+      v.actions = {{"Continue", std::string(cmd) + " NEXT=1"}};
+    } else if (state == "awaiting_remove") {
+      if (num(status, "replace_grams", a) && num(status, "grams", b)) {
+        v.text = fmt("Printer measures %.0f g, ", a) + fmt("your scale said %.0f g.\n\n", b) + v.text;
+      }
+      v.actions = {{"Continue", std::string(cmd) + " NEXT=1"}};
+    } else if (state == "awaiting_finger") {
+      if (num(status, "finger_grams", a)) {
+        v.text += fmt("\nPrinter measures %.0f g.", a);
+      }
+      v.actions = {{"Measure", std::string(cmd) + " MEASURE=1"},
+                   {"Continue", std::string(cmd) + " NEXT=1"}};
+    } else if (state == "awaiting_confirmation") {
+      v.text = "Calibration done";
+      if (num(status, "counts_per_gram", a)) v.text += fmt(": %.2f counts per gram", a);
+      v.text += ".";
+      if (num(status, "old_counts_per_gram", a) && num(status, "change_percent", b)) {
+        v.text += fmt("\nPrevious calibration: %.2f counts per gram", a) + fmt(" (%+.0f%%).", b);
+      }
+      if (status.contains("change_warning") && status["change_warning"].is_boolean()
+          && status["change_warning"].get<bool>()) {
+        v.text += "\nThis is very different from before. Only save if the bottle stood "
+                  "right and its weight is correct.";
+      }
+      v.text += "\nApply & Save restarts Klipper.";
+      v.actions = {{"Apply & Save", std::string(cmd) + " ACCEPT=1"}};
+    }
   }
   std::string problem = str(status, p + "problem");
   if (flow == CalFlow::LOAD_CELL && v.can_cancel && !problem.empty()) {

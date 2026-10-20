@@ -119,6 +119,7 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   , auto_calibrate_panel(websocket_client, l, CalFlow::AUTO_CALIBRATE)
   , esteps_panel(websocket_client, l, CalFlow::ESTEPS)
   , load_cell_panel(websocket_client, l, CalFlow::LOAD_CELL)
+  , bed_tram_panel(websocket_client, l, CalFlow::BED_TRAM)
   , input_shaper_panel(websocket_client, l, CalFlow::INPUT_SHAPER)
   , bedmesh_panel(bedmesh)
   , axis_twist_panel(axis_twist)
@@ -332,9 +333,10 @@ void CalibrationMenuPanel::activate_row(lv_obj_t *row) {
   }
 
   if (row == bed_tram_row) {
-    // Homes and probes the four corners; never mid-print.
+    // G89: its own page like the other guided flows; Start asks before the
+    // printer homes and probes. Never mid-print.
     if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
-    confirm_bed_tram();
+    bed_tram_panel.foreground();
     return;
   }
 
@@ -394,24 +396,4 @@ void CalibrationMenuPanel::activate_row(lv_obj_t *row) {
     bedmesh_panel.foreground();
     return;
   }
-}
-
-// G87: the tramming wizard runs in Klipper (NEBULAOS_BED_TRAM) and talks to
-// the operator through the prompt panel, the same as in Mainsail.
-void CalibrationMenuPanel::confirm_bed_tram() {
-  static const char *btns[] = {"Cancel", "Start", ""};
-  lv_obj_t *mbox = lv_msgbox_create(NULL, NULL,
-    "The printer will home and measure the four bed corners, then tell you "
-    "which corner to adjust, one at a time.\n\nThe bed must be empty.",
-    btns, false);
-  lv_obj_add_event_cb(mbox, [](lv_event_t *e) {
-    lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(e));
-    auto *panel = (CalibrationMenuPanel *)lv_event_get_user_data(e);
-    bool start = lv_msgbox_get_active_btn(obj) == 1;
-    lv_msgbox_close(obj);
-    if (start) {
-      panel->ws.gcode_script("NEBULAOS_BED_TRAM");
-    }
-  }, LV_EVENT_VALUE_CHANGED, this);
-  KUtils::style_lock_mbox(mbox, 90);
 }

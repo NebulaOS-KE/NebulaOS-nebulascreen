@@ -62,8 +62,13 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   lv_textarea_set_max_length(measure_ta, 6);
   lv_obj_set_flex_grow(measure_ta, 2);
   lv_obj_add_event_cb(measure_ta, &GuidedCalibrationPanel::_handle_kb, LV_EVENT_FOCUSED, this);
-  measure_btn = make_text_btn(measure_row, LV_SYMBOL_OK " Submit", &GuidedCalibrationPanel::_handle_callback, this);
+  measure_btn = make_text_btn(measure_row, (std::string(LV_SYMBOL_OK " ") + cal_input_button(flow)).c_str(),
+                              &GuidedCalibrationPanel::_handle_callback, this);
 
+  for (int i = 0; i < kMaxActions; i++) {
+    action_btns[i] = make_text_btn(btn_row, "", &GuidedCalibrationPanel::_handle_callback, this);
+    lv_obj_add_flag(action_btns[i], LV_OBJ_FLAG_HIDDEN);
+  }
   start_btn = make_text_btn(btn_row, LV_SYMBOL_PLAY " Start", &GuidedCalibrationPanel::_handle_callback, this);
   cancel_btn = make_text_btn(btn_row, LV_SYMBOL_CLOSE " Cancel", &GuidedCalibrationPanel::_handle_callback, this);
 
@@ -113,6 +118,14 @@ void GuidedCalibrationPanel::refresh() {
   };
   show(start_btn, v.can_start);
   show(cancel_btn, v.can_cancel);
+  for (int i = 0; i < kMaxActions; i++) {
+    bool on = i < (int)v.actions.size();
+    if (on) {
+      lv_label_set_text(lv_obj_get_child(action_btns[i], 0), v.actions[i].first.c_str());
+      action_cmds[i] = v.actions[i].second;
+    }
+    show(action_btns[i], on);
+  }
   show(measure_row, v.needs_measurement);
   if (!v.needs_measurement) {
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
@@ -128,6 +141,15 @@ void GuidedCalibrationPanel::consume(json &j) {
   }
   std::lock_guard<std::mutex> lock(lv_lock);
   refresh();
+  if (flow == CalFlow::LOAD_CELL || flow == CalFlow::BED_TRAM) {
+    auto status = State::get_instance()->get_data(
+      json::json_pointer(std::string("/printer_state/") + cal_status_object(flow)));
+    bool active = cal_view(flow, status, false).can_cancel;
+    if (active && !was_active) {
+      lv_obj_move_foreground(cont);
+    }
+    was_active = active;
+  }
 }
 
 // Called from LVGL callbacks; the reply arrives on the websocket thread.
@@ -157,6 +179,8 @@ void GuidedCalibrationPanel::confirm_start() {
   static const char *btns[] = {"Cancel", "Start", ""};
   const char *msg = flow == CalFlow::AUTO_CALIBRATE
     ? "The printer will home, clean the nozzle, probe and mesh the bed, then restart Klipper.\n\nThe bed must be empty."
+    : flow == CalFlow::BED_TRAM
+    ? "The printer will home and measure the four bed corners, then tell you which corner to adjust, one at a time.\n\nThe bed must be empty."
     : "The printer will home and shake each axis.\n\nThe accelerometer must be connected and the bed clear.";
   lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, msg, btns, false);
   lv_obj_add_event_cb(mbox, [](lv_event_t *e) {
@@ -200,6 +224,11 @@ void GuidedCalibrationPanel::handle_callback(lv_event_t *e) {
     confirm_start();
   } else if (btn == cancel_btn) {
     send(cal_cancel_command(flow), "Cancel failed");
+  } else if (btn == action_btns[0] || btn == action_btns[1]) {
+    int i = btn == action_btns[0] ? 0 : 1;
+    if (!action_cmds[i].empty()) {
+      send(action_cmds[i], "Step failed");
+    }
   } else if (btn == measure_btn) {
     submit_measurement();
   }
