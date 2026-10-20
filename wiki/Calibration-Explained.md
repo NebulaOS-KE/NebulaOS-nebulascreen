@@ -17,8 +17,10 @@ then slicer. Doing it out of order means redoing work.
 |---|---|
 | 0. Touch calibration | Tap targets are off on a fresh install |
 | 1. Mechanics | Loose hardware that no software can fix |
+| 1b. Bed tramming | One corner of the bed higher or lower than the others |
 | 2. Temperature (PID) | Inconsistent extrusion from wobbly heater temps |
 | 3. Axis Twist | First layer uneven left-to-right |
+| 3b. Load cell calibration | Needed once before the automatic Z offset (water bottle, 2 min) |
 | 4. Z-Offset & Bed Mesh | First layer height everywhere (bed mesh + Z-offset, one guided flow) |
 | 5. Input shaper | Ghosting/ringing on fast prints |
 | 6. E-Steps Calibration | Prints uniformly over- or under-extruded |
@@ -26,9 +28,10 @@ then slicer. Doing it out of order means redoing work.
 | 8. Skew correction | Parts that aren't square |
 | 9. TMC Autotune | Loud or hot motors (optional) |
 
-The screen's **Tune → Calibration** menu numbers steps 3–9 the same way, in the same order, in
-its own list (labelled 1–6 there since it only lists steps with a dedicated calibration screen —
-mechanics, PID, and pressure advance/flow are done elsewhere, so they don't get a row).
+The screen's **Tune → Calibration** menu lists the steps that have their own guided screen, in
+this order: 1 Bed Tramming, 2 Axis Twist, 3 Load Cell, 4 Z-Offset & Bed Mesh, 5 Input Shaper,
+6 E-Steps, 7 Skew Correction, 8 TMC Autotune. Mechanics, PID and pressure advance/flow are done
+elsewhere, so they don't get a row.
 
 **"Which one fixes my problem?"**
 
@@ -70,11 +73,9 @@ Software can't fix loose hardware — it can only paper over it.
   pitch — a noticeably lower/duller thunk on one side usually means that belt is looser. Slack belts
   cause layer shift and ringing.
 - **Gantry:** square. The X bar should be parallel to the bed, not tilted.
-- **Bed level (rough, by hand):** if your bed screws are wildly uneven, the BLTouch probe and bed mesh
-  can usually compensate — but a bed that's *very* far off makes the mesh work harder than it needs to,
-  and in bad cases can exceed what meshing can fix. If you installed the optional **Screws Tilt Adjust**
-  mod (offered at install time), run `SCREWS_TILT_CALCULATE` from the Klipper console — it tells you
-  exactly which corner screw to turn and which way, instead of guessing.
+- **Bed corners:** run **Calibration → 1 Bed Tramming**. The printer measures the four corners and
+  tells you which one to correct, one at a time (a printed shim on the stock rigid spacers, or a screw
+  turn on rubber/spring mounts). See [Bed tramming](Bed-Tramming).
 - **Bed:** not rocking. Gently push each corner — no play.
 - **V-wheels/rails:** snug but not binding. Should spin with light finger pressure.
 - **Nozzle:** clean, no plastic blob.
@@ -110,6 +111,14 @@ bed mesh hasn't fixed it.
 
 In short: **Tune → Axis Twist** on the screen runs a 5-point guided paper test across the X axis. The
 result corrects the probe readings so the bed mesh is accurate. Takes ~15 minutes, done once.
+
+---
+
+## Step 3b — Load cell calibration (once)
+
+The automatic Z offset feels the bed with the load cell under the front-left bed screw. Teach it once
+with a 1.5 L water bottle and a kitchen scale: **Calibration → 3 Load Cell**, about 2 minutes, nothing
+moves. Redo it after changing the front-left bed corner. See [Load cell calibration](Load-Cell-Calibration).
 
 ---
 

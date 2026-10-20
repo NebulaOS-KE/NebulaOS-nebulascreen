@@ -7,6 +7,8 @@
 
 **Get great prints**
 - [Calibration walkthrough (A→Z)](Calibration-Explained)
+- [Bed tramming](Bed-Tramming)
+- [Load cell calibration (water bottle)](Load-Cell-Calibration)
 - [Axis Twist Compensation](Axis-Twist-Compensation)
 - [Adaptive meshing + purge](Adaptive-Print-Setup)
 - [Square parts (Skew Correction)](Skew-Correction)
