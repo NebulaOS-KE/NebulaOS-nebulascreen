@@ -45,6 +45,8 @@ CROSS_COMPILE="$CROSS_COMPILE" bash scripts/build-mips.sh
 EXPECT_DATE=$(LC_ALL=C date -u -d "@$EPOCH" '+%b %e %Y')
 if ! strings -a build/bin/nebulascreen | grep -qF "$EXPECT_DATE"; then
 	echo "FATAL: nebulascreen does not embed the commit date ($EXPECT_DATE) - SOURCE_DATE_EPOCH did not reach the compiler" >&2
+	echo "       SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH; date-shaped strings actually embedded:" >&2
+	strings -a build/bin/nebulascreen | grep -aoE '(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [ 0-9][0-9] [0-9]{4}' | sort -u >&2 || true
 	exit 1
 fi
 
