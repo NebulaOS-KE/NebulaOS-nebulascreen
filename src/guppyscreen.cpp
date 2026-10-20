@@ -1,4 +1,5 @@
 #include "guppyscreen.h"
+#include "nebulascreen_paths.h"
 #include "nebulaos_display.h"
 
 #include "config.h"
@@ -90,16 +91,18 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
   spdlog::sinks_init_list log_sinks{android_sink};
 #endif  // OS_ANDROID
 
-  auto klogger = std::make_shared<spdlog::logger>("guppyscreen", log_sinks);
+  auto klogger = std::make_shared<spdlog::logger>(nebulascreen::kService, log_sinks);
   spdlog::register_logger(klogger);
 
   spdlog::set_level(ll);
   spdlog::set_default_logger(klogger);
   klogger->flush_on(ll);
 
-#ifdef GUPPYSCREEN_VERSION
-  spdlog::info("Guppy Screen Version: {}", GUPPYSCREEN_VERSION);
-#endif  // GUPPYSCREEN_VERSION
+#if defined(NEBULASCREEN_VERSION)
+  spdlog::info("NebulaScreen Version: {} (based on GuppyScreen)", NEBULASCREEN_VERSION);
+#elif defined(GUPPYSCREEN_VERSION)
+  spdlog::info("NebulaScreen Version: {} (based on GuppyScreen)", GUPPYSCREEN_VERSION);
+#endif
 
   spdlog::info("DPI: {}", LV_DPI_DEF);
   /*LittlevGL init*/

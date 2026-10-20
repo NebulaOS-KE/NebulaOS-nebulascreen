@@ -1,0 +1,8 @@
+NebulaScreen - the touchscreen app of NebulaOS for the Creality Ender-3 V3 KE.
+
+NebulaScreen is based on GuppyScreen by ballaswag
+(https://github.com/ballaswag/guppyscreen), through the OpenKE fork, and is
+distributed under the GNU General Public License v3 (see LICENSE). Internal
+source identifiers (for example the GuppyScreen class and GUPPY_* build
+flags) keep their upstream names. Third-party components keep their own
+licences (LVGL, libhv, spdlog, lv_drivers, lv_touch_calibration).

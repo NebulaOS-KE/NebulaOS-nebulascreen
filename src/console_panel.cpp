@@ -1,4 +1,5 @@
 #include "console_panel.h"
+#include "nebulascreen_paths.h"
 #include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
@@ -811,7 +812,7 @@ void ConsolePanel::toggle_favorite(CommandItem *item) {
 
 void ConsolePanel::save_favorites() {
   json h = {
-    {"namespace", "guppyscreen"},
+    {"namespace", nebulascreen::kLegacyDbNamespace},
     {"key", "console.favorites"},
     {"value", favorites}
   };

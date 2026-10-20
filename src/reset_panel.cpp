@@ -1,4 +1,5 @@
 #include "reset_panel.h"
+#include "nebulascreen_paths.h"
 #include "config.h"
 #include "nebulaos_display.h"
 #include "nebulaos_image.h"
@@ -17,8 +18,7 @@ LV_IMG_DECLARE(swap_img);
 
 // NebulaOS keeps the shipped guppyconfig.json here (the live one is bind-mounted
 // over /opt/guppyscreen/guppyconfig.json); see NebulaOS-firmware post-build.
-static const char *const GUPPY_DEFAULT_CONFIG =
-  "/usr/share/nebulaos/guppyscreen/guppyconfig.default.json";
+static const char *const GUPPY_DEFAULT_CONFIG = nebulascreen::kDefaultConfig;
 
 ResetPanel::ResetPanel(KWebSocketClient &c, std::mutex &lock)
   : ws(c)
@@ -75,13 +75,13 @@ void ResetPanel::shown() {
 }
 
 void ResetPanel::restart_gui() {
-  json params = {{"service", "guppyscreen"}};
+  json params = {{"service", nebulascreen::kService}};
   ws.send_jsonrpc("machine.services.restart", params, [this](json &reply) {
     auto err = jsonrpc_error_message(reply);
     if (err.empty()) {
       return;
     }
-    spdlog::warn("GuppyScreen restart failed: {}", err);
+    spdlog::warn("NebulaScreen restart failed: {}", err);
     std::lock_guard<std::mutex> lock(lv_lock);
     KUtils::notify_toast("Saved. Restart failed (" + err + ") - reboot to apply.", 6000);
   });
@@ -104,7 +104,7 @@ void ResetPanel::reset_gui_settings() {
       return;
     }
   }
-  spdlog::warn("GuppyScreen config reset to {}.", GUPPY_DEFAULT_CONFIG);
+  spdlog::warn("NebulaScreen config reset to {}.", GUPPY_DEFAULT_CONFIG);
   restart_gui();
 }
 

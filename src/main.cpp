@@ -1,4 +1,5 @@
 #include "lvgl/lvgl.h"
+#include "nebulascreen_paths.h"
 #include "lv_drivers/display/fbdev.h"
 #include "lv_drivers/indev/evdev.h"
 #include "lv_tc.h"
@@ -41,7 +42,7 @@ int main(void)
     spdlog::debug("current path {}", std::string(fs::canonical("/proc/self/exe").parent_path()));
 
     Config *conf = Config::get_instance();
-    auto config_path = fs::canonical("/proc/self/exe").parent_path() / "guppyconfig.json";
+    auto config_path = fs::canonical("/proc/self/exe").parent_path() / nebulascreen::kConfigFile;
     conf->init(config_path.string(), "/opt/printer_data/thumbnails");
 
     GuppyScreen::init(hal_init);

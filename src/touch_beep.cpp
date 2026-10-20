@@ -1,4 +1,5 @@
 #include "touch_beep.h"
+#include "nebulascreen_paths.h"
 #include "spdlog/spdlog.h"
 
 #include <atomic>
@@ -21,7 +22,7 @@ namespace {
 
   // Hardware-PWM soft "tick" (see k1/k1_mods/buzzer/guppybeep.c). Far quieter
   // and lower than /usr/bin/beep's fixed loud pulse - a phone-like touch tick.
-  const char *BEEP_PATH = "/opt/guppyscreen/guppybeep";
+  const char *BEEP_PATH = nebulascreen::kBeepPath;
 }
 
 namespace TouchBeep {
@@ -44,8 +45,8 @@ void beep() {
   if (pid == 0) {
     pid_t grandchild = fork();
     if (grandchild == 0) {
-      execl(BEEP_PATH, "guppybeep", "click", (char *)NULL);
-      _exit(127); // exec failed (guppybeep missing) - nothing we can do here
+      execl(BEEP_PATH, nebulascreen::kBeepName, "click", (char *)NULL);
+      _exit(127); // exec failed (nebulabeep missing) - nothing we can do here
     }
     _exit(0);
   } else if (pid > 0) {

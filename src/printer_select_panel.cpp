@@ -1,4 +1,5 @@
 #include "printer_select_panel.h"
+#include "nebulascreen_paths.h"
 #include "guppyscreen.h"
 #include "config.h"
 #include "utils.h"
@@ -42,7 +43,7 @@ PrinterSelectContainer::PrinterSelectContainer(PrinterSelectPanel &ps,
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
       PrinterSelectContainer *p = (PrinterSelectContainer*)e->user_data;
-      lv_obj_t *msgbox = p->prompt(fmt::format("Guppy Screen will restart. Do you want to switch to {}?",
+      lv_obj_t *msgbox = p->prompt(fmt::format("NebulaScreen will restart. Do you want to switch to {}?",
 					       p->name));
       lv_obj_add_event_cb(msgbox, [](lv_event_t *e) {
 	lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(e));
@@ -58,15 +59,15 @@ PrinterSelectContainer::PrinterSelectContainer(PrinterSelectPanel &ps,
 	  // the GuppyScreen process on this screen, and the websocket may be
 	  // talking to another printer's Moonraker at this point. The string
 	  // overload splits on whitespace into a proper argv.
-	  auto init_script = conf->get<std::string>("/guppy_init_script");
+	  auto init_script = conf->get<std::string>(std::string("/") + nebulascreen::kInitScriptKey);
 	  const fs::path script(init_script);
 	  if (fs::exists(script)) {
 	    int rc = sp::call(init_script + " restart");
 	    if (rc != 0) {
-	      spdlog::warn("Restart Guppy Screen (printer switch): '{} restart' exited with code {}", init_script, rc);
+	      spdlog::warn("Restart NebulaScreen (printer switch): '{} restart' exited with code {}", init_script, rc);
 	    }
 	  } else {
-	    spdlog::warn("Failed to restart Guppy Screen on printer switch. Restart script not found: {}", init_script);
+	    spdlog::warn("Failed to restart NebulaScreen on printer switch. Restart script not found: {}", init_script);
 	  }
 
 	}

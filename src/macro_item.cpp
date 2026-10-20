@@ -1,4 +1,5 @@
 #include "macro_item.h"
+#include "nebulascreen_paths.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
 
@@ -180,7 +181,7 @@ void MacroItem::handle_favorite(lv_event_t *e) {
 
   std::string key = fmt::format("macros.settings.{}", mname);
   json h = {
-    {"namespace", "guppyscreen"},
+    {"namespace", nebulascreen::kLegacyDbNamespace},
     {"key", key},
     {"value", {
 	{ "favorite", favorite }

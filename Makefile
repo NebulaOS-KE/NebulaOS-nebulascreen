@@ -24,7 +24,7 @@ WARNINGS		:= -Wall -Wextra -Wno-unused-function -Wno-error=strict-prototypes -Wp
 					-Wunreachable-code -Wno-switch-default -Wreturn-type -Wmultichar -Wformat-security -Wno-sign-compare
 CFLAGS 			?= -O3 -g0 -MD -MP -I$(LVGL_DIR)/ $(WARNINGS) 
 LDFLAGS 		?= -static -lm -Llibhv/lib -Lspdlog/build -l:libhv.a -latomic -lpthread -lstdc++fs -l:libspdlog.a
-BIN 			= guppyscreen
+BIN 			= nebulascreen
 BUILD_DIR 		= ./build
 BUILD_OBJ_DIR 	= $(BUILD_DIR)/obj
 BUILD_BIN_DIR 	= $(BUILD_DIR)/bin
@@ -56,8 +56,11 @@ endif
 
 CSRCS 			+= $(wildcard $(LVGL_DIR)/assets/$(ASSET_DIR)/*.c)
 
-ifdef GUPPYSCREEN_VERSION
-DEFINES			+= -D GUPPYSCREEN_VERSION="\"${GUPPYSCREEN_VERSION}\""
+# NebulaScreen (Run 15): NEBULASCREEN_VERSION; GUPPYSCREEN_VERSION is still
+# accepted from older build scripts.
+NEBULASCREEN_VERSION	?= $(GUPPYSCREEN_VERSION)
+ifneq ($(NEBULASCREEN_VERSION),)
+DEFINES			+= -D NEBULASCREEN_VERSION="\"${NEBULASCREEN_VERSION}\""
 endif
 
 OBJEXT 			?= .o
@@ -113,14 +116,21 @@ wpaclient:
 ## the matching tests/test_*.cpp.
 .PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image
 
-test: test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image
+test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image
+
+# NebulaScreen rename (Run 15): device names and the legacy-config mapping.
+test-nebulascreen-paths: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		src/nebulascreen_paths.cpp tests/test_nebulascreen_paths.cpp \
+		-o build/test_nebulascreen_paths
+	./build/test_nebulascreen_paths
 
 # 2026-08-06 crash-fix regression test: Config::init()/ThemeConfig::init()
 # must fall back to defaults, never crash, when a stat()-present file fails
 # to actually parse (see tests/test_config_theme_parse_safety.cpp header).
 test-config-theme-parse-safety: libhv.a libspdlog.a
 	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I./spdlog/include -I. -DSPDLOG_COMPILED_LIB \
-		src/config.cpp src/theme.cpp tests/test_config_theme_parse_safety.cpp \
+		src/config.cpp src/nebulascreen_paths.cpp src/theme.cpp tests/test_config_theme_parse_safety.cpp \
 		-Lspdlog/build -l:libspdlog.a -lstdc++fs \
 		-o build/test_config_theme_parse_safety
 	./build/test_config_theme_parse_safety

@@ -1,4 +1,5 @@
 #include "init_panel.h"
+#include "nebulascreen_paths.h"
 #include "nebulaos_image.h"
 #include "nebulaos_system.h"
 #include "settings_ui.h"
@@ -30,7 +31,7 @@ InitPanel::InitPanel(MainPanel &mp, BedMeshPanel &bmp, FilamentRunoutPanel &frp,
   if (!conf->get_json("/default_printer").is_null()) {
     lv_label_set_text(label, LV_SYMBOL_WARNING " Waiting for printer to initialize...");
   } else {
-    lv_label_set_text(label, "Welcome to Guppy Screen. Use the Setting Panel to add your printers.");
+    lv_label_set_text(label, "Welcome to NebulaScreen. Use the Setting Panel to add your printers.");
   }
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
@@ -70,8 +71,8 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	      }
 	    });
 	  }
-	  if (database_has_namespace(l, "guppyscreen")) {
-	    json h = {{ "namespace", "guppyscreen" }};
+	  if (database_has_namespace(l, nebulascreen::kLegacyDbNamespace)) {
+	    json h = {{ "namespace", nebulascreen::kLegacyDbNamespace }};
 	    ws.send_jsonrpc("server.database.get_item", h,
 	      [](json& j) { State::get_instance()->set_data("guppysettings", j, "/result/value"); });
 	  }

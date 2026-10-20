@@ -1,4 +1,5 @@
 #include "config.h"
+#include "nebulascreen_paths.h"
 #include "platform.h"
 
 #include <sys/stat.h>
@@ -84,7 +85,7 @@ void Config::init(std::string config_path, const std::string thumbdir) {
   }
   if (!parsed) {
     data = {
-        {"log_path", "/opt/printer_data/logs/guppyscreen.log"},
+        {"log_path", nebulascreen::kLogPath},
         {"thumbnail_path", thumbdir},
         {"display_sleep_sec", 600},
         {"default_extruder_temp", 240}
@@ -103,6 +104,9 @@ void Config::init(std::string config_path, const std::string thumbdir) {
     };
   }
 
+  // Run 15: a config copied from the GuppyScreen file keeps old names and
+  // paths; map them in memory (saved later into the NEW file only).
+  nebulascreen::normalize_legacy_config(data);
   data["config_path"] = config_path;
 
   auto df_name = data["/default_printer"_json_pointer];
@@ -158,9 +162,9 @@ void Config::init(std::string config_path, const std::string thumbdir) {
     // have silently pointed "Restart Guppy" at a nonexistent path. This repo
     // (NebulaOS-guppyscreen) is pinned and built directly by NebulaOS, so its
     // own compiled-in fallback should match what NebulaOS actually deploys.
-    auto &guppy_init = data["/guppy_init_script"_json_pointer];
-    if (guppy_init.is_null()) {
-      data["/guppy_init_script"_json_pointer] = "/etc/init.d/S58guppyscreen";
+    if (!data.contains(nebulascreen::kInitScriptKey)
+        || data[nebulascreen::kInitScriptKey].is_null()) {
+      data[nebulascreen::kInitScriptKey] = nebulascreen::kInitScript;
     }
 
     auto &ll = data[json::json_pointer(df() + "log_level")];

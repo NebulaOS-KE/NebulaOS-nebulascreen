@@ -1,4 +1,5 @@
 #include "system_panel.h"
+#include "nebulascreen_paths.h"
 #include "config.h"
 #include "nebulaos_display.h"
 #include "nebulaos_system.h"
@@ -15,7 +16,9 @@ LV_IMG_DECLARE(power_img);
 LV_IMG_DECLARE(info_img);
 LV_IMG_DECLARE(sd_img);
 
-#ifdef GUPPYSCREEN_VERSION
+#if defined(NEBULASCREEN_VERSION)
+#define GS_VERSION NEBULASCREEN_VERSION
+#elif defined(GUPPYSCREEN_VERSION)
 #define GS_VERSION GUPPYSCREEN_VERSION
 #else
 #define GS_VERSION "dev-snapshot"
@@ -115,7 +118,7 @@ void SystemPanel::show_info(const json &reply) {
   auto info = system_info(reply);
   std::string text = info.text;
   auto nl = text.find('\n');
-  text.insert(nl == std::string::npos ? text.size() : nl, "\nGuppyScreen " GS_VERSION);
+  text.insert(nl == std::string::npos ? text.size() : nl, "\nNebulaScreen " GS_VERSION);
   lv_label_set_text(info_label, text.c_str());
   if (info.storage_warning) {
     lv_obj_set_style_text_color(info_label, lv_palette_main(LV_PALETTE_ORANGE), 0);
@@ -137,7 +140,7 @@ void SystemPanel::restart_gui() {
   // Through Moonraker (GUI_BACKEND=MOONRAKER_ONLY): its supervisorctl shim runs
   // /etc/init.d/S58guppyscreen restart; NebulaOS allows the service in
   // moonraker.asvc. On success this process is stopped and restarted.
-  json params = {{"service", "guppyscreen"}};
+  json params = {{"service", nebulascreen::kService}};
   ws.send_jsonrpc("machine.services.restart", params, [this](json &reply) {
     report_error(reply, "Restart failed");
   });
