@@ -43,4 +43,34 @@ bool normalize_legacy_config(nlohmann::json &config) {
   return changed;
 }
 
+std::string ui_api_problem(const nlohmann::json &version_info) {
+  if (!version_info.is_object() || !version_info.contains("nebulaos_ui_api")) {
+    return "";
+  }
+  const auto &level = version_info["nebulaos_ui_api"];
+  if (!level.is_number_integer()) {
+    return "the image states an unreadable nebulaos_ui_api";
+  }
+  if (level.get<int>() != kRequiredUiApi) {
+    return "this NebulaScreen needs image contract " + std::to_string(kRequiredUiApi)
+      + ", the image provides " + std::to_string(level.get<int>());
+  }
+  return "";
+}
+
+const char *version() {
+#if defined(NEBULASCREEN_VERSION)
+  return NEBULASCREEN_VERSION;
+#elif defined(GUPPYSCREEN_VERSION)
+  return GUPPYSCREEN_VERSION;
+#else
+  return "dev-snapshot";
+#endif
+}
+
+nlohmann::json report_params() {
+  return {{"name", kService}, {"version", version()},
+          {"nebulaos_ui_api", kRequiredUiApi}};
+}
+
 }  // namespace nebulascreen

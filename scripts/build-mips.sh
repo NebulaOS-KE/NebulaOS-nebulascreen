@@ -1,10 +1,10 @@
 #!/bin/bash
-# Cross-compile guppyscreen for MIPS (Ingenic X2000, K1/KE)
+# Cross-compile NebulaScreen (based on GuppyScreen) for MIPS (Ingenic X2000, KE)
 # Run inside ghcr.io/coreflake1/guppydev:latest Docker container
 set -e
 
 CROSS_COMPILE="${CROSS_COMPILE:-mipsel-linux-}"
-GUPPYSCREEN_VERSION="${GUPPYSCREEN_VERSION:-v1.5.0-OpenKE}"
+NEBULASCREEN_VERSION="${NEBULASCREEN_VERSION:-${GUPPYSCREEN_VERSION:-dev-snapshot}}"
 GUPPY_THEME="${GUPPY_THEME:-blue}"
 JOBS="$(nproc)"
 WORKDIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -59,7 +59,7 @@ cp libspdlog.a "$WORKDIR/spdlog/build/libspdlog.a"
 cd "$WORKDIR"
 
 # --- guppyscreen ---
-echo "=== Building guppyscreen for MIPS (GUPPY_SMALL_SCREEN=1) ==="
+echo "=== Building nebulascreen for MIPS (GUPPY_SMALL_SCREEN=1) ==="
 make clean
 # Pre-create every object directory before the parallel build starts. Each
 # compile rule's own `mkdir -p $(dir $@)` normally suffices, but on a truly
@@ -77,7 +77,7 @@ find . -maxdepth 6 -type d \
 MAKE_ARGS=(
     CROSS_COMPILE="$CROSS_COMPILE"
     GUPPY_SMALL_SCREEN=1
-    GUPPYSCREEN_VERSION="$GUPPYSCREEN_VERSION"
+    NEBULASCREEN_VERSION="$NEBULASCREEN_VERSION"
     GUPPY_THEME="$GUPPY_THEME"
     EVDEV_CALIBRATE=1
 )
@@ -90,10 +90,10 @@ if ! make -j"$JOBS" "${MAKE_ARGS[@]}"; then
   make -j"$JOBS" "${MAKE_ARGS[@]}"
 fi
 
-# --- guppybeep (hardware-PWM buzzer player) ---
-echo "=== Building guppybeep (buzzer) for MIPS ==="
-"${CROSS_COMPILE}gcc" -O2 -static -o build/bin/guppybeep k1/k1_mods/buzzer/guppybeep.c
+# --- nebulabeep (hardware-PWM buzzer player; source keeps its upstream name) ---
+echo "=== Building nebulabeep (buzzer) for MIPS ==="
+"${CROSS_COMPILE}gcc" -O2 -static -o build/bin/nebulabeep k1/k1_mods/buzzer/guppybeep.c
 
 echo "=== Build complete ==="
-file build/bin/guppyscreen
-file build/bin/guppybeep
+file build/bin/nebulascreen
+file build/bin/nebulabeep

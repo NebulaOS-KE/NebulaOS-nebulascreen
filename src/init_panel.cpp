@@ -100,6 +100,11 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	  ws.send_jsonrpc(ACK_CLEAN_RESET_METHOD, json::object(), [](json &) {});
 	});
 
+	// G82: tell NebulaOS which NebulaScreen runs (the update supervisor's
+	// health check). Older images have no such method: the error is ignored.
+	ws.send_jsonrpc(nebulascreen::kReportMethod, nebulascreen::report_params(),
+			[](json &) {});
+
 	// Once after a system image install: what the trial boot found.
 	this->ws = &ws;
 	image_result(40);

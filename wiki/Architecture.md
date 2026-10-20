@@ -42,7 +42,7 @@ Panels are gated by print state (`print_stats/state` is `printing` or `paused`):
 ├── patches/             Patches applied to submodules before building
 ├── scripts/             Build, release, install, and update scripts
 │   ├── build-mips.sh        MIPS cross-build (run in the toolchain container)
-│   ├── release.sh           Packages a release tarball
+│   ├── build-release.sh     Builds + packages the release zip (G82)
 │   ├── installer.sh         On-printer installer/uninstaller (MIPS/BusyBox path)
 │   ├── installer-deb.sh     aarch64/systemd/Debian installer (NOT for the KE)
 │   └── update.sh            On-printer updater

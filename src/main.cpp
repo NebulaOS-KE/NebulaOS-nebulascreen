@@ -6,6 +6,8 @@
 #include "lv_tc_screen.h"
 
 #include <unistd.h>
+#include <fstream>
+#include <cstdio>
 #include <pthread.h>
 #include <time.h>
 #include <sys/time.h>
@@ -40,6 +42,23 @@ int main(void)
 {
     // config
     spdlog::debug("current path {}", std::string(fs::canonical("/proc/self/exe").parent_path()));
+
+    // G82: refuse to run on an image whose path/name contract differs from
+    // the one this build needs (the update supervisor then falls back to the
+    // image's own NebulaScreen). An unreadable file is no refusal.
+    {
+      nlohmann::json image_info;
+      try {
+        image_info = nlohmann::json::parse(std::ifstream(nebulascreen::kImageVersionFile));
+      } catch (const std::exception &) {
+      }
+      std::string problem = nebulascreen::ui_api_problem(image_info);
+      if (!problem.empty()) {
+        fprintf(stderr, "NebulaScreen %s: %s - not starting\n", nebulascreen::version(),
+                problem.c_str());
+        return 3;
+      }
+    }
 
     Config *conf = Config::get_instance();
     auto config_path = fs::canonical("/proc/self/exe").parent_path() / nebulascreen::kConfigFile;

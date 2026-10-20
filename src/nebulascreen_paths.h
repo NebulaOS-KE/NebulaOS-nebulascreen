@@ -43,6 +43,24 @@ constexpr const char *kInitScriptKey = "nebulascreen_init_script";
 // changed.
 bool normalize_legacy_config(nlohmann::json &config);
 
+// G82: the image path/name contract this build needs. An image states the
+// one it provides as "nebulaos_ui_api" in /opt/nebulaos-version.json.
+constexpr int kRequiredUiApi = 1;
+constexpr const char *kImageVersionFile = "/opt/nebulaos-version.json";
+
+// "" when this build may run on the image described by version_info (the
+// parsed nebulaos-version.json); otherwise why not. An image that states no
+// level is accepted (the update supervisor never installs a release there).
+std::string ui_api_problem(const nlohmann::json &version_info);
+
+// This build's version (NEBULASCREEN_VERSION at compile time).
+const char *version();
+
+// Reported to NebulaOS once connected (the update supervisor compares it with
+// the installed release_info.json): JSON-RPC method and its parameters.
+constexpr const char *kReportMethod = "machine.nebulaos.screen.report";
+nlohmann::json report_params();
+
 }  // namespace nebulascreen
 
 #endif  // __NEBULASCREEN_PATHS_H__

@@ -1,10 +1,20 @@
-name: guppy build
+name: nebulascreen build
+
+# G82 (Run 15): ONE recipe for the image and for releases -
+# scripts/build-release.sh, in the same digest-pinned NebulaOS build
+# container NebulaOS-firmware uses (manifests/dependencies.conf
+# BUILD_IMAGE_REPO/BUILD_IMAGE_DIGEST).
+#   push to main  -> build + check the release zip, nothing is published
+#   tag vX.Y.Z    -> build + check + publish exactly one asset,
+#                    nebulascreen-vX.Y.Z.zip, as a normal (stable) release
+# Moonraker's update_manager (type: zip, channel: stable) reads the latest
+# stable release; the release name, the tag and release_info.json "version"
+# are the same string. No nightly/prerelease channel any more.
 
 on:
   push:
-    branches: [ "main", "develop", "ke-next" ]
-    tags:
-      - "*"
+    branches: [ "main" ]
+    tags: [ "v*" ]
   workflow_dispatch: {}
 
 permissions:
@@ -13,151 +23,57 @@ permissions:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        include:
-          # Ender-3 V3 KE only: MIPS, 480x272 small screen.
-          - arch: mipsel-buildroot-linux-musl-
-            theme: material
-            small: true
-            rotate: false
-            calibrate: true
-            asset: guppyscreen-smallscreen
-
     runs-on: ubuntu-22.04
     container:
-      # NebulaOS Final Closure mission (2026-08-15): migrated from the
-      # standalone ghcr.io/coreflake1/guppydev:latest (mutable tag) to the
-      # same digest-pinned, NebulaOS-owned image NebulaOS-firmware's own
-      # build.sh uses (see manifests/dependencies.conf's BUILD_IMAGE_REPO/
-      # BUILD_IMAGE_DIGEST there, and docs/NEBULAOS_BUILD_ENVIRONMENT.md for
-      # what it contains). Bundles the identical Bootlin mips32el--musl
-      # toolchain guppydev provided - confirmed both toolchain prefixes this
-      # workflow's own matrix.arch expects (mipsel-buildroot-linux-musl-)
-      # resolve to real binaries in the new image before this migration was
-      # made, not assumed.
       image: ghcr.io/coreflake1/nebulaos-build@sha256:a6ba57c69fa1ea630b037a1d1f55cf0c044a7f5a403bde9b155ea54bca1cceba
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
       options: --user 1001
-
     env:
-      CROSS_COMPILE: ${{ matrix.arch }}
-      CC: ${{ matrix.arch }}
-      CXX: ${{ matrix.arch }}
-      GUPPY_THEME: ${{ matrix.theme }}
-      # Final Closure mission: an arbitrary container UID (1001 above) has
-      # no /etc/passwd entry in this image, so HOME defaults to "/" -
-      # unwritable, breaks anything wanting a cache/config file (pip, git).
-      # Same real bug NebulaOS-firmware's own build.sh hit and fixed for
-      # this exact image - see its own comment on -e HOME=/tmp.
+      CROSS_COMPILE: mipsel-buildroot-linux-musl-
+      NEBULASCREEN_THEME: blue
       HOME: /tmp
-      # This image deliberately does NOT put the Bootlin toolchain on the
-      # global PATH (NebulaOS-firmware's own build-env/Dockerfile: its
-      # bundled autoreconf/automake shadow the system ones a v4l-utils-
-      # style autotools build needs - a real bug found and fixed there).
-      # guppydev put it on PATH directly, which is what this workflow's
-      # plain `make`/`${CROSS_COMPILE}gcc` calls assume - added explicitly
-      # here instead, literal (not $PATH-relative - GitHub Actions env:
-      # blocks don't shell-expand) to the image's own confirmed default.
+      # The image keeps the Bootlin toolchain off the global PATH on purpose.
       PATH: /toolchains/mips32el--musl--stable-2024.02-1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
     steps:
     - uses: actions/checkout@v6
       with:
         submodules: recursive
+        fetch-depth: 0
 
-    - if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
-      name: set guppyscreen nightly version
+    - name: version
       run: |
-        echo "GUPPYSCREEN_VERSION=nightly-${{ github.sha }}" >> $GITHUB_ENV
-
-    # ke-next gets its own moving prerelease tag so its nightly never
-    # overwrites main's - every other ref (main, develop, and tag pushes)
-    # keeps the original shared "nightly" tag unchanged.
-    - name: set nightly channel
-      run: |
-        if [ "${{ github.ref_name }}" = "ke-next" ]; then
-          echo "NIGHTLY_TAG=nightly-ke-next" >> $GITHUB_ENV
+        if [ "${GITHUB_REF_TYPE}" = tag ]; then
+          v="${GITHUB_REF_NAME}"
+          echo "$v" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            || { echo "tag $v is not vMAJOR.MINOR.PATCH" >&2; exit 1; }
         else
-          echo "NIGHTLY_TAG=nightly" >> $GITHUB_ENV
+          v="v0.0.0-main.$(git rev-parse --short HEAD)"
         fi
+        echo "NEBULASCREEN_VERSION=$v" >> "$GITHUB_ENV"
 
-    - if: startsWith(github.ref, 'refs/tags/')
-      name: set guppyscreen release version
+    - name: host tests
       run: |
-        echo "GUPPYSCREEN_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+        env -u CROSS_COMPILE make test-nebulascreen-paths
+        python3 tests/test_nebulascreen_release.py
 
-    - if: matrix.small
-      name: export screen size
-      run: |
-        echo "GUPPY_SMALL_SCREEN=${{ matrix.small }}" >> $GITHUB_ENV
-
-    - if: matrix.rotate
-      name: export screen rotate
-      run: |
-        echo "GUPPY_ROTATE=${{ matrix.rotate }}" >> $GITHUB_ENV
-
-    - if: matrix.calibrate
-      name: export touch calibrate
-      run: |
-        echo "EVDEV_CALIBRATE=${{ matrix.calibrate }}" >> $GITHUB_ENV
-
-    # lv_drivers carries its KE patches in the coreflake1/lv_drivers fork
-    # (see .gitmodules); no build-time patch needed.
-
-    - name: patch fmt in spdlog
-      run: |
-        git apply ../patches/0002-spdlog_fmt_initializer_list.patch
-      working-directory: ./spdlog
-
-    - name: patch dpi text scale in lvgl
-      run: |
-        git apply ../patches/0003-lvgl-dpi-text-scale.patch
-      working-directory: ./lvgl
-
-    - name: make wpaclient
-      run: make wpaclient
-
-    - name: make libhv
-      run: make libhv.a
-
-    - name: make libspdlog
-      run: make libspdlog.a
-
-    - name: make guppyscreen
-      run: make -j
-
-    - name: make kd_graphic_mode
-      run: make kd_graphic_mode
-
-    - name: make guppybeep
-      run: ${CROSS_COMPILE}gcc -O2 -static -o build/bin/guppybeep k1/k1_mods/buzzer/guppybeep.c
-
-    - name: package release
-      run: |
-        chmod +x ./scripts/release.sh
-        ./scripts/release.sh ${{ matrix.asset }}
+    - name: build release
+      run: bash scripts/build-release.sh "$NEBULASCREEN_VERSION"
 
     - uses: actions/upload-artifact@v7
       with:
-        name: ${{ matrix.asset }}
-        path: ./${{ matrix.asset }}.tar.gz
-
-    - name: nightly release
-      uses: softprops/action-gh-release@v3
-      with:
-        prerelease: true
-        name: ${{ env.NIGHTLY_TAG }}
-        tag_name: ${{ env.NIGHTLY_TAG }}
-        files: ${{ matrix.asset }}.tar.gz
-        fail_on_unmatched_files: true
+        name: nebulascreen-${{ env.NEBULASCREEN_VERSION }}
+        path: dist/nebulascreen-${{ env.NEBULASCREEN_VERSION }}.zip
 
     - name: stable release
+      if: github.ref_type == 'tag'
       uses: softprops/action-gh-release@v3
-      if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: ${{ matrix.asset }}.tar.gz
-        generate_release_notes: true
+        name: ${{ github.ref_name }}
+        tag_name: ${{ github.ref_name }}
+        prerelease: false
+        files: dist/nebulascreen-${{ github.ref_name }}.zip
         fail_on_unmatched_files: true
+        generate_release_notes: true

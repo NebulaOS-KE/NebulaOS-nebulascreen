@@ -1,104 +1,51 @@
-# Releases and Deployment
+# Releases & deployment
 
-Heads up: this page mostly describes OpenKE's own independent release process (`-OpenKE` tags,
-`github.com/coreflake1/guppyscreen/releases`, its SSH installer) — inherited from this repo's
-OpenKE-lineage history. NebulaOS doesn't consume GuppyScreen through a separate release/tag/
-installer flow at all; `NebulaOS-firmware` pins an exact commit of this repo directly and
-cross-compiles it as one stage of the full OS build — see
-[Integration with NebulaOS](Integration-with-NebulaOS). The CI toolchain detail below is also out
-of date for this repo's own workflow — see [CI](CI) for the current state.
+*(Developer doc.)* NebulaScreen (based on GuppyScreen) ships in two ways.
+Both are built by the **same recipe**, `scripts/build-release.sh`:
 
-## CI pipeline
+1. **Inside the NebulaOS image.** NebulaOS-firmware pins a commit of this repo,
+   builds it in its digest-pinned build container and installs it under
+   `/opt/nebulascreen` (read-only).
+2. **As a stand-alone release (G82).** A tag `vX.Y.Z` makes the CI publish
+   exactly one asset, `nebulascreen-vX.Y.Z.zip`, as a normal (stable) GitHub
+   release. On the printer, Moonraker's update manager (`type: zip`,
+   `channel: stable`) installs it into `/usr/data/nebulaos/apps/nebulascreen`.
+   The NebulaOS update supervisor checks it before use and rolls it back if it
+   fails. After a new system image is installed, the image's own NebulaScreen
+   wins.
 
-Release artifacts are produced by `.github/workflows/build.yml`, which, as of the Final Closure
-mission (2026-08-15), runs inside `NebulaOS-firmware`'s unified build image — not the
-`ghcr.io/coreflake1/guppydev:latest` container this page originally described. See [CI](CI) for
-the current state. The rest of this section (trigger conditions, packaging) still reflects this
-repo's own workflow: pushes to `main`/`develop` (nightly prerelease) and tags (stable release). The
-workflow checks out submodules, applies the three patches, builds the bundled libraries, builds
-GuppyScreen, then packages each asset with `scripts/release.sh`.
+## The release zip
 
-### Build output
+| Entry | What |
+|---|---|
+| `nebulascreen`, `nebulabeep` | static ELF32 little-endian MIPS executables (mode 0755) |
+| `themes/` | themes |
+| `release_info.json` | `project_name` NebulaOS-nebulascreen, `project_owner` coreflake1, `version` (= tag = release name), `nebulaos_ui_api` |
+| `LICENSE`, `NOTICE` | GPL-3; based on GuppyScreen by ballaswag |
 
-This is a KE-focused fork, so CI builds **only the Ender-3 V3 KE asset**:
+Never in the zip: symlinks or the user's config (`nebulascreen.json`). The zip
+is deterministic: sorted entries, fixed modes, and every timestamp is the
+commit date. `scripts/nebulascreen_release.py check <zip>` validates a zip.
 
-| Asset | Toolchain | Theme | Small screen | Notes |
-|---|---|---|---|---|
-| `guppyscreen-smallscreen.tar.gz` | `mipsel-buildroot-linux-musl-` | material | **yes** | **The Ender-3 V3 KE asset** |
+`nebulaos_ui_api` is the path/name contract with the image (see
+`src/nebulascreen_paths.h`). A release only runs on an image that provides
+the same level. The app itself refuses to start on a mismatch.
 
-- Non-tag pushes set `GUPPYSCREEN_VERSION=nightly-<sha>` and publish a `nightly` prerelease.
-- Tag pushes set `GUPPYSCREEN_VERSION=<tag>` and publish a stable release. **The CI-generated notes
-  are just GitHub's bare auto-generated commit list + a changelog link — genuinely written,
-  plain-language release notes (the style every past release actually has) are a manual step, not
-  something CI does.** See "Writing the release notes" below - don't skip this, it's easy to miss
-  since the release exists and looks published either way.
+## Building locally
 
-> The toolchain image still ships an aarch64 cross-compiler, so other targets (standard-screen K1,
-> Z-Bolt icons, aarch64) can be built manually if ever needed — they're just not released.
+Inside the NebulaOS build container (toolchain on `PATH`):
 
-## Packaging locally
-
-After a successful build (see [Building from Source](Building-from-Source)), package a tarball with:
-
-```bash
-GUPPYSCREEN_VERSION=0.1.1-ke-gui-fixes GUPPY_THEME=blue \
-  bash scripts/release.sh guppyscreen-smallscreen
+```
+scripts/build-release.sh v0.9.0
+python3 tests/test_nebulascreen_release.py      # host tests of the packager
+make test                                        # host unit tests
 ```
 
-`scripts/release.sh`:
+## CI
 
-1. Strips the binary (using `$CROSS_COMPILE`strip).
-2. Copies the binaries, `k1/k1_mods`, `k1/scripts`, and `themes/` into `releases/guppyscreen/`.
-3. Writes a `.version` file (`{version, theme, asset_name}`).
-4. Produces `<asset>.tar.gz`.
+- `.github/workflows/build.yml`:
+  - a push to main builds and checks the zip, without publishing;
+  - a tag `vX.Y.Z` builds, checks and publishes the release.
+- `.github/workflows/pull_request.yml`: the same build for pull requests.
 
-(NebulaOS Phase 0 cleanup, 2026-08-16: `installer.sh`, `installer-deb.sh`, `update.sh`, and
-`debian/` were deleted from this repo as confirmed-dead OpenKE installer/packaging weight — never
-fetched or consumed by any NebulaOS boot path — so `release.sh` no longer packages them either.
-`k1/k1_mods` itself is now just `buzzer/` (the `guppybeep` source) and `tmcstatus.py`.)
-
-The on-printer installer downloads the matching `*.tar.gz` from the GitHub release.
-
-## Release tags
-
-Stable releases are tagged `vX.Y.Z-OpenKE` on `main` (e.g. `v1.5.0-OpenKE`) — check the
-[GitHub Releases page](https://github.com/coreflake1/guppyscreen/releases) for the current one
-rather than trusting a version number hardcoded in this doc, since it goes stale fast. Earlier
-pre-rename tags (`v0.1.1-ke-gui-fixes`, `v0.1.0-ke-bedmesh`, the `0.0.x-beta` series) exist further
-back in the repository history from before the `-OpenKE` naming convention.
-
-### Testing an unreleased `ke-next` build
-
-Every push to `ke-next` also publishes a moving `nightly-ke-next` prerelease (same CI, see
-`.github/workflows` for the exact build job name). To try it before it's merged to `main`:
-
-```sh
-PINNED_RELEASE=nightly-ke-next sh -c "$(curl -sL https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-next/scripts/installer.sh)"
-```
-
-(Use `curl`, not the `wget` form shown elsewhere in this wiki, if your printer's `wget` can't
-complete a TLS handshake against GitHub — see [Troubleshooting](Troubleshooting).) Re-run the
-normal install command with no `PINNED_RELEASE` to go back to the latest stable release.
-
-See **[Troubleshooting](Troubleshooting)** for current installer/upgrade caveats.
-
-## Writing the release notes (manual step, every stable release)
-
-CI publishes the tag with bare auto-generated notes (a commit list + changelog link) — fine for
-developers, not for end users, most of whom are not developers. **After the tag build succeeds,
-replace the notes** (`gh release edit <tag> --notes-file <file>` or the GitHub web UI) with real,
-plain-language writing in the established house style — look at any past release
-(e.g. `gh release view v1.4.2-OpenKE --json body`) for the exact tone to match:
-
-- A one-line `## What's new in vX.Y.Z` title, then a short plain-English summary sentence.
-- If the update needs the **full installer** (not just the in-app "Update Guppy" button) - e.g. it
-  touches Klipper macros/config, not just the GuppyScreen binary - say so up front with a `⚠️`
-  callout, since "Update Guppy" alone silently won't apply those parts.
-- One `###` section per real change, in plain language: what a user would have actually noticed
-  going wrong (not the internal root cause), and what's different now. No jargon, no file names,
-  no internal code identifiers - a non-developer should be able to read every line.
-- End with the upgrade command and a `**Full Changelog**:` compare link (same two things CI's
-  bare notes already have, just keep them).
-
-Skipping this is easy to miss precisely because the release already looks published and complete
-without it - it isn't done until the notes are rewritten.
+There is no nightly or pre-release channel.

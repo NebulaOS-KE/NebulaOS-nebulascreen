@@ -73,6 +73,24 @@ TEST(Names, contract) {
   ASSERT_TRUE(std::string(kService).size() <= 15);   // process comm limit
 }
 
+TEST(UiApi, contract_levels) {
+  ASSERT_EQ(ui_api_problem(json::parse(R"({"nebulaos_ui_api": 1})")), std::string(""));
+  ASSERT_TRUE(ui_api_problem(json::parse(R"({"nebulaos_ui_api": 2})")).find("needs image contract 1")
+              != std::string::npos);
+  ASSERT_FALSE(ui_api_problem(json::parse(R"({"nebulaos_ui_api": "1"})")).empty());
+  // an image that states no level (or an unreadable file) is accepted
+  ASSERT_EQ(ui_api_problem(json::parse(R"({"version": "0.9.0"})")), std::string(""));
+  ASSERT_EQ(ui_api_problem(json()), std::string(""));
+}
+
+TEST(Report, params) {
+  json p = report_params();
+  ASSERT_EQ(p["name"].get<std::string>(), std::string("nebulascreen"));
+  ASSERT_EQ(p["version"].get<std::string>(), std::string("dev-snapshot"));
+  ASSERT_EQ(p["nebulaos_ui_api"].get<int>(), kRequiredUiApi);
+  ASSERT_EQ(std::string(kReportMethod), std::string("machine.nebulaos.screen.report"));
+}
+
 int main() {
   return minitest::run_all("nebulascreen_paths") > 0 ? 1 : 0;
 }
