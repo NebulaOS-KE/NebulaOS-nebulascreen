@@ -16,3 +16,4 @@ build-mips/
 /releases/
 /.idea
 /.vscode
+dist/
