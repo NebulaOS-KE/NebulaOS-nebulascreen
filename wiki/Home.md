@@ -1,90 +1,67 @@
-> **This wiki describes OpenKE**, a separate project from NebulaOS that installs onto stock Creality
-> firmware via SSH. This repository (`NebulaOS-guppyscreen`) is a NebulaOS component, inherited this
-> wiki from the same fork lineage, and is consumed as a pinned build dependency of
-> [`NebulaOS-firmware`](https://github.com/coreflake1/NebulaOS-firmware) instead — most of the
-> installation/upgrading/troubleshooting content below describes OpenKE's own distribution model, not
-> how NebulaOS builds or deploys this code. See this repo's root
-> [`README.md`](https://github.com/coreflake1/NebulaOS-guppyscreen#readme) for the NebulaOS context.
+# NebulaScreen
 
-# OpenKE — perfect prints on the Ender-3 V3 KE
+NebulaScreen is the touchscreen app of **NebulaOS** for the **Creality Ender-3 V3 KE**. It runs
+directly on the printer's 480×272 display (framebuffer, no X11 or Wayland) and talks to Klipper
+through Moonraker.
 
-So you've got a **Creality Ender-3 V3 KE** and you want it to print *really* well — clean first layers,
-square parts, quiet motors, no babysitting. That's the whole point of OpenKE.
+NebulaScreen is based on [GuppyScreen](https://github.com/ballaswag/guppyscreen) by ballaswag
+(GPL-3). See [History and credits](History-and-Credits) for the full lineage.
 
-OpenKE is three things in one project:
+NebulaScreen is not installed on its own. It is part of every NebulaOS image, built by
+[`NebulaOS-firmware`](https://github.com/coreflake1/NebulaOS-firmware) from a pinned commit of this
+repository. See [Installation](Installation).
 
-1. **A better screen.** A fast touch UI that replaces the stock interface — full print control, an
-   interactive 3D bed mesh you can spin around, and an on-screen calibration suite. It runs right on the
-   printer's display (no PC, no display server). The UI is a KE-focused fork of
-   [GuppyScreen](https://github.com/ballaswag/guppyscreen).
-2. **The mods that actually make prints good.** Adaptive bed mesh + purge + park, Axis Twist
-   Compensation, TMC Autotune, skew correction — the stuff people normally hunt down across a dozen
-   GitHub repos, gathered and documented here for the KE.
-3. **Guides that explain the *why*.** Not just "tap this button" — *when* to recalibrate, what each
-   tool fixes, and how to chase down a specific print problem.
+## Start here
 
-> **Heads-up on the name:** this project used to be called **GuppyKE** and is now **OpenKE**. Recent
-> releases are tagged `vX.Y-OpenKE` (older ones were `vX.Y-GuppyKE`), and you'll still see `GuppyKE` in
-> a few file names — same project. **Already running an older version?** See
-> [Upgrading from an older version](Upgrading).
+1. **[Installation and updates](Installation)** — how NebulaScreen gets onto the printer and how it
+   is updated.
+2. **[Screen reference](Using-NebulaScreen)** — every tab and panel.
+3. **[Calibration walkthrough](Calibration-Explained)** — the order to calibrate a KE in.
 
-## New here? Do this
+## Print-quality guides
 
-1. **[Install OpenKE](Installation)** — one command over SSH, keeps your config (and backs it up).
-2. **[Take the screen tour](Using-GuppyKE)** — every panel, every setting, explained for newcomers.
-3. **[Calibrate your printer](Calibration-Explained)** — the short path from "it prints" to "it
-   prints *well*."
+- First layer uneven left to right → [Axis Twist Compensation](Axis-Twist-Compensation)
+- One bed corner high or low → [Bed tramming](Bed-Tramming)
+- Automatic Z offset needs teaching once → [Load cell calibration](Load-Cell-Calibration)
+- Mesh only the print area, purge next to it → [Adaptive meshing and purge](Adaptive-Print-Setup)
+- Parts not square → [Skew Correction](Skew-Correction)
+- Motors loud or hot → [TMC Autotune](TMC-Autotune)
+- Something else wrong → [Troubleshooting](Troubleshooting)
 
-## Want better prints specifically?
+## What the screen does
 
-Start with **[Calibration walkthrough (A→Z)](Calibration-Explained)**, then dig into whichever matches
-your problem:
+- Print status and control: temperatures, fans, LED, homing and jogging, file browser (including USB
+  sticks), Exclude Object, Spoolman
+- Interactive 3D bed mesh (rotate, zoom) plus a table view
+- A **Calibration** menu with guided screens, in order: Bed Tramming, Axis Twist, Load Cell,
+  Z-Offset & Bed Mesh, Input Shaper, E-Steps, Skew Correction, TMC Autotune
+- Live tuning during a print: speed, flow, Z offset, pressure advance; firmware retraction and machine
+  limits on their own panels
+- Power-loss recovery through NebulaOS
+- NebulaOS settings on the screen: Wi-Fi and static IP, printer name, display brightness and sleep,
+  boot logo, updates (packages and system image), logs, reset and A/B boot slot swap
+- Buzzer: touch click, `M300` with real pitch, `PLAY_TUNE` songs ([Beeps & songs](Buzzer-and-Sounds))
+- Print-state locks: actions that could ruin a running print are blocked or ask first
 
-- **First layer squished on one side, lifting on the other?** →
-  [Axis Twist Compensation](Axis-Twist-Compensation)
-- **Want smarter bed meshing + auto purge line?** → [Adaptive Meshing](Adaptive-Print-Setup)
-- **Parts come out as parallelograms / not square?** → [Skew Correction](Skew-Correction)
-- **Motors loud or hot?** → [TMC Autotune](TMC-Autotune)
-- **Layer shift right after a pause/resume?** → [Troubleshooting](Troubleshooting)
-
-## What's actually in it
-
-- Print status & control, with MCU temp on the print screen (plus chamber temp, if you've configured a
-  chamber sensor)
-- **Interactive 3D bed mesh** — colour height map you can rotate/zoom/pan (plus a table view)
-- **Guided Calibration hub** — a single numbered menu, in the order you actually need them: Axis Twist,
-  a combined Z-offset + bed mesh Recalibration Wizard, Input Shaper, E-Steps Calibration, Skew
-  Correction, TMC Autotune
-- **Fine-tune mid-print** — speed, flow, Z-offset (down to 0.001 mm), pressure advance, firmware retraction
-- File browser (incl. USB sticks), macro/console shell, Spoolman, TMC metrics
-- **Reworked WiFi** — grouped network list, a Network Details screen, a rebuilt Static IP screen, and a
-  Low-Latency toggle (snappier Mainsail/screen — power-save off, roam off, Bluetooth off)
-- **Buzzer beeps & songs** — real-pitch `M300`, `PLAY_TUNE` jingles, and a soft touchscreen click ([Beeps & songs](Buzzer-and-Sounds))
-- **Print-state safety locks** — anything that could wreck a running job is blocked or asks first
-- Power-loss recovery, and a 480×272 layout tuned for the KE (screen the right way up)
-
-## Will it run on my printer?
-
-OpenKE is built and verified for the **Creality Ender-3 V3 KE** specifically.
+## Hardware
 
 | | |
 |---|---|
-| Printer | Creality Ender-3 V3 KE |
-| Chip / arch | Ingenic XBurst2 X2000 — **MIPS (mipsel)**, *not* aarch64 |
-| Display | 480×272 |
+| Printer | Creality Ender-3 V3 KE, running NebulaOS |
+| SoC / arch | Ingenic X2000 — MIPS (mipsel) |
+| Display | 480×272, resistive touch |
 
-The code can build for other boards/screens (and an x86 simulator for development), but the installer and
-the on-device fixes here are written for the KE. If you have a different printer, this isn't the droid
-you're looking for.
+The code also builds as an SDL simulator for desktop development
+([Development and simulator](Development-and-Simulator)).
 
-## Building it / contributing
+## Developers
 
-Developer docs live in the **🛠️ Developers** section of the sidebar — start with
-[Build from source](Building-from-Source) and [Architecture](Architecture).
+Start with [Building from source](Building-from-Source) and [Architecture](Architecture).
 
-## License & credits
+## License
 
-GPL-3.0. The touch UI builds on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
-[probielodan/guppyscreen](https://github.com/probielodan/guppyscreen), with the 3D bed mesh from
-[prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). The vendored Klipper mods keep
-their own upstream licenses and credits — see [Contributing](Contributing). Full credits there too.
+GPL-3.0. NebulaScreen is based on GuppyScreen by ballaswag; the KE work builds on
+[probielodan/guppyscreen](https://github.com/probielodan/guppyscreen) and
+[pellcorp/grumpyscreen](https://github.com/pellcorp/grumpyscreen), and the 3D bed mesh comes from
+[prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). Full credits:
+[Contributing](Contributing#credits--attribution).

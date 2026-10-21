@@ -1,25 +1,22 @@
 # CI
 
-`.github/workflows/build.yml` cross-compiles the Ender-3 V3 KE asset (material theme, small screen)
-on pushes to `main`/`develop`/`ke-next` and on tags.
+Three workflows in `.github/workflows/`:
 
-Since the Final Closure mission (2026-08-15), it runs inside the same digest-pinned
-`ghcr.io/coreflake1/nebulaos-build` image `NebulaOS-firmware`'s own `build.sh` uses — not the
-retired standalone `ghcr.io/coreflake1/guppydev:latest`. We confirmed both toolchain prefixes the
-workflow's matrix expects actually resolve to real binaries in the new image before switching.
-Two real gotchas came up during that migration, both explained right in the workflow file's own
-comments:
-- An arbitrary container UID has no `/etc/passwd` entry in this image, so `HOME` defaults to `/`
-  (unwritable) — we set it to `/tmp` explicitly.
-- The image deliberately doesn't put the Bootlin toolchain on the global `PATH` (its bundled
-  `autoreconf`/`automake` would shadow the system ones a v4l-utils-style build needs) — `guppydev`
-  used to put it directly on `PATH`, so this tripped us up briefly.
+| Workflow | Runs on | What it does |
+|---|---|---|
+| `build.yml` | push to `main`, tags `v*`, manual | Host tests, then `scripts/build-release.sh` and the zip check. A push to `main` builds `v0.0.0-main.<sha>` and uploads it as a workflow artifact; a tag `vX.Y.Z` also publishes `nebulascreen-vX.Y.Z.zip` as a normal (stable) GitHub release. |
+| `pull_request.yml` | pull requests to `main` | The same build and tests, without publishing. |
+| `wiki.yml` | push to `main` that touches `wiki/**` | Copies `wiki/` to the GitHub Wiki, see [Wiki publishing](Wiki-Publishing). |
 
-There's also `.github/workflows/wiki.yml`, which syncs the `wiki/` folder to this repo's own
-GitHub Wiki on every push to `main` that touches `wiki/**`. See [Wiki Publishing](Wiki-Publishing)
-for how that works — and a real failure it hit (2026-08-14, fixed the next day) because the wiki
-had never had a first page yet.
+The build jobs run inside the digest-pinned NebulaOS build image (`ghcr.io/coreflake1/nebulaos-build`),
+the same one NebulaOS-firmware builds with, using the Bootlin `mips32el--musl--stable-2024.02-1`
+toolchain (`CROSS_COMPILE=mipsel-buildroot-linux-musl-`). Two details are set in the workflow:
 
-See also: [Integration with NebulaOS](Integration-with-NebulaOS), and
-[NebulaOS-firmware's Build Environment doc](https://github.com/coreflake1/NebulaOS-firmware/wiki/Build-Environment)
-for what's actually in that shared image.
+- `HOME=/tmp`, because the container user has no home directory.
+- The toolchain directory is added to `PATH` by the workflow; the image keeps it off the global `PATH`
+  on purpose.
+
+The host tests in CI are `make test-nebulascreen-paths` and `python3 tests/test_nebulascreen_release.py`.
+The full `make test` set runs locally, see [Testing](Testing).
+
+There is no nightly or pre-release channel.

@@ -1,46 +1,57 @@
-# Development and Simulator
+# Development and simulator
 
-The SDL simulator lets you iterate on the UI on a desktop, without a printer or the embedded hardware.
-This is the recommended way to develop.
+The SDL simulator runs NebulaScreen on a desktop, without a printer. It is the quickest way to work
+on the UI.
 
 ## Run the simulator
 
-1. Build the simulator (see **[Building from Source](Building-from-Source)** → step 4a). Add
-   `GUPPY_SMALL_SCREEN=1` to the build if you want the 480×272 layout.
-2. Create / point a local `guppyconfig.json` at a reachable Moonraker instance, and set `log_path`
-   and `thumbnail_path` to **existing** local directories.
-3. Run:
+1. Build it (see [Building from source](Building-from-Source) → simulator build). Add
+   `GUPPY_SMALL_SCREEN=1` for the KE's 480×272 layout; without it the window is 800×480.
+2. NebulaScreen reads `nebulascreen.json` from the directory of its executable, so create
+   `build/bin/nebulascreen.json`. Point it at a reachable Moonraker, and set `log_path` and
+   `thumbnail_path` to directories that exist:
+   ```json
+   {
+     "log_path": "/tmp/nebulascreen/nebulascreen.log",
+     "thumbnail_path": "/tmp/nebulascreen/thumbnails",
+     "default_printer": "sim",
+     "printers": { "sim": { "moonraker_host": "127.0.0.1", "moonraker_port": 7125,
+                            "moonraker_api_key": false } }
+   }
+   ```
+3. Copy the themes next to it (`cp -r themes build/bin/`) and run:
    ```bash
-   ./build/bin/guppyscreen
+   ./build/bin/nebulascreen
    ```
 
-> The binary **crashes on startup if the directory in `log_path` does not exist**
-> (`spdlog_ex: Failed opening file ... for writing`). Create it first.
+> The program **crashes at start if the directory in `log_path` does not exist**
+> (`spdlog_ex: Failed opening file ... for writing`). Create it first. Without a config file the
+> built-in default log path is `/opt/printer_data/logs/nebulascreen.log`.
 
-## Notes & gotchas
+## Notes
 
-- Without a printer connected, the websocket reconnects roughly every 2 s — this is expected.
-- The simulator window is **480×800**; the small-screen layout only takes effect when compiled with
-  `GUPPY_SMALL_SCREEN=1`.
-- Mouse-wheel zoom works in the 3D bed mesh in the simulator (enabled by the `SIMULATOR` define).
-- GuppyScreen typically expects to run as `root` on the printer because it talks directly to
-  wpa_supplicant; in the simulator, WiFi features are not exercised.
+- Without Moonraker, the websocket reconnects about every 2 s — expected.
+- The `machine.nebulaos.*` methods only exist on a NebulaOS printer; against another Moonraker the
+  NebulaOS Settings pages show errors or empty values.
+- Simulator builds define `SIMULATOR`; some panels have simulator-only demo data and screenshot helpers
+  under that define.
 
 ## No printer? Use a virtual one
 
-[virtual-klipper-printer](https://github.com/mainsail-crew/virtual-klipper-printer) runs Klipper +
-Moonraker in Docker. After starting it, set `moonraker_host` to `127.0.0.1` and `moonraker_port` to
-`7125` in your simulator `guppyconfig.json`.
+[virtual-klipper-printer](https://github.com/mainsail-crew/virtual-klipper-printer) runs Klipper and
+Moonraker in Docker. Set `moonraker_host` to `127.0.0.1` and `moonraker_port` to `7125` in
+`build/bin/nebulascreen.json`.
 
 ## Iterating
 
-After an initial full build, edit files under `src/` and re-run `make` (with the same flags) to
-recompile only what changed. Each screen is a `*_panel.cpp`; shared helpers (print-state checks,
-toasts, confirmation dialogs) live in `src/utils.cpp`.
+After a full build, edit files under `src/` and re-run `make` with the same flags; only changed files
+are recompiled. Each screen is a `*_panel.cpp`; shared helpers (print-state checks, toasts,
+confirmations) live in `src/utils.cpp` and `src/settings_ui.cpp`. Logic that does not need LVGL goes
+into a plain `src/nebulaos_*.cpp` file with a host test ([Testing](Testing)).
 
 ## Further reading
 
-- `DEVELOPMENT.md` — upstream development notes (toolchains, environment variables, virtual Klipper).
-- `docs/dev-notes.md` — detailed, KE-specific discoveries from building, packaging, and on-device SSH
-  inspection (hardware facts, installer behavior, display orientation, font/layout tuning). This is the
-  most thorough internal reference.
+- `DEVELOPMENT.md` — upstream GuppyScreen development notes (toolchains, environment variables).
+- `docs/dev-notes.md` — notes from the original KE port (hardware facts, display orientation, font and
+  layout tuning). A historical snapshot: the install and packaging parts describe the old OpenKE
+  installer.

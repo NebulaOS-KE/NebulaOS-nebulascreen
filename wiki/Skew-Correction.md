@@ -2,7 +2,7 @@
 
 Do your prints come out as a slight **parallelogram** instead of a true square? A box whose lid won't sit
 square, holes that look a touch oval, a 100 mm part that measures 100 mm on each side but isn't quite
-*square*? That's **skew** — and OpenKE can correct it entirely from the printer's screen.
+*square*? That's **skew** — and NebulaScreen can correct it entirely from the printer's screen.
 
 You don't need a computer or a slicer for this. Print one test frame from the screen, measure it with
 calipers, type in three numbers, and you're done.
@@ -42,11 +42,9 @@ measures the error from a test print and shears every move by the opposite amoun
   it isn't a screen button — it's one console command (`SET_SKEW CLEAR=1`, see
   [Undoing / clearing it](#undoing--clearing-it) below) — but it is quick and fully reversible.
 
-> **Requirement:** your printer needs the `[skew_correction]` section enabled. The OpenKE installer adds
-> it for you (under the print-quality mods prompt). The **Skew** button always looks the same — if the
-> section isn't enabled, tapping it pops up a message for a few seconds: *"Skew correction isn't
-> enabled. Add [skew_correction] to printer.cfg."* If you see that, see
-> [Enabling it](#enabling-it) at the bottom.
+> **Requirement:** Klipper needs a `[skew_correction]` section. NebulaOS ships one in its machine config
+> (`/etc/nebulaos/klipper/machine.cfg`). Without it, tapping the row shows *"Skew correction isn't
+> enabled. Add [skew_correction] to printer.cfg."* for a few seconds — see [Enabling it](#enabling-it).
 
 ---
 
@@ -98,7 +96,7 @@ if your calipers allow):
 
 ![Skew Correction panel](images/skew-correction.png)
 
-1. On the printer: **Tune → Skew**.
+1. On the printer: **Tune → Calibration → 7 Skew Correction**.
 2. Tap each field and type the millimetre value (the keypad has a decimal point): **A-C**, **B-D**, **A-D**.
 3. Tap **Apply & Save**.
 
@@ -134,29 +132,15 @@ That zeroes the correction. Re-running Steps 1–3 overwrites it with fresh meas
 
 ## Enabling it
 
-The OpenKE installer enables this for you (it ships a `[skew_correction]` section). If tapping
-**Tune → Skew** pops up *"Skew correction isn't enabled"*, the quickest fix is to **re-run the [installer](Installation)**
-and answer **Y** at the print-quality-mods prompt, then **Restart Klipper** (if it shuts down with a
-`serialqueue` error, restart once more — see [Troubleshooting](Troubleshooting)).
+NebulaOS enables this already: its machine config contains a bare `[skew_correction]` section. If you
+still get *"Skew correction isn't enabled"* (for example with your own Klipper config), add this line to
+`printer.cfg` above the `#*# <---- SAVE_CONFIG ---->` marker and restart Klipper:
 
-You don't need any of the steps below for a normal install — this is only for people who'd rather add
-the one bare section (no settings) by hand instead of re-running the installer.
+```ini
+[skew_correction]
+```
 
-<details>
-<summary>Manual steps</summary>
-
-1. Open `printer.cfg` (Mainsail **Machine** tab, or over SSH).
-2. Add this line **anywhere above** the `#*# <---- SAVE_CONFIG ---->` marker:
-   ```ini
-   [skew_correction]
-   ```
-3. Save and `FIRMWARE_RESTART`.
-
-</details>
-
-> A Creality firmware update can reset this. If the Skew button stops working after an update, just re-run
-> the installer (or re-add that one line). Your saved skew values live in `printer.cfg` and aren't lost by
-> re-running the installer.
+Your saved skew values live in the `SAVE_CONFIG` block of `printer.cfg`.
 
 ---
 

@@ -1,27 +1,35 @@
 # Vendored dependencies
 
-Two genuinely different things share the word "vendored" here — worth keeping them straight.
+Two different things in this repository are called "vendored".
 
-## GuppyScreen's own build submodules
+## The app's own dependencies
 
-`lvgl` (LVGL v8), `lv_drivers`, `libhv`, `spdlog` — real git submodules, fetched by
-`git clone --recurse-submodules`. `wpa_supplicant` is vendored in-tree. These are used by every
-build, standalone or as part of NebulaOS — see
-[Building from Source](https://github.com/coreflake1/NebulaOS-firmware/wiki/Build-From-Source).
+`lvgl` (LVGL v8), `lv_drivers` (from `coreflake1/lv_drivers`), `libhv` and `spdlog` are git submodules,
+fetched with `git clone --recurse-submodules`. Two patches in `patches/` are applied before building
+(`0002-spdlog_fmt_initializer_list.patch`, `0003-lvgl-dpi-text-scale.patch`);
+`scripts/build-release.sh` applies them itself when needed. `lv_touch_calibration/` is in the tree.
+Every build uses these, in CI and in NebulaOS-firmware.
 
-## The `docker/k1-bash-build/` toolchain reconstruction and `scripts/build-*-mipsel.sh`
+There is no `wpa_supplicant` in the tree any more: Wi-Fi goes through NebulaOS (`machine.nebulaos.wifi.*`),
+and `make wpaclient` is kept only as a no-op for older build scripts.
 
-You may spot `docker/k1-bash-build/`, the `scripts/build-{nginx,pillow,streaming-form-data,curl,
-openrc,ft2font}-mipsel.sh` scripts, and `docs/VENDORING.md`'s vendored-Klipper-mods system
-(`k1/k1_mods/`, `scripts/installer.sh`) in this repo's tree. These are all inherited from this
-repo's OpenKE lineage — they support OpenKE's own SSH installer on stock Creality firmware,
-rebuilding pieces of its toolchain and dependency chain from scratch if an upstream image ever
-disappears. Real, credit-worthy work — see [`docker/README.md`](../docker/README.md) for the
-Pellcorp lineage behind the toolchain piece specifically.
+## Inherited OpenKE-era build scripts
 
-**A normal NebulaOS build or this repo's own CI never touches any of this.** These are rare,
-one-off maintenance/re-vendoring scripts carried over in the tree, not part of NebulaOS's current
-build or deployment path. See `docker/README.md` and `docs/VENDORING.md` for the full detail if
-you're specifically maintaining OpenKE's own installer chain.
+The repository still contains tooling from its OpenKE history (see
+[History and credits](History-and-Credits)):
 
-See also: [OpenKE Relationship](OpenKE-Relationship), [CI](CI).
+- `scripts/build-{nginx,pillow,streaming-form-data,curl,ft2font,ax88179}-mipsel.sh` and their sources
+  and outputs under `scripts/vendor/` — rebuilds of target-side packages and kernel modules for the
+  stock Creality system.
+- `docker/k1-bash-build/` — a reconstruction of Pellcorp's `k1-bash-build` toolchain image those scripts
+  use (credit and details in [`docker/README.md`](https://github.com/coreflake1/NebulaOS-guppyscreen/blob/main/docker/README.md)).
+- `docker/Dockerfile` — a standalone toolchain image (Bootlin mips32el musl and an aarch64 toolchain),
+  the replacement for upstream `ballaswag/guppydev`.
+- `docs/VENDORING.md` — describes the Klipper-mod vendoring of the old installer. That machinery was
+  deleted from this repository; the document is kept for reference only.
+
+**Neither CI nor the NebulaOS build uses any of these.** The Klipper add-ons NebulaOS ships (autotune,
+calibration workflows, power-loss recovery, ...) live in NebulaOS-klipper-extensions and
+NebulaOS-firmware, not here.
+
+See also: [CI](CI), [Building from source](Building-from-Source).

@@ -1,263 +1,83 @@
-# Adaptive Meshing + Purge Line
+# Adaptive meshing and purge line
 
-OpenKE makes your printer smarter about bed preparation before each print:
+NebulaOS prepares the bed for each print in its `START_PRINT` macro:
 
-- **Adaptive meshing** — instead of mapping the whole 220×220 mm bed every time, it maps only the
-  area your actual print footprint covers. Faster, and the points are denser where it matters.
-  Uses Klipper's own native adaptive meshing under the hood, ported onto the KE's Klipper.
-- **Auto purge line** — draws a clean purge line right next to the print, so the nozzle is primed and
-  clean for the first move.
+- **Adaptive bed mesh** — probes only the area the print covers instead of the whole bed, using
+  Klipper's own `BED_MESH_CALIBRATE ADAPTIVE=1`.
+- **Smart park** — parks the nozzle next to the print while it heats.
+- **Line purge** — draws a purge line just in front of the print area.
 
-These are independent — you can use either one on its own. The simplest way in is the single
-`START_PRINT` macro (see Step 2), which calls all three and lets you skip any one with a flag; if you
-want more control you can also call `ADAPTIVE_BED_MESH_CALIBRATE`/`SMART_PARK`/`LINE_PURGE` yourself
-and drop the ones you don't want — e.g. skip `LINE_PURGE` entirely if your slicer already draws its
-own purge/skirt, or skip `SMART_PARK` if you don't care where the nozzle parks while heating.
+All three use the print's object outlines (Klipper `[exclude_object]`), so the slicer must write
+object labels. These macros are part of the NebulaOS image (`/etc/nebulaos/klipper/print.cfg`), not
+of NebulaScreen; this page describes how to use them.
 
-> **Do [Axis Twist Compensation](Axis-Twist-Compensation) first** if you have left-right unevenness.
-> Adaptive meshing relies on accurate probing; there's no point in a denser mesh if the probe readings
-> are skewed.
+> **Do [Axis Twist Compensation](Axis-Twist-Compensation) first** if the first layer is uneven left to
+> right. A denser mesh does not help when the probe readings are off.
 
 ---
 
-## Before you start
+## Step 1 — Turn on object labels in the slicer
 
-- ⏱️ **Time:** ~15 minutes (most of it is one slicer config change).
-- 🧰 **You need:** the printer, Mainsail/Fluidd in a browser, and your slicer.
-- ↩️ **Safe to try:** fully reversible — see [Undoing it](#undoing-it).
+In **OrcaSlicer**: print settings → **Others** → tick **Label Objects**. Other slicers have a similar
+option. NebulaOS's `moonraker.conf` already has `enable_object_processing: True`, so Moonraker passes
+the outlines to Klipper.
 
-> ⚠️ These changes live in the printer's system files. **A Creality firmware update will erase them.** Re-run the OpenKE installer afterwards and they come back.
+The same setting enables **Exclude Object** on the print status screen: if one part fails, you can drop
+it and let the rest keep printing.
 
----
+## Step 2 — Call `START_PRINT` from the start G-code
 
-## Step 1 — Make sure it's installed
-
-The OpenKE installer drops this in during the print-quality mods step. To verify, check Mainsail's
-Machine tab for a `GuppyScreen/modules/` folder (with `Adaptive_Meshing.cfg`, `Line_Purge.cfg`,
-`Smart_Park.cfg`, `Start_Print.cfg` inside) plus `GuppyScreen/Settings.cfg`. If they're there,
-you're good — jump to Step 2.
-
-If not, re-run the [installer](Installation) and answer **Y** at the print-quality mods prompt. If
-you previously had **KAMP** installed (an older OpenKE version vendored it directly), the installer
-detects it, carries over any settings you'd customized, and removes the old files automatically —
-nothing to do by hand.
-
----
-
-## Step 2 — Tell your slicer to use it (OrcaSlicer)
-
-This is triggered from your slicer's **Machine start G-code**. Nothing works until this is set.
-
-In **OrcaSlicer**, go to your printer profile → **Machine G-code** → **Machine start G-code**.
-
-First, enable **Label Objects** in your print settings (Orca: **Others** tab → tick **Label Objects**).
-The adaptive macros use the object labels to know the print footprint.
-
-> 🎁 **Bonus:** the same **Label Objects** setting also enables **Exclude Object** — if a print starts
-> failing partway through, you can drop the failed piece and let the rest keep printing. One setting,
-> two features.
-
-There are two ways to wire it up: the one-line `START_PRINT` macro (recommended for most people), or
-calling the three macros yourself if you want more control over the sequence. Pick one — don't do both.
-
-### Option A — `START_PRINT` (recommended)
-
-One macro does the whole sequence: home, heat the bed, mesh, heat the nozzle, park, purge. Set your
-Machine start G-code to:
+In OrcaSlicer: printer profile → **Machine G-code** → **Machine start G-code**:
 
 ```gcode
-START_PRINT BED_TEMP=[bed_temperature_initial_layer_single] EXTRUDER_TEMP=[nozzle_temperature_initial_layer] BRIM_WIDTH=[brim_width]
+START_PRINT EXTRUDER_TEMP=[nozzle_temperature_initial_layer] BED_TEMP=[bed_temperature_initial_layer_single]
 ```
 
-`BED_TEMP=` and `EXTRUDER_TEMP=` are required — `START_PRINT` raises a clear error and aborts the print
-if either is missing, rather than silently heating to 0°C. `BRIM_WIDTH=` is optional (defaults to `0`
-if left off); passing it lets the mesh/park/purge margin grow automatically to clear that print's actual
-brim, the same way `MARGIN=` works for the individual macros below.
+`START_PRINT` then does, in order:
 
-Don't want one of the three steps? Add `SKIP_MESH=1`, `SKIP_PARK=1`, and/or `SKIP_PURGE=1`:
+1. Checks the filament sensor; with no filament it stops with a message.
+2. Starts heating the nozzle to 150 °C (below oozing) and the bed to `BED_TEMP`.
+3. Homes if needed, moves to Z 50 while the bed heats, and waits for the bed.
+4. Bed warp stabilisation: an extra wait that depends on how far the bed had to heat (on by default).
+5. Clears the old mesh and probes a new one — adaptive, unless the print covers more than 75 % of the
+   bed, in which case it probes the full bed.
+6. Parks next to the print, waits for the nozzle to reach `EXTRUDER_TEMP`, and purges a line in front
+   of the print (or along its left side when there is no room in front).
 
-```gcode
-START_PRINT BED_TEMP=[bed_temperature_initial_layer_single] EXTRUDER_TEMP=[nozzle_temperature_initial_layer] SKIP_PURGE=1
-```
+While it runs, speed and acceleration are capped for probing and restored afterwards.
 
-### Option B — call the macros yourself
+If the parameters are left out, `BED_TEMP` defaults to 65 and `EXTRUDER_TEMP` to 230 — always pass
+both from the slicer.
 
-More lines, but full control over the exact sequence (custom moves between steps, a different order,
-etc.). Set your Machine start G-code to:
+### Options
 
-```gcode
-M140 S[bed_temperature_initial_layer_single]   ; start heating bed (don't wait)
-M104 S[nozzle_temperature_initial_layer]       ; start heating nozzle (don't wait)
-G28                                             ; home all axes
-ADAPTIVE_BED_MESH_CALIBRATE MARGIN={brim_width + 5}    ; mesh just the print area (+ your brim)
-M190 S[bed_temperature_initial_layer_single]   ; wait for bed to reach temp
-SMART_PARK MARGIN={brim_width + 10}             ; park next to the print while heating
-M109 S[nozzle_temperature_initial_layer]       ; wait for nozzle temp
-LINE_PURGE MARGIN={brim_width + 10}             ; purge a line beside the print
-```
-
-> The exact temperature token names can vary slightly across Orca versions — what matters is the
-> **order**: home → mesh → wait for temps → purge. Don't wait for temps before meshing; a cold bed
-> expands slightly as it heats, and you want the mesh taken at printing temperature.
-
-> 💡 **`MARGIN=`/`BRIM_WIDTH=` are optional.** `[brim_width]` is OrcaSlicer's own per-print brim
-> setting — passing it means the mesh/park/purge margin automatically grows to clear whatever brim
-> that specific print actually has, instead of you guessing a fixed value. No brim on a print?
-> `brim_width` is `0`, so it just falls back to a small fixed buffer. Leave it off entirely and each
-> macro uses its `Settings.cfg` default (`variable_mesh_margin` / `variable_purge_margin`) instead —
-> plain slicers without a `brim_width` placeholder (Cura, PrusaSlicer use different token names —
-> check your slicer's docs) should do that.
-
-Either option: if Label Objects isn't ticked (or your slicer didn't write object labels for some
-other reason), the adaptive mesh doesn't fail or stop your print — it just prints *"No objects
-detected! ... Defaulting to regular meshing"* in the console and falls back to a normal full-bed mesh.
-Worst case you lose the "adaptive" speed-up for that one print; nothing breaks.
-
-### Option C — preheat the nozzle during meshing (community-contributed, advanced)
-
-Shared by a community member on Discord. Options A/B both wait until *after* meshing to start heating
-the nozzle. This overlaps the two instead: start warming the nozzle to a "safe" intermediate
-temperature at the same time as the bed, so by the time meshing finishes it only has to climb the last
-stretch to full temp instead of starting from a cold stop. On a typical mesh this can shave real time
-off the print start.
-
-```gcode
-M140 S[bed_temperature_initial_layer_single]        ; start heating bed (don't wait)
-M104 S150                                            ; preheat nozzle to a SAFE temp - tune this, see below
-G28                                                  ; home all axes
-M190 S[bed_temperature_initial_layer_single]         ; wait for bed to reach temp
-ADAPTIVE_BED_MESH_CALIBRATE MARGIN={brim_width + 5}  ; mesh just the print area (nozzle already warm)
-M104 S[nozzle_temperature_initial_layer]             ; ramp to full temp - shorter climb since it's already warm
-SMART_PARK MARGIN={brim_width + 10}
-M109 S[nozzle_temperature_initial_layer]             ; wait for full nozzle temp
-LINE_PURGE MARGIN={brim_width + 10}
-```
-
-> ⚠️ **This needs tuning, it's not a drop-in default.** The `150` above is a placeholder, not a
-> recommendation — it has to sit below your filament's oozing point. PLA/PETG/ABS users have
-> reported anywhere from ~140–180°C working reliably; you'll need to test your own printer and
-> filament rather than trust a fixed number. **Skip this option entirely for TPU/flexibles** — their
-> low melt viscosity means they can ooze even at fairly low temps, well below what's safe for PLA/PETG.
->
-> **The longer your mesh takes, the more this matters.** A bigger print footprint or a denser mesh
-> (see [Optional — denser mesh](#optional--denser-mesh)) means more probe points, which means the
-> nozzle sits at that warm temp for longer before purging — raising oozing risk on large prints even
-> with an otherwise-safe temperature.
->
-> The time savings are real; whether a warm-nozzle mesh is also *more accurate* (some probes shift
-> slightly as nearby metal parts warm up) hasn't been independently measured on the KE — treat that
-> as a plausible bonus, not a confirmed one.
-
-### Using a different slicer (Cura, PrusaSlicer, SuperSlicer)
-
-The G-code above is Orca-flavoured, but none of this cares which slicer sends it — only that **object
-labels** are present and the **order** (home → mesh → wait for temps → purge) is right. The setting
-names differ:
-
-| Slicer | Equivalent of "Label Objects" | Where to add the start G-code |
-|---|---|---|
-| **Cura** | Exclude Objects is built in and always labels objects — nothing to enable | Printer Settings → **Start G-code** |
-| **PrusaSlicer / SuperSlicer** | **Label objects** checkbox, Print Settings → **Output options** | Printer Settings → **Custom G-code** → **Start G-code** |
-
-Swap the bracketed tokens (`[bed_temperature_initial_layer_single]`, `[brim_width]`, etc.) for whatever
-your slicer's own placeholder syntax is — check its start G-code documentation or an existing default
-profile for the exact names. The macro calls themselves (`START_PRINT`, `ADAPTIVE_BED_MESH_CALIBRATE`,
-`SMART_PARK`, `LINE_PURGE`) are identical no matter which slicer sends them.
-
----
-
-## Optional — denser mesh
-
-This works fine with the stock 5×5 grid, but a 9×9 gives smoother compensation. If you want it, open
-`printer.cfg` in Mainsail and update your `[bed_mesh]` section to:
-
-```ini
-[bed_mesh]
-speed: 350
-horizontal_move_z: 8
-mesh_min: 5,10
-mesh_max: 215,215
-probe_count: 9,9
-algorithm: bicubic
-fade_start: 1
-fade_end: 10
-```
-
-> **Don't add** `zero_reference_position` or `relative_reference_index` — they either aren't supported on
-> the KE or conflict with adaptive meshing. Remove them if a config you copied has them.
-
----
-
-## Optional — further tuning
-
-`Settings.cfg` (Mainsail Machine tab, in `GuppyScreen/`) has more variables than most people ever
-touch, but they're there if you want to adjust the defaults:
-
-| Variable | Controls |
+| Parameter | Effect |
 |---|---|
-| `variable_mesh_margin` | Extra margin added around the print footprint before meshing |
-| `variable_purge_height` | Z height of the purge line |
-| `variable_purge_margin` | Distance between the purge line and the print |
-| `variable_purge_amount` | How much filament the purge line uses |
-| `variable_tip_distance` | Retract distance at the end of the purge |
-| `variable_flow_rate` | Purge line flow rate |
-| `variable_smart_park_height` | Z height while parked and waiting to heat |
+| `BED_MESH_ADAPTIVE=0` | Probe the full bed instead of the print area |
+| `BED_MESH_PROFILE=<name>` | Load a saved mesh instead of probing |
 
-Leave these alone unless you have a specific reason to change one — the defaults work for the KE as
-shipped. They're also just the *fallback*: any `MARGIN=` passed at the macro call (see Step 2) wins
-for that call, and only falls back to `variable_mesh_margin`/`variable_purge_margin` if you don't
-pass one.
+Remove any `BED_MESH_PROFILE LOAD=...` line from older start G-code: loaded after `START_PRINT`, it
+would replace the fresh mesh.
 
-> ⚠️ **Supports still aren't counted in the footprint.** The polygon your slicer reports per object
-> (via `EXCLUDE_OBJECT_DEFINE`) is the outline of the model geometry only — it's generated before
-> supports are sliced, and there's no slicer setting that reports "how far supports stick out," so
-> there's nothing to pass as `MARGIN=` for that case (unlike brim, which is one fixed, known width —
-> see Step 2). If a part needs supports that extend past the model itself, the mesh area or purge
-> line can end up placed right at or under that overhang. There's no automatic fix for this one — pad
-> `MARGIN=`/`variable_mesh_margin`/`variable_purge_margin` a bit further if you print heavily
-> supported parts often.
+Without object labels there is no print area to adapt to: expect a full-bed mesh, and park and purge
+near the bed's front-left corner. Turn labels on.
 
 ---
 
-## Done when
+## Settings
 
-- Your slicer's start G-code calls `START_PRINT` (Option A), or the individual macros you want
-  (Option B).
-- A print starts, and the console shows the mesh running over roughly the print's footprint — not the
-  whole bed — before heating finishes.
-- A purge line (if enabled) appears right next to the print, not across the whole bed.
-
----
-
-## Undoing it
-
-The easiest path is the [uninstaller](Resetting-and-Uninstalling). By hand:
-
-```sh
-rm -rf /usr/data/printer_data/config/GuppyScreen/modules \
-       /usr/data/printer_data/config/GuppyScreen/Settings.cfg
-```
-
-Then `FIRMWARE_RESTART`. Remove `START_PRINT` (or `ADAPTIVE_BED_MESH_CALIBRATE`, `SMART_PARK`, and
-`LINE_PURGE`) from your slicer start G-code and replace with plain `M140`/`G28`/`BED_MESH_CALIBRATE`/
-`M104`/`M109` calls if you still want a full mesh with no adaptive purge/park.
+The purge and park values are variables of the macro `_KAMP_Settings` (for example
+`variable_purge_amount`, `variable_purge_margin`, `variable_flow_rate`, `variable_smart_park_height`),
+and the start/end behaviour is in `_START_END_PARAMS` (for example
+`variable_full_bed_mesh_above_percentage_full`, `variable_start_preheat_nozzle_temp`). Both are in
+`/etc/nebulaos/klipper/print.cfg`. Bed warp stabilisation is the switch `Bed_Warp_Stabilisation`
+(an `output_pin`), which Mainsail shows with the other outputs.
 
 ---
 
-## Where this code actually lives
+## Credits
 
-Unlike most third-party Klipper mods, this isn't a vendored copy of someone else's package anymore.
-`ADAPTIVE_BED_MESH_CALIBRATE` delegates to Klipper's own native adaptive meshing (ported onto the
-KE's older Klipper via a small, targeted patch — see `patch_bed_mesh.py`); `SMART_PARK` and
-`LINE_PURGE` are OpenKE-maintained macros (originally adapted from
-[KAMP](https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging), credited in `NOTICE.md`);
-`START_PRINT` is original OpenKE code that just calls the other three in sequence.
-Everything lives in [`k1/k1_mods/klipper_mods/adaptive_print_setup/`](../k1/k1_mods/klipper_mods/adaptive_print_setup/)
-if you want to see or adapt it yourself — see [Building from Source](Building-from-Source).
-
----
-
-## After a Creality firmware update
-
-Re-run the [installer](Installation) with **Y** at the print-quality mods prompt. Your slicer start
-G-code lives on your computer and survives — just double-check it after any OrcaSlicer update too.
+The purge and park macros derive from
+[pellcorp/creality](https://github.com/pellcorp/creality) ("SimpleAF") and, through it, from
+[KAMP](https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging) (GPL-3.0). The adaptive mesh
+itself is Klipper's native `ADAPTIVE=1`.

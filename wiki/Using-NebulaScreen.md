@@ -1,7 +1,7 @@
-# Screen Reference — Every Panel, Every Setting
+# Screen reference — every panel, every setting
 
-Plain-English reference for every screen in OpenKE. If you're looking at something and wondering
-"what does this do?" — find it here.
+Plain-English reference for every screen in NebulaScreen. If you're looking at something and
+wondering "what does this do?", find it here.
 
 > 🔒 **You can't break a running print by exploring the screen.** Anything that would interrupt a job is
 > blocked or asks you to confirm first. Tap around freely.
@@ -34,7 +34,7 @@ Your everyday screen. Inline content — no launcher grid.
 
 ### Temperature panel
 
-Shows live read-outs with target values for whichever sensors are configured in `guppyconfig.json`
+Shows live read-outs with target values for whichever sensors are configured in `nebulascreen.json`
 (`monitored_sensors`) — by default **nozzle, bed, and MCU**. A **chamber** sensor also appears here,
 but only if one is set up in your printer's config with the display name "Chamber" — it is not shown
 by default on a stock KE.
@@ -98,10 +98,10 @@ There is no button to home a single axis (X, Y, or Z) by itself — only the two
 Disables stepper motors so you can move the toolhead and bed by hand. They re-engage on the next move
 command or home.
 
-### Invert Y toggle
+### Inverted arrows
 
-Flips which direction Y+ and Y− move the bed. Some users find the default unintuitive on a bed-slinger.
-Toggle to match your mental model. (Also settable permanently in Settings → System → Invert Y Direction.)
+If Y or Z moves the opposite way to what you expect, swap the arrow labels in
+**Settings → Printer → Invert Y arrows / Invert Z arrows**.
 
 ---
 
@@ -162,19 +162,16 @@ Opens from the Home tab **Fans** button.
 
 ![Fan panel](images/fan-panel.png)
 
-There are two very different kinds of row here, and which one you get depends on whether the fan is
-listed in `guppyconfig.json`'s `fans` setting:
+There are two kinds of row here:
 
-- **Fans listed in `fans`** (by default, just the **Part Cooling Fan**) get a full editable control:
-  an **Off** button, a **0–100% slider**, and a **Max** button. Changes apply immediately and override
-  whatever gcode was sending. 0% for the first layer of ABS/ASA; 100% for PLA/PETG bridges.
-- **Everything else Klipper reports as a fan** (typically the **Hotend Fan** and **Mainboard Fan** —
-  Klipper's `heater_fan`/`controller_fan` types) shows as a **plain read-only row**: just the name and
-  its current "On"/"Off" state, with **no slider or toggle at all**. These are auto-managed by Klipper
-  based on temperature — you cannot control them manually from this screen.
+- **Fans you can drive** get an **Off** button, a **0–100% slider** and a **Max** button. Changes apply
+  immediately and override whatever the G-code was sending. If `nebulascreen.json`'s `fans` list names
+  fans, exactly those are shown this way; if it names none (the NebulaOS default), the part-cooling fan,
+  generic fans and PWM fan pins are.
+- **Fans Klipper manages itself** (`heater_fan`, `controller_fan`, and fan pins that are not editable
+  rows) are **read-only rows**: the name and the current state, no slider.
 
-If you want a fan that currently shows as read-only to become adjustable, add it to `fans` in
-`guppyconfig.json` — see [Configuration](Configuration).
+See [Configuration](Configuration) for the `fans` list.
 
 ---
 
@@ -245,8 +242,6 @@ watching the first layer:
 - **Lines not fusing / gaps:** too high — lower (−)
 - **Lines translucent or completely flat:** too low — raise (+)
 - **Squished together and fused, no gaps:** correct
-
-Saves automatically.
 
 ### Control buttons
 
@@ -395,9 +390,8 @@ First-layer baby-stepping. Same as tapping Z on the print-status screen, but als
   the offset to exactly 0.
 - Step size buttons: **0.001 / 0.005 / 0.01 / 0.025 / 0.05 mm**
 - Current value shown at top
-- There is no separate Save button — every tap (including Reset) adjusts the offset and saves it
-  automatically (via the Save Z-Offset macros the installer sets up). You'll see "Adjustments are saved
-  automatically" on the panel as a reminder.
+- There is no separate Save button — every tap (including Reset) applies the change at once
+  (`SET_GCODE_OFFSET Z_ADJUST=… MOVE=1`). The panel shows "Adjustments are saved automatically".
 - **The printer must be homed first.** If it isn't, you'll get a homing prompt instead of the adjustment
   going through. This isn't just a safety check — an unhomed adjustment would actually change the
   live offset (so the on-screen number would move) but silently fail to move the toolhead or save,
@@ -488,20 +482,18 @@ actually works.
 
 ### Power Settings
 
-![Power Settings panel](images/power-settings.png)
-
 | Section | What it does |
 |---|---|
-| **Power devices** | On/off buttons for any smart plugs or relays configured in Moonraker. **If none are configured, this section doesn't appear at all** — no placeholder text, it's just not there. |
-| **Power Loss Recovery** | Resume a print that was interrupted by a power cut. **Not automatic** — after power comes back, you have to open this screen yourself. It reads Creality's own saved print-state file to find something to resume, so it isn't a GuppyKE-invented feature; if that file is missing or stale, there's nothing to offer. Three things you might see here: (1) if a print is currently running, "A print is running. If power is lost, reopen this screen to resume." — that's the reminder of what to do; (2) if nothing is recoverable, "No interrupted print to recover."; (3) if something is recoverable, a **Resume** button (reheats and returns to the saved position — a real resume, not a restart) and a **Dismiss** button (clears the prompt without printing). If the saved position turns out invalid, it safely restarts the file from the beginning instead of crashing. |
+| **Power devices** | On/off buttons for smart plugs or relays configured in Moonraker's `[power]` section. NebulaOS ships none, so this section is normally not shown. |
+| **Power Loss Recovery** | Shows the state of NebulaOS power-loss recovery (the Klipper object `nebulaos_power_loss_recovery`). Not automatic: after power comes back, open this screen. While a print runs it says the print is being recorded. After a power cut it shows the interrupted file and, when the printer allows a physical resume, a **Resume Print** button (asks to confirm); **Discard** drops the record. If the record cannot be resumed (file or printer configuration changed), it says why and offers only **Discard**. |
 
 ### TMC Metrics
 
 ![TMC Metrics panel](images/tmc-metrics.png)
 
-The panel itself says it best: **"TMC Metrics is experimental and disabled by default."** There's a
-toggle at the top — it's off unless you turn it on (turning it on/off loads or unloads a separate
-Klipper diagnostics module, so there's a real reason it isn't always running).
+Live TMC driver metrics, refreshed every second. The switch at the top starts and stops polling the
+drivers (`TMCSTATUS ENABLE=1` / `ENABLE=0`); it is off when the screen starts. NebulaOS always loads the
+`[tmcstatus]` module, so no config edit or restart is needed.
 
 ⚠️ **This is not just a read-only diagnostics screen.** Once enabled, each stepper shows a live graph
 (`sg_result`, `i_rms` in mA, and two other computed values — the panel doesn't explain what these mean
@@ -510,103 +502,70 @@ values**: `toff` (0–15), `tbl` (0–3), `hstrt` (0–7), `hend` (0–15) — t
 register names. Tapping +/- on any of them sends the change to the driver **immediately, live** — it is
 not a preview you confirm afterward. There's no indication these persist across a restart on their own.
 
-Given the app's own "experimental" label and that these are low-level hardware timing values, don't
-adjust them unless you specifically know what you're doing (per the driver datasheet) — this isn't
+These are low-level hardware timing values: don't adjust them unless you specifically know what you're doing (per the driver datasheet) — this isn't
 needed for normal printing or normal troubleshooting. If you suspect a driver issue, **TMC Autotune**
 (inside the **Calibration** hub below) is the supported way to tune your drivers.
 
 ### Calibration
 
-![Calibration menu](images/calibration-menu.png)
+One menu for every calibration routine, reached from the **Calibration** tile. It is a scrollable
+list: the numbered **IN ORDER** steps follow the order of the
+[Calibration walkthrough](Calibration-Explained), then an **OTHER** section. **Up / ✓ / Down** on the
+right move through the list; **Back** is at the top right.
 
-A single hub for every calibration routine, reached from the **Calibration** tile. Replaces what used
-to be four separate Tune-tab tiles (Input Shaper, Axis Twist, Skew, TMC Autotune) plus a since-retired
-Belts/Shake screen (mechanically dead-ended and no longer reachable from anywhere in the app). Opens as
-a numbered, scrollable list matching the order the [Calibration Explained](Calibration-Explained) guide
-recommends doing these in, followed by an unordered **Other** section for routine (non-calibration)
-tools:
-
-| # | Step | Opens |
+| # | Row | Opens |
 |---|---|---|
-| 1 | **Axis Twist** | Axis Twist Compensation wizard |
-| 2 | **Z-Offset & Bed Mesh** | The guided Recalibration Wizard |
-| 3 | **Input Shaper** | Input Shaper calibration |
-| 4 | **E-Steps Calibration** | The guided E-Steps wizard |
-| 5 | **Skew Correction** | Skew Correction |
-| 6 | **TMC Autotune** *(optional)* | TMC Autotune |
-| — | **Bed Mesh** *(Other)* | The same Bed Mesh panel as the Tune-tab tile above — view or re-mesh standalone without redoing the whole wizard |
+| 1 | **Bed Tramming** | Guided four-corner tramming ([Bed tramming](Bed-Tramming)) |
+| 2 | **Axis Twist** | Axis Twist Compensation wizard |
+| 3 | **Load Cell** | Guided load cell calibration ([Load cell calibration](Load-Cell-Calibration)) |
+| 4 | **Z-Offset & Bed Mesh** | Guided nozzle clean, Z offset and bed mesh, saved with one Klipper restart |
+| 5 | **Input Shaper** | Guided resonance measurement |
+| 6 | **E-Steps Calibration** | Guided mark-extrude-measure calibration |
+| 7 | **Skew Correction** | Skew Correction |
+| 8 | **TMC Autotune** *(optional)* | TMC Autotune |
+| — | **Bed Mesh** *(Other)* | The same Bed Mesh panel as the Tune-tab tile — view or re-mesh on its own |
 
-Tapping **Axis Twist** or **Skew Correction** when their Klipper config section isn't present shows a
-toast instead of opening the panel, same as before when they were their own tiles. Tapping any row
-while a print is running shows the usual "locked during print" notice instead of opening it.
+Every row except Bed Mesh is locked while a print is running. **Axis Twist** and **Skew Correction**
+show a message instead of opening when their Klipper section (`[axis_twist_compensation]`,
+`[skew_correction]`) is missing; NebulaOS ships both. **TMC Autotune** is greyed out when Klipper has
+no `motor_database.cfg`.
 
-#### Z-Offset & Bed Mesh (Recalibration Wizard)
+#### The guided screens (Bed Tramming, Load Cell, Z-Offset & Bed Mesh, Input Shaper, E-Steps)
 
-The guided, combined replacement for doing Z-offset and bed-mesh calibration as two separate manual
-steps: paper-test (or BLTouch) Z-offset → automatic bed mesh → review/save, with an optional
-load-cell-assisted refine step along the way. Full walkthrough:
-[Calibration Explained](Calibration-Explained).
+These run NebulaOS calibration workflows in Klipper (`NEBULAOS_*` macros). Each screen shows a short
+description, a **Start** button (asks to confirm) and, while the workflow runs, its live state, the
+buttons for the current step and **Cancel**. What each one does:
 
-#### Input Shaper
-
-![Input Shaper panel](images/input-shaper.png)
-
-Reduces ghosting/ringing (echoes trailing sharp corners at speed). The panel has 3 buttons on the left
-(**Calibrate**, **Save**, **Stop**) and, per axis, a toggle switch, a frequency value, and a shaper-type
-dropdown (populated with whatever shaper types Klipper supports — e.g. `mzv`, `ei`, `3hump_ei`, `zv`).
-
-- **X switch / Y switch** — turn an axis **on or off for the next Calibrate run**, not "enable/disable
-  shaping" on that axis. Turn one off if you only want to re-test the other. Both are on by default.
-- **Graph switch** (top) — off by default. Turn it on **before** tapping Calibrate if you want an actual
-  plotted frequency-response curve rendered after the sweep; leave it off for a faster run that just
-  gives you the recommended frequency + shaper type as numbers/dropdown, no picture.
-- **Stop** is a general **emergency stop** (same action as everywhere else in the app) — it is not a
-  "cancel this specific calibration" button.
-
-Typical flow:
-
-1. Leave both axis switches on (or turn one off if you only want to redo one axis). Optionally turn
-   **Graph** on if you want to see the curve.
-2. Tap **Calibrate** — the printer sweeps frequencies on the selected axis/axes (~1 minute).
-3. The frequency value and shaper-type dropdown update with the recommended result for each axis you
-   tested. You can change the dropdown yourself before saving if you want to try a different shaper type.
-4. Tap **Save** to persist your choices.
-
-> 💡 For the **Y axis** test: move the accelerometer to the **bed** (it must be on whatever moves for
-> that axis). Tape or zip-tie it on for the 1-minute test.
+- **Bed Tramming** — measures the four bed corners and tells you which one to correct, one at a
+  time: a printed shim on rigid spacers, or a screw turn on rubber or spring mounts. The printer homes
+  and probes; the bed must be empty.
+- **Load Cell** — teaches the load cell how much force it measures, with a 1.5 L water bottle and a
+  kitchen scale. About 2 minutes; nothing moves or heats.
+- **Z-Offset & Bed Mesh** — cleans the nozzle, measures the Z offset with the load cell and probes a
+  bed mesh, then saves everything with one Klipper restart. Takes several minutes; the bed must be
+  empty. Full walkthrough: [Calibration walkthrough](Calibration-Explained).
+- **Input Shaper** — measures resonances with the accelerometer, first mounted on the toolhead (X),
+  then on the bed (Y), and saves the result with one Klipper restart.
+- **E-Steps Calibration** — the hotend heats; you mark the filament at the extruder entry, the printer
+  extrudes a fixed length, and you type in how far the mark moved. The corrected value is applied
+  for you.
 
 #### Axis Twist
 
 ![Axis Twist intro screen](images/axis-twist.png)
 
-Launches the 5-point calibration wizard for Axis Twist Compensation. Fixes first layers that are
-uneven left-to-right despite re-meshing. Full guide: [Axis Twist Compensation](Axis-Twist-Compensation).
+A 5-point paper test across X (`AXIS_TWIST_COMPENSATION_CALIBRATE SAMPLE_COUNT=5`). Fixes first
+layers that are uneven left to right despite re-meshing. Full guide:
+[Axis Twist Compensation](Axis-Twist-Compensation).
 
-#### E-Steps Calibration
-
-![E-Steps Calibration panel](images/esteps-calibration.png)
-
-A guided version of the classic mark-extrude-measure rotation-distance calibration:
-
-1. Heats the extruder to a safe temperature for you.
-2. Marks the filament, then tap **Extrude** to push a fixed length through.
-3. Measure how far the mark actually moved (calipers or a ruler) and type it in on the numeric keypad.
-4. The panel computes and applies the corrected `rotation_distance` for you — no manual math.
-
-Auto-cancels if left idle for 2 minutes (e.g. mid-measurement) rather than leaving the extruder primed
-indefinitely. If the corrected value keeps changing significantly between repeat runs, that points to a
-hardware issue (extruder gears/tension), not something this calibration itself can fix. Full guide:
-[Calibration Explained](Calibration-Explained).
-
-#### Skew
+#### Skew Correction
 
 ![Skew Correction panel](images/skew-correction.png)
 
 Corrects parts that come out as slight parallelograms instead of squares.
 
 - Enter three caliper measurements from a printed test square: **AC diagonal**, **BD diagonal**, **AD side**.
-- Tap **Apply & Save** — this sends the correction *and* saves it in one step. You don't need to run
-  `SAVE_CONFIG` separately; the button already does that for you.
+- Tap **Apply & Save** — this sends the correction *and* runs `SAVE_CONFIG` (Klipper restarts).
 
 Full guide: [Skew Correction](Skew-Correction).
 
@@ -614,136 +573,147 @@ Full guide: [Skew Correction](Skew-Correction).
 
 ![TMC Autotune panel](images/tmc-autotune.png)
 
-Quieter, cooler, sometimes smoother steppers. Select motor type and a goal, tap **Save/Restart**:
-
-- **Performance** — prioritises current/torque (slightly louder)
-- **Silent** — prioritises quiet operation
-
-Settings are saved and reapplied every boot.
-
-> The row is **disabled** until the TMC Autotune module is installed (the installer does this during
-> the print-quality mods step). Full guide: [TMC Autotune](TMC-Autotune).
+Quieter, cooler steppers. For each stepper pick a **Motor** and a **Tuning Goal** (`auto`, `silent`,
+`performance`, `autoswitch`), then tap **Save/Restart**. Steppers without a saved choice are
+pre-selected with the KE's stock motors. Full guide: [TMC Autotune](TMC-Autotune).
 
 ---
 
 ## Settings tab
 
-A **4-column × 2-row grid of icon buttons** plus a quick-action restart row at the top. Nothing is
-configured inline on this tab.
+A grid of six tiles. Each opens its own page; **Back** returns to the grid.
 
-![Settings tab grid](images/settings-tab.png)
+| Tile | What's there |
+|---|---|
+| **Connections** | Wi-Fi, address, printer name, Mainsail / Moonraker / Spoolman |
+| **Display** | Brightness, sleep, theme, touch beep, boot logo |
+| **Printer** | Jog and temperature defaults, Klipper and MCU restarts, MCU firmware |
+| **System** | Version info, report a problem, storage, logs, restart / reboot / shut down |
+| **Updates** | Package updates and system image install |
+| **Reset** | GUI settings, touch calibration, clean reset, boot slot swap |
 
-### Quick-action row (top row)
+### Connections
 
-These execute immediately — no sub-panel opens:
+Shows the current **Wi-Fi** network, **Address**, printer **Name** (with **Change**), and the
+**Mainsail**, **Moonraker** and **Spoolman** addresses (Spoolman says "not configured" when Moonraker
+has no Spoolman). Buttons:
+
+- **Wi-Fi networks** — see [Wi-Fi panel](#wi-fi-panel).
+- **Printers** — see [Printers panel](#printers-panel).
+- **Spoolman** — see [Spoolman panel](#spoolman-panel).
+
+**Change** (printer name) sets the network name: the printer is then reachable as `<name>.local`.
+Invalid names are flagged while you type; saving asks to confirm first.
+
+### Display
+
+| Setting | What it does |
+|---|---|
+| **Brightness** | Backlight level. The levels come from NebulaOS. |
+| **Sleep after** | Never / 30 seconds / 1 minute / 5 minutes / 10 minutes / 30 minutes / 1 hour. Touch to wake. |
+| **Theme colour** | Blue, Red, Green, Purple, Pink, Yellow. Applies immediately. |
+| **Touch beep** | A short click through the buzzer on every tap. A test beep plays when you turn it on. |
+| **Boot logo** | Choose the boot screen and power-on logo of this boot slot: the NebulaOS logo, an image added from a USB stick or uploaded in Mainsail (PNG, BMP or JPEG, max 4 MB), or **Restore Creality logo**. |
+
+### Printer
+
+| Setting | What it does |
+|---|---|
+| **Default extruder temp** | 180–300 °C. Used by Load/Unload when no target is set. |
+| **Ask before emergency stop** | On: Stop asks "Do you want to emergency stop?" first. Off: acts immediately. Default on. |
+| **Invert Y arrows** / **Invert Z arrows** | Swap the jog arrows in the Homing panel. |
+| **Restart Klipper** | Restarts Klipper. Asks first if a print is running (the print stops). |
+| **Restart MCU** | Restarts the printer board's firmware, then Klipper (`FIRMWARE_RESTART`). Asks first if a print is running. |
+| **MCU firmware** | Installs a new mainboard (MCU) firmware. |
+
+### System
+
+An info block with the NebulaScreen version, the NebulaOS build, boot slot, kernel, host name and
+storage. Buttons:
 
 | Button | What it does |
 |---|---|
-| **Restart Klipper** | Restarts the Klipper host process. Use after editing `printer.cfg`. |
-| **Restart Firmware** | Resets the mainboard MCU (`FIRMWARE_RESTART`). Use after MCU-level config changes. |
-| **Restart Guppy** | Restarts the OpenKE screen process only (not Klipper). Use if the UI feels stuck. |
-| **Update Guppy** | Downloads and installs the latest OpenKE screen binary. **Note:** only swaps the binary — for full updates (Klipper mods, adaptive mesh config, etc.) re-run the full installer. |
+| **Report a problem** | Three steps: set the **Log level** (Info / Warning / Debug; Debug switches back to Info after 24 hours), **Save logs to USB**, and report on GitHub (QR code and address on screen). |
+| **Storage** | Disk usage, and **Clean up Creality files** — see [Resetting](Resetting#freeing-space-from-the-creality-system). |
+| **Logs** | Read log files on the screen, including the Wi-Fi lines of `system.log`. |
+| **Restart GUI** | Restarts NebulaScreen only. Klipper keeps running. |
+| **Reboot** / **Shut down** | Ask first. After shutting down, switch the printer off at the power switch. |
 
-### Navigation row (main row)
+### Updates
 
-| Button | Opens |
-|---|---|
-| **WIFI** | WiFi connection panel |
-| **Printers** | Printer connection manager |
-| **Spoolman** | Filament tracking panel |
-| **System** | Screen settings + info panel |
+Lists what Moonraker's update manager knows (Klipper, Moonraker, Mainsail, NebulaOS extensions, ...)
+with version and state. **Check now** refreshes the list, **Update all** installs every available
+update, and each row has its own **Update** button. Klipper stops while Klipper or the extensions
+update.
+
+**System image** installs a NebulaOS (or Creality) `.img` from a USB stick or from
+`config/uploads/system-image` into the boot slot that is not running, then restarts into it. After a
+NebulaOS image, the new slot gets one trial boot: if Klipper and the screen do not come up, NebulaOS
+goes back to the previous slot. See [Installation and updates](Installation#updates).
+
+### Reset
+
+See [Resetting](Resetting).
 
 ---
 
-## WiFi panel
+## Wi-Fi panel
 
-Opens from Settings → **WIFI**.
+Opens from Settings → Connections → **Wi-Fi networks**. Wi-Fi is managed through NebulaOS.
 
-![WiFi panel](images/wifi-panel.png)
+Networks are grouped into **KNOWN NETWORKS** (saved) and **OTHER NETWORKS IN RANGE**, each row with
+signal bars. **Other network (hidden)...** at the end connects to a network that does not broadcast
+its name.
 
-Networks are grouped into two lists — **KNOWN NETWORKS** (anything with a saved password) and **OTHER
-NETWORKS IN RANGE** — each row showing 4 signal-strength bars derived from the scan's RSSI. Rescans
-automatically on open; scan results are merged across scans (a network has to miss 3 scans in a row
-before it's dropped) so the list doesn't visibly reshuffle or shrink between scans the way a
-clear-and-redraw would.
-
-Each row's tap targets are different depending on what it is — this was a deliberate fix (an earlier
-layout packed a status icon and an edit icon into two adjacent narrow columns, and a mistap between
-them could delete a saved password instead of opening network settings):
-
-| Row type | Tapping the row body | Extra affordance |
+| Row type | Tapping the row | Extra |
 |---|---|---|
-| **Connected network** | Opens [Network Details](#network-details-panel) | A chevron (**›**) on the right — purely a visual hint, the whole row does the same thing |
-| **Known, not connected** | Reconnects to it | A separately-spaced **✕** box — tap to **forget** it (asks you to confirm first; this deletes the saved password) |
-| **Not known (in range only)** | Prompts for a password to connect | *(none)* |
+| **Connected network** | Opens [Network Details](#network-details-panel) | A chevron (**›**) as a hint |
+| **Known, not connected** | Reconnects to it | A separate **✕** to forget it (asks first) |
+| **Not known** | Asks for the password (empty for an open network) | — |
 
-**Password entry** has an **eye-toggle** button to reveal/hide what you're typing.
-
-**Low Latency** is a compact link near the bottom (not a screen-dominating control) that reads "Low
-Latency: ON/OFF". Disables WiFi power-save, idle sleep, background roam scans, and **Bluetooth**. The
-KE's WiFi and Bluetooth share one 2.4 GHz radio and antenna — leaving BT on (it's unused) makes WiFi
-yield to it periodically and stutter. Low Latency eliminates that. Persists across reboots. Turn off to
-re-enable Bluetooth.
-
-> If Mainsail feels laggy, the camera stutters, or tap response feels slow — enable **Low Latency** first.
+The password field has an eye button to show or hide what you type.
 
 ---
 
 ## Network Details panel
 
-Reached by tapping the connected network's row (or its chevron) in the WiFi panel.
+Reached by tapping the connected network's row in the Wi-Fi panel.
 
-![Network Details panel](images/network-details-panel.png)
+An info card (**Signal**, **Security**, **IP address**) plus two buttons:
 
-An info card (**Signal**, **Security**, **IP address**) for the connected network, plus two clearly
-labelled buttons:
-
-- **Configure Static IP** — opens the [Static IP panel](#static-ip-panel) below.
-- **Forget This Network** (red outline) — deletes the saved password for this network. Same destructive
-  action as the ✕ on a known-but-unconnected row in the WiFi panel, just reached from here instead.
-
-**Back** returns to the WiFi panel.
+- **Configure Static IP** — opens the [Static IP panel](#static-ip-panel).
+- **Forget This Network** (red outline) — removes the saved network.
 
 ---
 
 ## Static IP panel
 
-Reached from Network Details → **Configure Static IP**.
+Reached from Network Details → **Configure Static IP**. Titled **"Static IP (all Wi-Fi networks)"**:
+the setting is global for the Wi-Fi interface, not per network.
 
-![Static IP panel](images/static-ip-panel.png)
+**DHCP** / **Manual** switches the view. **Manual** has four address rows — **IP**, **Netmask**,
+**Gateway**, **DNS** — each as four octet boxes; a value outside 0–255 is flagged red at once.
+**✓ Save** stays visible outside the scrolling area. With a static address set, **Revert to DHCP**
+appears (asks first).
 
-Titled **"Static IP - `<network name>`"** — the config applies to that specific saved network, not
-globally. **DHCP** / **Manual** is a plain view switch at the top (tapping between them doesn't change
-anything on its own — it just shows different controls).
-
-**Manual** view: 4 address rows — **IP**, **Netmask**, **Gateway**, **DNS** — each entered as **4
-separate tap-sized octet boxes** (not one free-text field). Typing an invalid value (outside 0–255)
-flags that box red immediately, in place, rather than only failing when you try to save.
-
-- **✓ Save** is pinned outside the scrollable field area, so it's always reachable and can never scroll
-  out of view.
-- Already have a static config? A **Revert to DHCP** button appears — a separate, explicit action (with
-  its own Revert/Cancel confirmation) rather than something that happens as a side effect of switching
-  back to the DHCP tab.
-
-**Back** returns to Network Details.
+NebulaOS checks a new setting (static: the gateway answers; DHCP: a lease) and reverts it by itself
+when it does not work. This can take a couple of minutes.
 
 ---
 
 ## Printers panel
 
-Opens from Settings → **Printers**. Manages Moonraker connections.
+Opens from Settings → Connections → **Printers**. Manages Moonraker connections.
 
 ![Printers panel](images/printers-panel.png)
 
-Each configured printer is shown as a card with its name, IP, and port, plus:
+Each configured printer is a card with its name, IP and port, plus:
 
-- **Switch** — reconnects OpenKE to that printer
-- **✕ (close icon)** — removes it from the config. Asks you to tap **Confirm** or **Cancel** first;
-  there's no text label on the button itself, just the ✕ icon.
+- **Switch** — connects NebulaScreen to that printer
+- **✕** — removes it from the config (asks **Confirm** / **Cancel** first)
 
-**Add a printer:** on the left, fill in **Printer Name**, **Moonraker IP Address**, and the port field
-(pre-filled with `7125`), then tap the green **+ Printer** button. A keyboard appears for text entry.
+**Add a printer:** fill in **Printer Name**, the Moonraker IP address and the port (pre-filled with
+`7125`), then tap the green **+ Printer** button.
 
 ---
 
@@ -751,61 +721,14 @@ Each configured printer is shown as a card with its name, IP, and port, plus:
 
 ![Spoolman panel](images/spoolman-panel.png)
 
-Opens from Settings → **Spoolman**. Requires a [Spoolman](https://github.com/Donkie/Spoolman) server
-on your network — the button is greyed out until one is configured.
+Opens from Settings → Connections → **Spoolman**, and from the Filament panel. Requires a
+[Spoolman](https://github.com/Donkie/Spoolman) server configured in Moonraker; the button is greyed
+out until Moonraker reports one.
 
 | Feature | What it does |
 |---|---|
 | **Spool list** | A table with columns **ID**, **Name**, **MAT** (material), **Remain Weight**, **Remain Length**, plus a colour swatch per spool. |
-| **Set active** | Each non-archived, non-active row has a ▶ (play) icon in its row — tap it to make that spool active. The active row shows "(active)" instead of an icon. The active spool's filament use is deducted as you print. |
-| **Archive** | A non-active, non-archived spool shows a 💾-style icon in its row — tap it to archive. An archived spool shows an ⬆-style icon instead — tap it to bring it back. You can't archive the currently active spool. **Show Archived** (a switch **below** the table, next to Reload/Back) toggles whether archived spools are listed at all. |
-| **Reload** | Re-fetches the spool list from your Spoolman server. |
-| **Auto tracking** | Once a spool is active, filament used by prints is subtracted automatically. No weighing. |
-| **Wrong-filament check** | Before a print starts (and before a manual Load), a **"Use this filament?"** popup shows the active spool. Prevents "oops, wrong material" before it ruins a print. |
-
----
-
-## System panel
-
-![System panel](images/system-panel.png)
-
-Opens from Settings → **System**. This is the main settings panel for the screen itself — everything
-that changes how OpenKE behaves.
-
-**Network info label** (top of right column): shows each network interface and its IP address, plus the
-currently running OpenKE version. Read-only.
-
-### Left column
-
-| Setting | Options | What it does |
-|---|---|---|
-| **Display Sleep** | Never / 30 Seconds / 1 Minute / 5 Minutes / 10 Minutes / 30 Minutes / 1 Hour | Dims the screen after this period of inactivity. Touch to wake. |
-| **Brightness** | Low (10%) / Dim (25%) / Medium (50%) / Bright (75%) / Max (100%) | Backlight brightness. 10% is the minimum readable level. |
-| **Log Level** | trace / debug / info / warn | Verbosity of `guppyscreen.log`. **info** is the default (weeks-long logs). Use **debug** before reporting a bug, then switch back. **warn** = errors only (smallest logs). **trace** = developer use only. |
-| **Prompt Emergency Stop** | Toggle | **On:** tapping Emergency Stop shows a confirmation dialog first. **Off:** acts immediately, no dialog. Default on. |
-| **Invert Z Direction** | Toggle | Flips Z jog buttons in the movement panel (up/down). |
-| **Invert Y Direction** | Toggle | Flips Y jog buttons (front/back). Useful if the bed moves opposite to your expectation on a bed-slinger. |
-
-### Right column
-
-| Setting | Options | What it does |
-|---|---|---|
-| **Theme Color** | Blue, Red, Green, Purple, Pink, Yellow | Changes the screen colour scheme. Takes effect immediately. |
-| **Def. Temp** | Preset temperatures | Default extruder target used by Load/Unload when no explicit target has been set (e.g. on a cold boot). |
-| **Touch Beep** | Toggle | Plays a short click sound through the buzzer on every tap. A test beep plays immediately when you enable it. |
-
-### Reset Options
-
-Tap the **Reset Options** button (top-right corner of the System panel) to open a dialog with three choices:
-
-![Reset Options dialog](images/reset-options.png)
-
-| Option | What it does |
-|---|---|
-| **Reset GuppyScreen settings** | Deletes the screen config and sensor layout (`guppyconfig.json`). OpenKE restarts with factory defaults. Your Klipper config and print files are **not** touched. |
-| **Factory Reset Printer** | Wipes OpenKE, all Klipper config, gcodes, and calibration. Reboots to stock Creality firmware. **Irreversible.** WiFi and Creality cloud account are preserved. See [Resetting & Uninstalling](Resetting-and-Uninstalling). |
-| **Reset Touch Calibration** | Clears saved calibration. OpenKE restarts and shows the 9-tap calibration wizard immediately. |
-
-Tap **Close** to dismiss without doing anything.
-
-**Back** button (bottom-right of the System panel) returns to the Settings tab.
+| **Set active** | Each non-archived, non-active row has a ▶ icon — tap it to make that spool active. The active row shows "(active)". The active spool's filament use is deducted as you print. |
+| **Archive** | A non-active, non-archived spool has an archive icon; an archived spool has an icon to bring it back. You can't archive the active spool. **Show Archived** (below the table) toggles whether archived spools are listed. |
+| **Reload** | Re-fetches the spool list. |
+| **Wrong-filament check** | Before a print starts (and before a manual Load), a **"Use this filament?"** popup shows the active spool. |

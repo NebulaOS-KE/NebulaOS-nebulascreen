@@ -1,6 +1,8 @@
 # Contributing
 
-Issues and pull requests are welcome.
+Issues and pull requests are welcome. NebulaScreen is part of NebulaOS; bugs seen on a printer are
+best reported from the screen (**Settings → System → Report a problem**), which saves the logs to a
+USB stick and points to [github.com/coreflake1/NebulaOS/issues](https://github.com/coreflake1/NebulaOS/issues).
 
 ## Workflow
 
@@ -11,47 +13,37 @@ Issues and pull requests are welcome.
 3. Build the targets your change affects before opening a PR — at minimum the simulator, and the MIPS
    build for anything that touches on-device behavior or layout.
 4. For small-screen work, build with `GUPPY_SMALL_SCREEN=1` and check the 480×272 layout.
+5. Run the host tests: `make test` and `python3 tests/test_nebulascreen_release.py` (see [Testing](Testing)).
 
-Issue templates are provided under `.github/ISSUE_TEMPLATE/`. CI (`.github/workflows/build.yml`) runs
-the full build matrix on PRs and pushes.
+Issue templates are in `.github/ISSUE_TEMPLATE/`. CI builds and tests every pull request
+(`.github/workflows/pull_request.yml`), see [CI](CI).
 
 ## License
 
-This project is licensed under the **GNU General Public License v3.0** (see the `LICENSE` file at the
-repository root). Contributions are accepted under the same license.
+NebulaScreen is licensed under the **GNU General Public License v3.0** (see `LICENSE` and `NOTICE` at
+the repository root). It is based on GuppyScreen by ballaswag, also GPL-3. Contributions are accepted
+under the same license.
 
 ## Credits & attribution
 
-This project builds on the work of:
+NebulaScreen builds on the work of:
 
-- [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) — the original GuppyScreen
+- [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) — the original GuppyScreen, which
+  NebulaScreen is based on
 - [probielodan/guppyscreen](https://github.com/probielodan/guppyscreen) — KE-focused UI rework
 - [pellcorp/grumpyscreen](https://github.com/pellcorp/grumpyscreen) — bug fixes and improvements
-- [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen) — 3D bed mesh feature
-- [Moonraker](https://github.com/Arksine/moonraker), [Mainsail](https://github.com/mainsail-crew/mainsail),
-  [Klippain-shaketune](https://github.com/Frix-x/klippain-shaketune)
-- [nginx](https://nginx.org/) — vendored MIPS binary (1.29.3), serves the optional Mainsail web UI.
-  Cross-compiled from real nginx source by `scripts/build-nginx-mipsel.sh`, not a copied prebuilt
-  binary — see [`docs/VENDORING.md`](../docs/VENDORING.md) for how to rebuild it against a newer
-  version.
-- [Guilouz/Creality-Helper-Script](https://github.com/Guilouz/Creality-Helper-Script) — the
-  `useful-macros.cfg`/`M600-support.cfg`/`save-zoffset.cfg` templates are modeled on theirs. Moonraker
-  and Nginx were originally fetched from their repo at install time too, but are now vendored directly
-  by OpenKE instead (a real clone of the official upstream Moonraker, and a from-source rebuild of
-  nginx — no longer install-time-dependent on that repo staying online). As of this vendoring, the
-  installer has no remaining runtime dependency on Guilouz's repo for anything.
-- [kyleisah/Klipper-Adaptive-Meshing-Purging](https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging) —
-  `Smart_Park.cfg`/`Line_Purge.cfg` are still adapted from KAMP (GPL-3.0); the adaptive-mesh macro itself
-  is now original OpenKE code delegating to Klipper's own native adaptive meshing, no longer vendored KAMP
-- [Klipper3d/klipper](https://github.com/Klipper3d/klipper) — Axis Twist Compensation and Screws Tilt
-  Adjust modules, vendored verbatim from `klippy/extras/` (the KE's stock Klipper build predates/strips
-  both; Skew Correction uses Klipper's native `[skew_correction]` directly, no vendored file needed)
-- [evgarthub/klipper_tmc_autotune_k1](https://github.com/evgarthub/klipper_tmc_autotune_k1) (a K1/KE fork
-  of [andrewmcgr/klipper_tmc_autotune](https://github.com/andrewmcgr/klipper_tmc_autotune)) — vendored
-  TMC Autotune
-- Icons: [Material Design Icons](https://pictogrammers.com/library/mdi/), [Z-Bolt](https://github.com/Z-Bolt/OctoScreen)
+- [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen) — 3D bed mesh
+- [coreflake1/guppyscreen](https://github.com/coreflake1/guppyscreen) (OpenKE) — the KE fork this
+  repository grew out of, see [History and credits](History-and-Credits)
+- Libraries: [LVGL](https://github.com/lvgl/lvgl), [lv_drivers](https://github.com/lvgl/lv_drivers),
+  [libhv](https://github.com/ithewei/libhv), [spdlog](https://github.com/gabime/spdlog),
+  `lv_touch_calibration` — each under its own licence
+- [Moonraker](https://github.com/Arksine/moonraker) and [Klipper](https://github.com/Klipper3d/klipper),
+  which the app talks to
+- Icons: [Material Design Icons](https://pictogrammers.com/library/mdi/)
 
-See [`docs/VENDORING.md`](../docs/VENDORING.md) for pinned commits/tags and file-level provenance of
-each vendored mod.
+The Klipper macros and add-ons the guides describe (purge and park, TMC autotune, buzzer macros) are
+part of NebulaOS-firmware and NebulaOS-klipper-extensions and carry their own credits there.
 
-Upstream documentation: <https://ballaswag.github.io/docs/guppyscreen/configuration/>
+Upstream GuppyScreen documentation: <https://ballaswag.github.io/docs/guppyscreen/configuration/>
+(written for GuppyScreen; paths and file names differ in NebulaScreen).

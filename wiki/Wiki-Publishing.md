@@ -4,9 +4,8 @@
 That folder is the source of truth — edit it in a normal pull request like any other code. GitHub's
 **Wiki tab** (`github.com/coreflake1/NebulaOS-guppyscreen/wiki`) is a *separate* git repository
 (`...NebulaOS-guppyscreen.wiki.git`), so the files have to be copied across to actually appear there.
-This mechanism (and this file) was inherited from the OpenKE fork this repo started from — the CI
-workflow below correctly self-targets this repo's own wiki (`INPUT_REPOSITORY` resolves from
-`github.context`, not a hardcoded value), it's just this doc's example URLs that needed updating.
+The workflow below publishes to this repository's own wiki (the action takes the repository from the
+workflow context).
 
 This page explains how that copy happens and the conventions to follow so it doesn't break.
 
@@ -52,9 +51,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-**Wiki edits made on `ke-next` (or any other branch) don't reach the public Wiki tab until that
-branch actually merges into `main`** — normally at the next release cut. Nothing needs to be run by
-hand; just make sure `wiki/` changes are actually included in that merge.
+**Wiki edits on any other branch don't reach the public Wiki tab until they are merged into
+`main`.** Nothing needs to be run by hand.
 
 ## Publishing — manual method (fallback only)
 

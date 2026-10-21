@@ -54,7 +54,7 @@ elsewhere, so they don't get a row.
 A fresh install has no touch calibration data, so taps are uncompensated raw coordinates. Run the
 9-tap wizard once and the touchscreen becomes accurate.
 
-**Screen:** Settings → System → **Reset Touch Calibration**
+**Screen:** Settings → Reset → **Reset touch calibration**
 
 The screen shows three crosshairs in turn — tap the centre of each **three times** (lift your finger
 between taps; the screen averages the three for accuracy). Takes about 30 seconds. The calibration is
@@ -95,7 +95,8 @@ PID_CALIBRATE HEATER=heater_bed TARGET=60
 SAVE_CONFIG
 ```
 
-If you installed the Creality macros, `PID_HOTEND` / `PID_BED` do the same.
+NebulaOS also has `PID_HOTEND` (default 230 °C) and `PID_BED` (default 65 °C), each taking an optional
+`TARGET=`; run `SAVE_CONFIG` afterwards.
 
 **Done when:** the temperature holds flat at target on the graph (< ±1 °C).
 
@@ -109,7 +110,7 @@ bed mesh hasn't fixed it.
 
 **Full guide with instructions:** [Axis Twist Compensation](Axis-Twist-Compensation)
 
-In short: **Tune → Axis Twist** on the screen runs a 5-point guided paper test across the X axis. The
+In short: **Tune → Calibration → Axis Twist** on the screen runs a 5-point guided paper test across the X axis. The
 result corrects the probe readings so the bed mesh is accurate. Takes ~15 minutes, done once.
 
 ---
@@ -124,38 +125,21 @@ moves. Redo it after changing the front-left bed corner. See [Load cell calibrat
 
 ## Step 4 — Z-Offset & Bed Mesh (the big one)
 
-This is 80% of whether prints "look good." **Tune → Calibration → Z-Offset & Bed Mesh** on the screen
-walks you through both halves in one guided flow — the recommended path, especially right after
-changing hardware (bed, nozzle, BLTouch remount):
-
-1. **Z-offset paper test** — the wizard homes fresh and runs the same manual paper-drag probe as the
-   standalone Z-offset tool: jog down in small steps until you feel light drag on a sheet of paper,
-   then Accept.
-2. **Bed mesh** — runs automatically right after, no input needed. Maps the bed's hills and valleys so
-   Z follows them everywhere, not just the centre.
+This is 80% of whether prints "look good." **Tune → Calibration → 4 Z-Offset & Bed Mesh** on the
+screen does both in one guided run (the NebulaOS workflow `NEBULAOS_AUTO_CALIBRATE`): it cleans the
+nozzle, measures the Z offset with the load cell, probes a bed mesh, and saves everything with one
+Klipper restart. It takes several minutes and the bed must be empty. Do the
+[load cell calibration](Load-Cell-Calibration) (Step 3b) first.
 
 ![Bed Mesh panel](images/bed-mesh.png)
 
-3. **Review, then save** — both new values are shown together before anything is written. From here you
-   can Save & Restart directly, or optionally try **Refine with Load Sensor** first (see below).
-
-If you installed adaptive meshing (the installer default), your slicer's `ADAPTIVE_BED_MESH_CALIBRATE`
-start G-code still re-meshes just the print footprint at the start of every print, on top of whatever
-full mesh the wizard saves — see [Adaptive Meshing](Adaptive-Print-Setup).
+If your slicer calls NebulaOS's `START_PRINT`, each print also probes a fresh mesh of just the print
+area, on top of the saved full mesh — see [Adaptive meshing](Adaptive-Print-Setup).
 
 Prefer doing it by hand, or don't want the guided flow? Both halves are still available as separate
 tools: `BED_MESH_CALIBRATE` from the console or **Tune → Bed Mesh → Calibrate** on the screen, and the
 live baby-step readout on the print-status screen or **Tune → Z Offset** (0.01–0.05 mm nudges: lines not
 fusing/gaps = too high, lines translucent/flat = too low, squished and fused with no gaps = correct).
-
-> **What about the strain-sensor auto Z-offset?** The KE's nozzle load sensor can also propose a
-> Z-offset value. Its repeatability has measured very differently across sessions — an ~83 µm/32 µm
-> stddev spread one time, a tight ~21 µm spread another — so treat any single number as printer- and
-> session-dependent, not a fixed spec. That's exactly why the wizard treats it as an optional
-> **"Refine with Load Sensor"** step after the paper test, never a replacement for it: it shows both
-> values side by side and always makes you pick — it's never auto-applied. It also self-saves internally
-> every time it runs, so the wizard snapshots your config first and can fully discard the sensor attempt
-> if you'd rather keep the paper-test value.
 
 **Done when:** the first layer is uniform with no gaps, and it stays that way print after print.
 
@@ -165,23 +149,10 @@ fusing/gaps = too high, lines translucent/flat = too low, squished and fused wit
 
 Those faint echoes trailing sharp corners are vibration. Input shaping cancels them.
 
-![Input Shaper panel](images/input-shaper.png)
-
-**On the screen:** Tune → Input Shaper. There's a switch per axis (X, Y) — leave both on to test both at
-once, or switch one off to redo just the other. There's also a **Graph** switch, off by default; turn it
-on first if you want an actual plotted curve rather than just the numeric result.
-
-1. Tap **Calibrate** — the printer shakes through a frequency sweep (~1 minute) on whichever axis
-   switches are on.
-2. Each tested axis gets an updated frequency value and a recommended shaper type in its dropdown (with
-   the plotted graph too, if you turned Graph on). You can change the dropdown yourself if you want to
-   try a different shaper.
-3. Tap **Save**.
-4. If you only tested one axis, flip the switches (this axis off, the other on) and repeat — remember to
-   move the accelerometer to the **bed** for the Y measurement, since the sensor must be on whatever
-   moves for that axis.
-
-The **Stop** button on this panel is a general emergency stop, not a "cancel this test" button.
+**On the screen:** Tune → Calibration → **5 Input Shaper** (the NebulaOS workflow
+`NEBULAOS_INPUT_SHAPER_CALIBRATE`). Have the accelerometer ready: the run measures X with it mounted on
+the toolhead, then asks you to move it to the bed for Y, and saves the result with one Klipper restart.
+**Cancel** stops the run.
 
 **Done when:** a fast corner-test print shows no echoes. If it does, try a different shaper type.
 
@@ -193,22 +164,16 @@ Fixes the *amount* of filament extruded being wrong everywhere — not the corne
 that pressure advance fixes next, but consistent over- or under-extrusion across an entire print (walls
 look thicker or thinner than sliced, single-wall prints too fat or too thin).
 
-**On the screen:** Tune → Calibration → **E-Steps Calibration**. It's a dedicated guided panel that
-walks you through the mark-extrude-measure procedure:
+**On the screen:** Tune → Calibration → **6 E-Steps Calibration** (the NebulaOS workflow
+`NEBULAOS_ESTEPS_CALIBRATE`):
 
-1. It heats the hotend (this is a direct-drive extruder, so there's no cold/disconnected test) and tells
-   you where to put a piece of tape on the filament, above where it feeds into the top of the extruder.
-2. Tap **Extrude** — it pushes a measured length through and tells you what to measure next: the gap
-   left between the extruder and your tape mark.
-3. Type the result into the on-screen keypad and tap **Apply**. It computes and saves the corrected
-   `rotation_distance` for you — no manual math or re-entering values, and no console typing needed.
-4. Run `CALIBRATE_ESTEPS` again to verify; repeat until the extruded length matches what you asked for
-   (within ~0.5 mm).
+1. The hotend heats. Mark the filament at the extruder entry.
+2. The printer extrudes a fixed length.
+3. Measure how far the mark moved and type it in. The corrected `rotation_distance` is applied for you.
 
-If you don't respond within 2 minutes at any point, it auto-cancels and cools the hotend down on its
-own — nothing sits parked hot indefinitely. If the result keeps varying between repeats rather than
-converging, that's an extruder hardware issue (skipping steps, loose grub screw, worn gears), not
-something calibration can fix.
+Repeat once to check. If the result keeps varying between runs rather than converging, that's an
+extruder hardware issue (skipping steps, loose grub screw, worn gears), not something calibration can
+fix.
 
 **Done when:** the extruded length matches what you commanded within about 0.5 mm.
 
@@ -232,7 +197,7 @@ after the first layer and motion quality are solid. Tuning these first wastes ti
   retraction problem, not pressure advance. Most slicer profiles already retract in the gcode directly,
   which this app doesn't control. If your slicer's retraction *type* is instead set to "Firmware"
   (`G10`/`G11`), you can adjust retraction length/speed live from **Tune → Retraction** — but check
-  [Retraction](Using-GuppyKE#retraction) in the screen reference first, since that panel only does
+  [Retraction](Using-NebulaScreen#retraction) in the screen reference first, since that panel only does
   anything for gcode sliced that specific way.
 - **Temperature:** print a temperature tower from your slicer's test model library and pick the layer
   that looks cleanest.
@@ -242,7 +207,7 @@ after the first layer and motion quality are solid. Tuning these first wastes ti
 ## Step 8 — Skew correction (only if parts aren't square)
 
 If functional parts come out as slight parallelograms, print a calibration square, measure three lengths
-with calipers, and enter them on the screen: **Tune → Skew**. Full guide: [Skew Correction](Skew-Correction).
+with calipers, and enter them on the screen: **Tune → Calibration → Skew Correction**. Full guide: [Skew Correction](Skew-Correction).
 
 **Done when:** a measured test square matches the expected dimensions on both diagonals.
 
@@ -250,11 +215,11 @@ with calipers, and enter them on the screen: **Tune → Skew**. Full guide: [Ske
 
 ## Step 9 — TMC Autotune (optional)
 
-Quieter, cooler stepper motors. **Tune → TMC Autotune** — select your motor type, choose Performance or
-Silent, tap **Save/Restart**. It tunes the stepper drivers and reapplies the settings every boot. Doesn't affect
+Quieter, cooler stepper motors. **Tune → Calibration → TMC Autotune** — select your motor type, choose a
+tuning goal, tap **Save/Restart**. It tunes the stepper drivers and reapplies the settings every boot. Doesn't affect
 print quality or dimensions, just reduces noise and heat.
 
-See [TMC Autotune](TMC-Autotune) for the full guide and how to enable the greyed-out button.
+See [TMC Autotune](TMC-Autotune) for the full guide.
 
 ---
 

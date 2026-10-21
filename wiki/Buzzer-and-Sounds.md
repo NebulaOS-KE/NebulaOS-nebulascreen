@@ -1,7 +1,7 @@
 # Beeps & Songs (the Buzzer)
 
 Your Ender-3 V3 KE has a small buzzer on the board. Stock firmware only ever used it for one fixed,
-loud beep. OpenKE drives it with **hardware PWM** instead, so it can play **any pitch, any length, and
+loud beep. NebulaOS drives it with **hardware PWM** instead, so it can play **any pitch, any length, and
 full melodies** — and it does so with **zero CPU load**, which means it's safe even in the middle of a
 print.
 
@@ -11,11 +11,10 @@ There are three things this gives you:
 2. **`M300` beeps** with real pitch and duration (the standard slicer "beep" command).
 3. **`PLAY_TUNE` songs** — built-in tunes, plus your own, kept in an editable file.
 
-> **Upgraded from before `v1.1.0-OpenKE` and don't see `M300`/`PLAY_TUNE`?** These commands and the
-> default song list install into your Klipper config, which the on-screen **Update Guppy** button doesn't
-> touch — so **re-run the [installer](Installation)** once (safe, keeps your config) and they'll appear.
-> This is a one-time step only for that upgrade; **fresh installs already have everything**, and from
-> `v1.1.0-OpenKE` onward it's automatic. See [Upgrading](Upgrading) for details.
+The `M300`, `BEEP` and `PLAY_TUNE` macros are part of the NebulaOS Klipper config
+(`/etc/nebulaos/klipper/beeper.cfg`). They run `nebulabeep`, the buzzer player built from this
+repository (`k1/k1_mods/buzzer/guppybeep.c`) and installed as `/opt/nebulascreen/nebulabeep`. The old
+shell-command name `guppybeep` still works for your own macros.
 
 ---
 
@@ -23,7 +22,7 @@ There are three things this gives you:
 
 A quiet, low "tick" on every button tap — like a phone's touchscreen feedback.
 
-- **Turn it on/off:** **Settings → System → Touch Beep**. (Default is **off**.)
+- **Turn it on/off:** **Settings → Display → Touch beep**. (Default is **off**.)
 - It only clicks on real taps, not when you scroll or drag.
 - It's deliberately soft and low — not the old loud beep. Nothing to configure; flip it on and it just
   works.
@@ -68,7 +67,7 @@ These names come from a plain text file you can edit (see below). Great for a "p
 Songs live in:
 
 ```
-/usr/data/printer_data/config/songs.conf
+/opt/printer_data/config/songs.conf
 ```
 
 That's in the same config folder you already see in **Mainsail/Fluidd's file manager**, so you can edit
@@ -87,8 +86,8 @@ recompiling, no reflashing.
 
 Two things worth knowing:
 
-- **Your songs survive updates.** Reinstalling or updating OpenKE only creates `songs.conf` if it's
-  missing — it never overwrites the one you've edited.
+- **Your songs survive updates.** NebulaOS only creates `songs.conf` if it's missing — a NebulaOS
+  update never overwrites the one you've edited.
 - **Use normal `#` sharps here.** In `songs.conf` you can paste RTTTL exactly as found online
   (`a#`, `f#`, …). The buzzer player reads this file directly, so the sharps come through fine.
 

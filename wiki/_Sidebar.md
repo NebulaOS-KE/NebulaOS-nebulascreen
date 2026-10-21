@@ -1,9 +1,8 @@
-### 🖨️ OpenKE
+### 🖨️ NebulaScreen
 
 **Get started**
 - [Home](Home)
-- [Install OpenKE](Installation)
-- [Upgrade from older version](Upgrading)
+- [Installation and updates](Installation)
 
 **Get great prints**
 - [Calibration walkthrough (A→Z)](Calibration-Explained)
@@ -15,14 +14,12 @@
 - [Quieter steppers (TMC Autotune)](TMC-Autotune)
 
 **Using the screen**
-- [Screen reference (every setting)](Using-GuppyKE)
+- [Screen reference (every setting)](Using-NebulaScreen)
 - [Beeps & songs (buzzer)](Buzzer-and-Sounds)
-- [Camera image tuning](Camera-Image-Tuning)
 
 **Help**
 - [Troubleshooting](Troubleshooting)
-- [Resetting & uninstalling](Resetting-and-Uninstalling)
-- [Emergency factory reset (dead screen/SSH)](Emergency-Factory-Reset)
+- [Resetting](Resetting)
 
 ---
 ### 🛠️ Developers
@@ -31,13 +28,13 @@
 - [Architecture](Architecture)
 - [Configuration](Configuration)
 - [Releases & deployment](Releases-and-Deployment)
+- [Testing](Testing)
+- [CI](CI)
 - [Contributing](Contributing)
 - [Publishing this wiki](Wiki-Publishing)
 
-**NebulaOS-specific**
-- [OpenKE relationship](OpenKE-Relationship)
+**NebulaOS**
 - [Integration with NebulaOS](Integration-with-NebulaOS)
-- [CI](CI)
-- [Testing](Testing)
 - [Config and theme](Config-and-Theme)
 - [Vendored dependencies](Vendored-Dependencies)
+- [History and credits](History-and-Credits)

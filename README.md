@@ -64,11 +64,9 @@ for the pin history.
 
 ## Documentation
 
-Developer docs live in [`wiki/`](wiki/) and [`DEVELOPMENT.md`](DEVELOPMENT.md). Heads up: a chunk of
-`wiki/` (installation, upgrading, troubleshooting) is inherited from this fork's OpenKE history and
-still describes OpenKE's own SSH-installer setup on stock firmware, not how NebulaOS actually builds
-or deploys this. For NebulaOS build/install instructions, start at
-[`NebulaOS-firmware`](https://github.com/coreflake1/NebulaOS-firmware) instead.
+Developer and user docs live in [`wiki/`](wiki/) and [`DEVELOPMENT.md`](DEVELOPMENT.md). The wiki
+describes NebulaScreen as it ships inside NebulaOS; for building and installing NebulaOS itself, start
+at [`NebulaOS-firmware`](https://github.com/coreflake1/NebulaOS-firmware).
 
 ## License & credits
 

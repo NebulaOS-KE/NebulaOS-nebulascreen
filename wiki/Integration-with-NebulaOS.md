@@ -1,17 +1,26 @@
 # Integration with NebulaOS
 
-NebulaOS doesn't consume GuppyScreen through a separate release/tag/installer flow the way OpenKE
-does (see [OpenKE Relationship](OpenKE-Relationship)). Instead,
 [`NebulaOS-firmware`](https://github.com/coreflake1/NebulaOS-firmware) pins an exact commit of this
-repo and its build pipeline fetches, cross-compiles, and installs it automatically as one stage of
-the full OS image — see
-[Build From Source](https://github.com/coreflake1/NebulaOS-firmware/wiki/Build-From-Source). You
-never need to clone or build this repo directly to build NebulaOS.
+repository in `manifests/dependencies.conf`. Its image build fetches that commit, applies the submodule
+patches, cross-compiles it with this repository's `scripts/build-release.sh` (the same recipe the
+release CI uses) and installs the result read-only under `/opt/nebulascreen`. You do not need to clone
+or build this repository to build NebulaOS. Note that the pinned commit is not necessarily this
+repository's newest commit.
 
-Every real NebulaOS build records this repo's exact commit in `build-manifest.txt` — see
-[Build Provenance](https://github.com/coreflake1/NebulaOS-firmware/wiki/Build-Provenance).
+Every NebulaOS build records the exact commit it used in its build manifest.
 
-Also worth knowing: config and theme actually persist now on NebulaOS's read-only-squashfs setup —
-see [Config and Theme](Config-and-Theme) for the fix and how we confirmed it on real hardware.
+What the image provides around the app:
 
-See also: [CI](CI), [Vendored Dependencies](Vendored-Dependencies).
+- The service script `/etc/init.d/S58nebulascreen`, started after Klipper and Moonraker.
+- The persistent settings file and its bind mounts, plus the default copy in
+  `/usr/share/nebulaos/nebulascreen/` (see [Config and theme](Config-and-Theme)).
+- The `machine.nebulaos.*` Moonraker methods the Settings pages use, and the Klipper extensions behind
+  the guided calibrations, power-loss recovery and TMC autotune.
+- `/opt/nebulaos-version.json` with the `nebulaos_ui_api` level; NebulaScreen refuses to start when
+  the level does not match its own (currently 1).
+
+A NebulaScreen release zip can also run on top of the image, see
+[Releases and deployment](Releases-and-Deployment).
+
+See also: [CI](CI), [Vendored dependencies](Vendored-Dependencies),
+[History and credits](History-and-Credits).
