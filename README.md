@@ -1,6 +1,6 @@
-# NebulaOS GuppyScreen
+# NebulaScreen
 
-This is NebulaOS's touchscreen UI — a KE-focused fork of
+NebulaScreen is NebulaOS's touchscreen UI — a KE-focused fork of
 [GuppyScreen](https://github.com/ballaswag/guppyscreen). Full print control, an interactive 3D bed
 mesh, an on-screen calibration suite, running right on the printer's display with no X11, Wayland,
 or display server involved.
@@ -32,7 +32,7 @@ Two different workflows depending on what you're doing.
 commit of this repo and cross-compiles + installs it automatically as part of the full image. You
 don't need to clone this repo directly for that.
 
-**If you're actually developing GuppyScreen itself:**
+**If you're actually developing NebulaScreen itself:**
 
 ```bash
 git clone --recurse-submodules https://github.com/coreflake1/NebulaOS-guppyscreen.git
