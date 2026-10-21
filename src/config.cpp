@@ -3,8 +3,10 @@
 #include "platform.h"
 
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <fstream>
-#include <iomanip>
+#include <sstream>
 #include <experimental/filesystem>
 
 namespace fs = std::experimental::filesystem;
@@ -12,6 +14,62 @@ namespace fs = std::experimental::filesystem;
 Config *Config::instance{NULL};
 
 Config::Config() {
+}
+
+namespace {
+
+// Writes text to path and fsyncs it. truncate=false keeps the file (and its
+// inode) and cuts it to the new length after writing - the config is a bind
+// mount, and a bind mount keeps pointing at the inode it was made with.
+bool write_synced(const std::string &path, const std::string &text, bool truncate) {
+  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC | (truncate ? O_TRUNC : 0), 0644);
+  if (fd < 0) {
+    return false;
+  }
+  size_t done = 0;
+  while (done < text.size()) {
+    ssize_t n = write(fd, text.data() + done, text.size() - done);
+    if (n <= 0) {
+      close(fd);
+      return false;
+    }
+    done += n;
+  }
+  bool ok = ftruncate(fd, text.size()) == 0 && fsync(fd) == 0;
+  return close(fd) == 0 && ok;
+}
+
+}  // namespace
+
+std::string Config::journal_for(const std::string &config_path) {
+  return config_path == nebulascreen::kConfigPath ? std::string(nebulascreen::kConfigJournal)
+                                                  : config_path + ".saving";
+}
+
+// A journal left by save() means the last save was interrupted (power cut).
+// A complete journal is the newest config: put it back in place. An
+// incomplete one means the config itself was never touched: drop it.
+void Config::recover_interrupted_save() {
+  struct stat st;
+  if (stat(journal_path.c_str(), &st) != 0) {
+    return;
+  }
+  std::ifstream in(journal_path);
+  std::stringstream text;
+  text << in.rdbuf();
+  bool complete = false;
+  try {
+    complete = json::parse(text.str()).is_object();
+  } catch (const json::parse_error &) {
+  }
+  if (complete && write_synced(path, text.str(), false)) {
+    spdlog::warn("config: restored {} from the journal of an interrupted save", path);
+  } else if (!complete) {
+    spdlog::warn("config: dropped an incomplete save journal; {} is unchanged", path);
+  } else {
+    return;  // keep the journal for the next start
+  }
+  unlink(journal_path.c_str());
 }
 
 Config *Config::get_instance() {
@@ -23,6 +81,8 @@ Config *Config::get_instance() {
 
 void Config::init(std::string config_path, const std::string thumbdir) {
   path = config_path;
+  journal_path = journal_for(config_path);
+  recover_interrupted_save();
   struct stat buffer;
   json fans_conf = {
     {
@@ -227,8 +287,7 @@ void Config::init(std::string config_path, const std::string thumbdir) {
     data["/invert_z_ke_default_applied"_json_pointer] = true;
   }
 
-  std::ofstream o(config_path);
-  o << std::setw(2) << data << std::endl;
+  save();
 }
 
 std::string& Config::df() {
@@ -247,7 +306,20 @@ json &Config::get_json(const std::string &json_path) {
   return data[json::json_pointer(json_path)];
 }
 
+// Power-cut safe: the journal first (a complete copy, synced), then the
+// config in place, then the journal goes. Without a writable journal
+// directory (simulator) the config is still written, as before.
 void Config::save() {
-  std::ofstream o(path);
-  o << std::setw(2) << data << std::endl;
+  const std::string text = data.dump(2) + "\n";
+  bool journaled = write_synced(journal_path, text, true);
+  if (!journaled) {
+    spdlog::warn("config: could not write the save journal {}", journal_path);
+  }
+  if (!write_synced(path, text, false)) {
+    spdlog::error("config: could not save {}", path);
+    return;
+  }
+  if (journaled) {
+    unlink(journal_path.c_str());
+  }
 }

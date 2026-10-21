@@ -129,6 +129,73 @@ TEST(ThemeParseSafety, malformed_theme_write_back_is_best_effort_and_does_not_th
   ASSERT_TRUE(content.find("0x2196F3") != std::string::npos);
 }
 
+// --- power-cut safe save (journal, then in place) -----------------------
+
+std::string read_file(const std::string &path) {
+  std::ifstream f(path);
+  return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+}
+
+bool exists(const std::string &path) {
+  struct stat st;
+  return stat(path.c_str(), &st) == 0;
+}
+
+TEST(ConfigSave, save_round_trips_and_leaves_no_journal) {
+  auto dir = make_tmpdir();
+  std::string cfg = dir + "/nebulascreen.json";
+  Config c;
+  c.init(cfg, dir + "/thumbnails");
+  c.set<int>("/display_sleep_sec", 123);
+  c.save();
+  ASSERT_TRUE(!exists(Config::journal_for(cfg)));
+  Config d;
+  d.init(cfg, dir + "/thumbnails");
+  ASSERT_EQ(d.get_json("/display_sleep_sec").get<int>(), 123);
+}
+
+TEST(ConfigSave, save_keeps_the_inode_a_bind_mount_points_at) {
+  auto dir = make_tmpdir();
+  std::string cfg = dir + "/nebulascreen.json";
+  write_file(cfg, "{\"display_sleep_sec\": 1, \"padding\": \"a long value to be shortened\"}");
+  struct stat before, after;
+  ASSERT_EQ(stat(cfg.c_str(), &before), 0);
+  Config c;
+  c.init(cfg, dir + "/thumbnails");
+  c.get_json("").erase("padding");
+  c.save();
+  ASSERT_EQ(stat(cfg.c_str(), &after), 0);
+  ASSERT_TRUE(before.st_ino == after.st_ino);
+  ASSERT_TRUE(json::parse(read_file(cfg)).is_object());  // shorter content, cut cleanly
+}
+
+TEST(ConfigSave, interrupted_in_place_write_is_restored_from_the_journal) {
+  auto dir = make_tmpdir();
+  std::string cfg = dir + "/nebulascreen.json";
+  write_file(Config::journal_for(cfg), "{\"display_sleep_sec\": 77}");
+  write_file(cfg, "{\"display_sleep_sec\": 7");  // cut off mid-write
+  Config c;
+  c.init(cfg, dir + "/thumbnails");
+  ASSERT_EQ(c.get_json("/display_sleep_sec").get<int>(), 77);
+  ASSERT_TRUE(!exists(Config::journal_for(cfg)));
+}
+
+TEST(ConfigSave, interrupted_journal_write_leaves_the_config_alone) {
+  auto dir = make_tmpdir();
+  std::string cfg = dir + "/nebulascreen.json";
+  write_file(cfg, "{\"display_sleep_sec\": 55}");
+  write_file(Config::journal_for(cfg), "{\"display_sl");  // cut off
+  Config c;
+  c.init(cfg, dir + "/thumbnails");
+  ASSERT_EQ(c.get_json("/display_sleep_sec").get<int>(), 55);
+  ASSERT_TRUE(!exists(Config::journal_for(cfg)));
+}
+
+TEST(ConfigSave, the_device_journal_lives_beside_the_real_file) {
+  ASSERT_EQ(Config::journal_for(nebulascreen::kConfigPath),
+            std::string("/usr/data/nebulaos/nebulascreen/nebulascreen.json.saving"));
+}
+
 int main() {
   return minitest::run_all("config_theme_parse_safety") > 0 ? 1 : 0;
 }

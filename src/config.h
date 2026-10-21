@@ -12,6 +12,9 @@ class Config {
  private:
   static Config *instance;
   std::string path;
+  // A complete copy written before the config itself is rewritten (save()).
+  std::string journal_path;
+  void recover_interrupted_save();
 
  protected:
   json data;
@@ -39,6 +42,9 @@ class Config {
   std::string get_path();
 
   static Config *get_instance();
+
+  // Where save() keeps its journal for config_path.
+  static std::string journal_for(const std::string &config_path);
 
 };
 

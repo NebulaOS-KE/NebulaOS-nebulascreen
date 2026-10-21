@@ -19,6 +19,11 @@ constexpr const char *kProductName = "NebulaScreen";
 constexpr const char *kService = "nebulascreen";
 constexpr const char *kConfigFile = "nebulascreen.json";
 constexpr const char *kConfigPath = "/opt/nebulascreen/nebulascreen.json";
+// kConfigPath is a single-file bind mount of the persistent file (S01), so a
+// save cannot rename a new file over it. Config::save() first writes this
+// complete copy next to the real file, then rewrites the config in place.
+constexpr const char *kConfigJournal =
+  "/usr/data/nebulaos/nebulascreen/nebulascreen.json.saving";
 constexpr const char *kDefaultConfig =
   "/usr/share/nebulaos/nebulascreen/nebulascreen.default.json";
 constexpr const char *kInitScript = "/etc/init.d/S58nebulascreen";
