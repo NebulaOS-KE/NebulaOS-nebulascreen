@@ -18,8 +18,10 @@
 #include "minitest.h"
 #include "../src/config.h"
 #include "../src/theme.h"
+#include "../src/nebulascreen_paths.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <string>
 #include <sys/stat.h>
@@ -27,8 +29,9 @@
 namespace {
 
 std::string make_tmpdir() {
-  char tmpl[] = "/tmp/guppyscreen_config_test_XXXXXX";
-  char *dir = mkdtemp(tmpl);
+  const char *base = getenv("TMPDIR");
+  std::string tmpl = std::string(base && *base ? base : "/tmp") + "/nebulascreen_config_test_XXXXXX";
+  char *dir = mkdtemp(&tmpl[0]);
   ASSERT_TRUE(dir != nullptr);
   return std::string(dir);
 }
@@ -42,7 +45,7 @@ void write_file(const std::string &path, const std::string &content) {
 
 TEST(ConfigParseSafety, malformed_config_falls_back_to_defaults_not_crash) {
   auto dir = make_tmpdir();
-  std::string cfg = dir + "/guppyconfig.json";
+  std::string cfg = dir + "/nebulascreen.json";
   // Present (stat() succeeds) but not valid JSON - exactly what an
   // open-mode-rejected fstream read (or any other partial/failed read)
   // looks like to json::parse: non-empty stat, empty-or-garbage content.
@@ -52,22 +55,24 @@ TEST(ConfigParseSafety, malformed_config_falls_back_to_defaults_not_crash) {
   // Must not throw - this is the actual regression: it used to.
   c.init(cfg, dir + "/thumbnails");
 
-  // Falls back to the exact same defaults used for "file doesn't exist".
-  ASSERT_TRUE(c.get_json("/wpa_supplicant").is_string());
-  ASSERT_EQ(c.get_json("/wpa_supplicant").get<std::string>(), std::string("/var/run/wpa_supplicant"));
+  // Falls back to the exact same defaults used for "file doesn't exist"
+  // (wpa_supplicant was dropped from them with the Wi-Fi code, Q4).
+  ASSERT_TRUE(c.get_json("/display_sleep_sec").is_number());
+  ASSERT_EQ(c.get_json("/display_sleep_sec").get<int>(), 600);
+  ASSERT_EQ(c.get_json("/log_path").get<std::string>(), std::string(nebulascreen::kLogPath));
 }
 
 TEST(ConfigParseSafety, well_formed_config_still_parses_normally) {
   // Confirms the fix didn't disable the success path - only the failure
   // path changed.
   auto dir = make_tmpdir();
-  std::string cfg = dir + "/guppyconfig.json";
-  write_file(cfg, "{\"wpa_supplicant\": \"/custom/path\"}");
+  std::string cfg = dir + "/nebulascreen.json";
+  write_file(cfg, "{\"display_sleep_sec\": 42}");
 
   Config c;
   c.init(cfg, dir + "/thumbnails");
 
-  ASSERT_EQ(c.get_json("/wpa_supplicant").get<std::string>(), std::string("/custom/path"));
+  ASSERT_EQ(c.get_json("/display_sleep_sec").get<int>(), 42);
 }
 
 TEST(ConfigParseSafety, missing_config_still_uses_defaults_unaffected_by_fix) {
@@ -77,7 +82,7 @@ TEST(ConfigParseSafety, missing_config_still_uses_defaults_unaffected_by_fix) {
   Config c;
   c.init(cfg, dir + "/thumbnails");
 
-  ASSERT_EQ(c.get_json("/wpa_supplicant").get<std::string>(), std::string("/var/run/wpa_supplicant"));
+  ASSERT_EQ(c.get_json("/display_sleep_sec").get<int>(), 600);
 }
 
 TEST(ThemeParseSafety, malformed_theme_falls_back_to_default_blue_not_crash) {
