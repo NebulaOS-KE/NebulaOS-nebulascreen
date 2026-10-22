@@ -19,6 +19,10 @@ FilePanel::FilePanel(lv_obj_t *parent)
   , fname_label(lv_label_create(file_cont))
   , detail_label(lv_label_create(file_cont))
 {
+  // G94: empty until a file is picked (LVGL's default is "Text")
+  lv_label_set_text(fname_label, "");
+  lv_label_set_text(detail_label, "");
+
   // Setup main container
   lv_obj_set_size(file_cont, LV_PCT(100), LV_PCT(100));
   lv_obj_clear_flag(file_cont, LV_OBJ_FLAG_SCROLLABLE);

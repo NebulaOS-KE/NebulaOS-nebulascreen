@@ -38,7 +38,7 @@ FineTunePanel::FineTunePanel(KWebSocketClient &websocket_client, std::mutex &l)
   , back_btn(panel_cont, &back, "Back", &FineTunePanel::_handle_callback, this)
   , zoffset_selector(panel_cont, "Z (mm) - PA (mm/s)",
     {"0.01", "0.05", "0.10", ""}, 0, 30, 15, &FineTunePanel::_handle_callback, this)
-  , multipler_selector(panel_cont, "Multipler Step (%)",
+  , multipler_selector(panel_cont, "Multiplier Step (%)",
     {"1", "5", "10", "25", ""}, 0, 40, 15, &FineTunePanel::_handle_callback, this)
   , z_offset(values_cont, &home_z, 100, 100, 15, "0.0 mm")
   , pa(values_cont, &pa_plus_img, 100, 100, 15, "0.0 mm/s")

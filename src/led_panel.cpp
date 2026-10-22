@@ -29,6 +29,11 @@ LedPanel::LedPanel(KWebSocketClient &websocket_client, std::mutex &lock)
 
     lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
 
+    // G94: an empty page said nothing at all
+    empty_label = lv_label_create(ledpanel_cont);
+    lv_label_set_text(empty_label, "No LEDs or lights are set up in Klipper.");
+    lv_obj_center(empty_label);
+
     ws.register_notify_update(this);
 }
 
@@ -133,6 +138,11 @@ void LedPanel::foreground() {
     }
   }
 
+  if (leds.empty()) {
+    lv_obj_clear_flag(empty_label, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_obj_add_flag(empty_label, LV_OBJ_FLAG_HIDDEN);
+  }
   lv_obj_move_foreground(ledpanel_cont);
 }
 

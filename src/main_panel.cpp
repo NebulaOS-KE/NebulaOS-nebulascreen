@@ -675,7 +675,8 @@ void MainPanel::sim_tour(const char *dir) {
   st({{"toolhead", {{"homed_axes", "xyz"}}}, {"print_stats", {{"state", "standby"}}},
       {"nebulaos_z_adjust", {{"value", -0.04}, {"applied", true}}},
       {"configfile", {{"settings", {{"axis_twist_compensation", {{"calibrate_start_x", 20}}},
-                                    {"skew_correction", {{"enabled", true}}}}}}}});
+                                    }},
+                         {"config", {{"skew_correction", json::object()}}}}}});
   auto tab = [this](lv_obj_t *t) {
     lv_tabview_set_act(tabview, lv_obj_get_index(t), LV_ANIM_OFF);
     lv_obj_move_foreground(tabview);

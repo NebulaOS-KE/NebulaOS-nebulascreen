@@ -44,6 +44,7 @@ class LedPanel : public NotifyConsumer {
   KWebSocketClient &ws;
   lv_obj_t *ledpanel_cont;
   lv_obj_t *leds_cont;
+  lv_obj_t *empty_label;   // G94: shown when Klipper has no LEDs/lights
   std::map<std::string, std::shared_ptr<SliderContainer>> leds;
   ButtonContainer back_btn;
 

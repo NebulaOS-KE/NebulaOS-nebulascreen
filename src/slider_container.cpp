@@ -100,6 +100,9 @@ SliderContainer::SliderContainer(lv_obj_t *parent,
 
   lv_obj_align(slider, LV_ALIGN_CENTER, 0, 0);
   lv_obj_set_width(slider, LV_PCT(100));
+  // G94: no LVGL default "Text" (showed as a clipped "xt" under Limits) until
+  // the first value arrives
+  lv_label_set_text(slider_value, "");
   lv_obj_align_to(slider_value, slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 
   if (max_text == NULL) {
