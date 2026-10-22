@@ -29,7 +29,7 @@ HomingPanel::HomingPanel(KWebSocketClient &websocket_client, std::mutex &lock)
   , z_up_btn(homing_cont, &z_closer, "Z+", &HomingPanel::_handle_callback, this)
   , z_down_btn(homing_cont, &z_farther, "Z-", &HomingPanel::_handle_callback, this)
   , emergency_btn(homing_cont, &emergency, "Stop", &HomingPanel::_handle_callback, this,
-    "Do you want to emergency stop?",
+    ButtonContainer::ESTOP_PROMPT,
     [&websocket_client]() {
       spdlog::debug("emergency stop pressed");
       websocket_client.send_jsonrpc("printer.emergency_stop");

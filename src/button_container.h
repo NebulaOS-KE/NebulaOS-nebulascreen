@@ -31,6 +31,11 @@ class ButtonContainer {
 
   void handle_prompt();
   void run_callback();
+  bool asks_now() const;
+
+  // The emergency stop buttons' prompt; skipped when "Ask before emergency
+  // stop" is off (read at tap time).
+  static const char *const ESTOP_PROMPT;
   
   static void _handle_callback(lv_event_t *event) {
     ButtonContainer *button_container = (ButtonContainer*)event->user_data;

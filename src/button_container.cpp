@@ -3,6 +3,8 @@
 #include "utils.h"
 #include "spdlog/spdlog.h"
 
+const char *const ButtonContainer::ESTOP_PROMPT = "Do you want to emergency stop?";
+
 ButtonContainer::ButtonContainer(lv_obj_t *parent,
   const void *btn_img,
   const char *text,
@@ -36,29 +38,24 @@ ButtonContainer::ButtonContainer(lv_obj_t *parent,
   lv_obj_add_flag(btn, LV_OBJ_FLAG_EVENT_BUBBLE);
   // lv_obj_add_flag(btn_cont, LV_OBJ_FLAG_EVENT_BUBBLE);
 
-  Config *conf = Config::get_instance();
-  auto estop = conf->get_json("/prompt_emergency_stop");
-  auto prompt_estop = estop.is_null() ? false : estop.template get<bool>();
-
   if (cb != NULL && !pcb) {
     lv_obj_add_event_cb(btn_cont, &ButtonContainer::_handle_callback, LV_EVENT_PRESSED, this);
     lv_obj_add_event_cb(btn_cont, &ButtonContainer::_handle_callback, LV_EVENT_RELEASED, this);
 
     lv_obj_add_event_cb(btn_cont, cb, LV_EVENT_CLICKED, user_data);
   } else if (cb != NULL && pcb) {
-    if (prompt_text == "Do you want to emergency stop?" && !prompt_estop) {
-      lv_obj_add_event_cb(btn_cont, &ButtonContainer::_handle_callback, LV_EVENT_PRESSED, this);
-      lv_obj_add_event_cb(btn_cont, &ButtonContainer::_handle_callback, LV_EVENT_RELEASED, this);
-
-      lv_obj_add_event_cb(btn_cont, cb, LV_EVENT_CLICKED, user_data);
-    } else {
-      lv_obj_add_event_cb(btn_cont, [](lv_event_t *e) {
-        lv_event_code_t code = lv_event_get_code(e);
-        if (code == LV_EVENT_CLICKED) {
-          ((ButtonContainer *)e->user_data)->handle_prompt();
-        }
-        }, LV_EVENT_CLICKED, this);
-    }
+    // Run 17: "Ask before emergency stop" is read when the button is tapped,
+    // so a change in Settings > Printer applies at once (no screen restart).
+    lv_obj_add_event_cb(btn_cont, &ButtonContainer::_handle_callback, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(btn_cont, &ButtonContainer::_handle_callback, LV_EVENT_RELEASED, this);
+    lv_obj_add_event_cb(btn_cont, [](lv_event_t *e) {
+      auto *self = (ButtonContainer *)e->user_data;
+      if (self->asks_now()) {
+        self->handle_prompt();
+      } else {
+        self->run_callback();
+      }
+    }, LV_EVENT_CLICKED, this);
   }
 
   lv_label_set_text(label, text);
@@ -169,6 +166,16 @@ void ButtonContainer::handle_prompt() {
   }, LV_EVENT_VALUE_CHANGED, this);
 
   lv_obj_center(mbox1);
+}
+
+// Every prompt asks, except the emergency stop's when "Ask before emergency
+// stop" is off (Config default: on).
+bool ButtonContainer::asks_now() const {
+  if (prompt_text != ESTOP_PROMPT) {
+    return true;
+  }
+  auto estop = Config::get_instance()->get_json("/prompt_emergency_stop");
+  return estop.is_boolean() ? estop.template get<bool>() : true;
 }
 
 void ButtonContainer::run_callback() {

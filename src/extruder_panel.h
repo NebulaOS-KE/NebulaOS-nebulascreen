@@ -16,6 +16,7 @@ class ExtruderPanel : public NotifyConsumer {
   ~ExtruderPanel();
 
   void foreground();
+  void apply_default_temp();
   void enable_spoolman();
   void consume(json &j);
   void handle_callback(lv_event_t *e);
@@ -43,6 +44,7 @@ class ExtruderPanel : public NotifyConsumer {
   SpoolmanPanel &spoolman_panel;
   SensorContainer extruder_temp;
   Selector temp_selector;
+  int applied_default_temp = -1;  // last "Default extruder temp" put into temp_selector
   Selector length_selector;
   Selector speed_selector;
   lv_obj_t *rightside_btns_cont;

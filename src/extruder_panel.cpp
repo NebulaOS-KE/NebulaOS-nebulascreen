@@ -193,17 +193,7 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
 
   ws.register_notify_update(this);
 
-  auto def_ext_temp_v = conf->get_json("/default_extruder_temp");
-  if (!def_ext_temp_v.is_null()) {
-    int def_temp = def_ext_temp_v.template get<int>();
-    int temps[] = {180, 200, 220, 240, 260, 280, 300};
-    for (int i = 0; i < 7; i++) {
-      if (temps[i] == def_temp) {
-        temp_selector.set_selected_idx(i);
-        break;
-      }
-    }
-  }
+  apply_default_temp();
 
   build_filament_dialog();
 }
@@ -221,7 +211,30 @@ ExtruderPanel::~ExtruderPanel() {
 }
 
 void ExtruderPanel::foreground() {
+  apply_default_temp();
   lv_obj_move_foreground(panel_cont);
+}
+
+// "Default extruder temp" (Settings > Printer), re-read every time the panel is
+// shown so a change applies at once. Only a changed default moves the
+// selector: a temperature picked here by hand stays until the default changes.
+void ExtruderPanel::apply_default_temp() {
+  auto v = Config::get_instance()->get_json("/default_extruder_temp");
+  if (!v.is_number_integer()) {
+    return;
+  }
+  int def_temp = v.template get<int>();
+  if (def_temp == applied_default_temp) {
+    return;
+  }
+  static const int temps[] = {180, 200, 220, 240, 260, 280, 300};
+  for (int i = 0; i < 7; i++) {
+    if (temps[i] == def_temp) {
+      temp_selector.set_selected_idx(i);
+      applied_default_temp = def_temp;
+      break;
+    }
+  }
 }
 
 void ExtruderPanel::enable_spoolman() {

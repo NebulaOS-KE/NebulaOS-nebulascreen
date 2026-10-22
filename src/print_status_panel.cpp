@@ -43,7 +43,7 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   , resume_btn(buttons_cont, &resume, "Resume", &PrintStatusPanel::_handle_callback, this)
   , cancel_btn(buttons_cont, &cancel, "Cancel", &PrintStatusPanel::_handle_callback, this)
   , emergency_btn(buttons_cont, &emergency, "Stop", &PrintStatusPanel::_handle_callback, this,
-		  "Do you want to emergency stop?",
+		  ButtonContainer::ESTOP_PROMPT,
 		  [&websocket_client]() {
 		    spdlog::debug("emergency stop pressed");
 		    websocket_client.send_jsonrpc("printer.emergency_stop");
