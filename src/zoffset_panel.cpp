@@ -2,6 +2,7 @@
 #include "state.h"
 #include "spdlog/spdlog.h"
 #include "utils.h"
+#include "nebulaos_z_adjust.h"
 
 ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
   : NotifyConsumer(l)
@@ -45,9 +46,13 @@ ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
 
   lv_obj_set_width(step_selector.get_container(), LV_PCT(94));
 
-  // the Helper Script's Save Z-Offset macros persist every adjustment to
-  // variables.cfg automatically, so there is no Save button - just say so.
-  lv_label_set_text(auto_save_hint, LV_SYMBOL_OK "  Adjustments are saved automatically");
+  // G92: NebulaOS saves every adjustment (nebulaos_z_adjust), so there is no
+  // Save button. The line says what NebulaOS reports - and nothing with older
+  // extensions, where the adjustment is only kept until Klipper restarts.
+  lv_label_set_text(auto_save_hint, "");
+  lv_obj_set_width(auto_save_hint, LV_PCT(94));
+  lv_label_set_long_mode(auto_save_hint, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_align(auto_save_hint, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(auto_save_hint, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(auto_save_hint, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
 
@@ -100,11 +105,31 @@ void ZOffsetPanel::update_value(double z) {
   lv_label_set_text(value_label, fmt::format("{:.3f} mm", z).c_str());
 }
 
+// Asked at use time: the object list is re-read on every (re)connect, and an
+// extensions update can add the object.
+bool ZOffsetPanel::saved_adjust() {
+  return z_adjust_available(State::get_instance()->get_data("/printer_objs/objects"_json_pointer));
+}
+
+void ZOffsetPanel::update_saved_text() {
+  auto st = State::get_instance()->get_data("/printer_state/nebulaos_z_adjust"_json_pointer);
+  std::string text = z_adjust_text(saved_adjust(), st);
+  if (text.empty()) {
+    lv_obj_add_flag(auto_save_hint, LV_OBJ_FLAG_HIDDEN);
+    return;
+  }
+  bool ok = text.find("NOT saved") == std::string::npos;
+  lv_label_set_text(auto_save_hint, ((ok ? LV_SYMBOL_OK "  " : LV_SYMBOL_WARNING "  ") + text).c_str());
+  lv_obj_set_style_text_color(auto_save_hint,
+    ok ? lv_palette_lighten(LV_PALETTE_GREY, 1) : lv_palette_main(LV_PALETTE_ORANGE), 0);
+  lv_obj_clear_flag(auto_save_hint, LV_OBJ_FLAG_HIDDEN);
+}
+
 void ZOffsetPanel::apply_step(bool raise) {
-  // SET_GCODE_OFFSET ... MOVE=1 needs a homed axis: unhomed, Klipper still sets
-  // the offset (the readout would change) but the move fails and the Helper
-  // Script's save macro aborts before SAVE_VARIABLE - so it'd be applied live,
-  // not moved, and never saved. Guard before sending so the three never drift.
+  // The adjustment moves the nozzle (MOVE=1), which needs a homed axis:
+  // unhomed, Klipper would still set the offset (the readout would change) but
+  // the move fails. Guard before sending so the readout, the nozzle and the
+  // saved value never drift apart.
   if (!KUtils::is_homed()) {
     KUtils::show_homing_prompt(ws);
     return;
@@ -113,17 +138,21 @@ void ZOffsetPanel::apply_step(bool raise) {
   const char *step = lv_btnmatrix_get_btn_text(step_selector.get_selector(),
     step_selector.get_selected_idx());
 
-  // SET_GCODE_OFFSET operates in Klipper's normalized gcode frame, where
-  // negative Z_ADJUST always means closer to the bed - independent of the
-  // printer's physical stepper wiring. invert_z_direction only corrects the
-  // on-screen jog arrows for manual G0 moves (see homing_panel.cpp) and must
-  // not be applied here.
-  const char *sign = raise ? "+" : "-";
-  ws.gcode_script(fmt::format("SET_GCODE_OFFSET Z_ADJUST={}{} MOVE=1", sign, step));
+  // NEBULAOS_Z_ADJUST DELTA= (saved) or, with older extensions,
+  // SET_GCODE_OFFSET Z_ADJUST= (memory only). Both work in Klipper's
+  // normalized gcode frame, where negative always means closer to the bed -
+  // independent of the printer's physical stepper wiring. invert_z_direction
+  // only corrects the on-screen jog arrows for manual G0 moves (see
+  // homing_panel.cpp) and must not be applied here.
+  std::string cmd = z_adjust_step_command(saved_adjust(), raise, step ? step : "");
+  if (!cmd.empty()) {
+    ws.gcode_script(cmd);
+  }
 }
 
 void ZOffsetPanel::foreground() {
   update_value(cur_offset());
+  update_saved_text();
   lv_obj_move_foreground(panel_cont);
 }
 
@@ -131,6 +160,7 @@ void ZOffsetPanel::consume(json &j) {
   std::lock_guard<std::mutex> lock(lv_lock);
   auto v = j["/params/0/gcode_move/homing_origin/2"_json_pointer];
   if (v.is_number()) update_value(v.template get<double>());
+  if (j.contains("/params/0/nebulaos_z_adjust"_json_pointer)) update_saved_text();
 }
 
 void ZOffsetPanel::handle_callback(lv_event_t *e) {
@@ -156,7 +186,7 @@ void ZOffsetPanel::handle_callback(lv_event_t *e) {
       KUtils::show_homing_prompt(ws);
       return;
     }
-    ws.gcode_script("SET_GCODE_OFFSET Z=0 MOVE=1");
+    ws.gcode_script(z_adjust_reset_command(saved_adjust()));
   } else if (btn == back_btn) {
     lv_obj_move_background(panel_cont);
   }

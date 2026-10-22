@@ -390,12 +390,17 @@ First-layer baby-stepping. Same as tapping Z on the print-status screen, but als
   the offset to exactly 0.
 - Step size buttons: **0.001 / 0.005 / 0.01 / 0.025 / 0.05 mm**
 - Current value shown at top
-- There is no separate Save button — every tap (including Reset) applies the change at once
-  (`SET_GCODE_OFFSET Z_ADJUST=… MOVE=1`). The panel shows "Adjustments are saved automatically".
+- There is no separate Save button — every tap (including Reset) applies the change at once and
+  NebulaOS saves it (`NEBULAOS_Z_ADJUST DELTA=…` / `RESET=1`). The saved adjustment is applied again
+  after every Klipper restart or reboot, and set back to 0 when the Z-offset calibration saves a new
+  Z offset. The panel shows "Z offset adjustment: 0.050 mm, saved".
+- With older NebulaOS extensions (no `nebulaos_z_adjust`), the panel sends
+  `SET_GCODE_OFFSET Z_ADJUST=… MOVE=1` instead: the change is kept only until Klipper restarts, and the
+  panel does not say "saved". The Fine Tune panel's Z buttons work the same way.
 - **The printer must be homed first.** If it isn't, you'll get a homing prompt instead of the adjustment
-  going through. This isn't just a safety check — an unhomed adjustment would actually change the
-  live offset (so the on-screen number would move) but silently fail to move the toolhead or save,
-  which would leave the displayed value out of sync with what's actually stored. Homing first avoids that.
+  going through. An unhomed adjustment would change the live offset (so the on-screen number would
+  move) but fail to move the toolhead, which would leave the displayed value out of sync with the
+  nozzle. Homing first avoids that.
 
 ### Retraction
 

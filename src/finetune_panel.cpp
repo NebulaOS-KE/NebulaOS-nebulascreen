@@ -2,6 +2,7 @@
 #include "state.h"
 #include "spdlog/spdlog.h"
 #include "utils.h"
+#include "nebulaos_z_adjust.h"
 
 #include <algorithm>
 
@@ -181,35 +182,35 @@ void FineTunePanel::handle_zoffset(lv_event_t *e) {
   if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
     lv_obj_t *btn = lv_event_get_current_target(e);
 
-    // Every Z button here sends SET_GCODE_OFFSET ... MOVE=1, which needs a homed
-    // axis. Unhomed, the offset would change live but the move fails (and the
-    // save macro aborts), so block and prompt to home first instead.
+    // Every Z button here moves the nozzle (MOVE=1), which needs a homed axis.
+    // Unhomed, the offset would change live but the move fails, so block and
+    // prompt to home first instead.
     if (!KUtils::is_homed()) {
       KUtils::show_homing_prompt(ws);
       return;
     }
 
+    // G92: NEBULAOS_Z_ADJUST (saved by NebulaOS) when the extensions have it,
+    // else the old memory-only SET_GCODE_OFFSET (src/nebulaos_z_adjust.cpp).
+    bool saved = z_adjust_available(
+      State::get_instance()->get_data("/printer_objs/objects"_json_pointer));
+
     if (btn == zreset_btn.get_container()) {
       spdlog::trace("clicked zoffset reset");
-      ws.gcode_script("SET_GCODE_OFFSET Z=0 MOVE=1");
+      ws.gcode_script(z_adjust_reset_command(saved));
     } else {
-      try {
-        const char *step = lv_btnmatrix_get_btn_text(zoffset_selector.get_selector(),
-          zoffset_selector.get_selected_idx());
+      const char *step = lv_btnmatrix_get_btn_text(zoffset_selector.get_selector(),
+        zoffset_selector.get_selected_idx());
 
-        // SET_GCODE_OFFSET operates in Klipper's normalized gcode frame, where
-        // negative Z_ADJUST always means closer to the bed - independent of the
-        // printer's physical stepper wiring. invert_z_direction only corrects
-        // the on-screen jog arrows for manual G0 moves and must not be applied
-        // here (see homing_panel.cpp).
-        bool is_up_button = (btn == zup_btn.get_container());
-        const char *sign = is_up_button ? "+" : "-";
-
-        spdlog::trace("clicked z-offset {}{}", sign, step);
-        ws.gcode_script(fmt::format("SET_GCODE_OFFSET Z_ADJUST={}{} MOVE=1", sign, step));
-
-      } catch (const std::exception &ex) {
-        spdlog::error("Error in handle_zoffset: {}", ex.what());
+      // Klipper's normalized gcode frame: negative always means closer to the
+      // bed, independent of the printer's physical stepper wiring.
+      // invert_z_direction only corrects the on-screen jog arrows for manual G0
+      // moves and must not be applied here (see homing_panel.cpp).
+      bool is_up_button = (btn == zup_btn.get_container());
+      std::string cmd = z_adjust_step_command(saved, is_up_button, step ? step : "");
+      spdlog::trace("clicked z-offset: {}", cmd);
+      if (!cmd.empty()) {
+        ws.gcode_script(cmd);
       }
     }
   }

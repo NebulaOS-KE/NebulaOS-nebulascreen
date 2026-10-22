@@ -114,9 +114,9 @@ wpaclient:
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## the matching tests/test_*.cpp.
-.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image
+.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust
 
-test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image
+test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust
 
 # NebulaScreen rename (Run 15): device names and the legacy-config mapping.
 test-nebulascreen-paths: libhv.a
@@ -186,6 +186,13 @@ test-nebulaos-image: libhv.a
 		src/nebulaos_image.cpp tests/test_nebulaos_image.cpp \
 		-o build/test_nebulaos_image
 	./build/test_nebulaos_image
+
+# Saved Z offset adjustment (src/nebulaos_z_adjust.cpp, G92): commands and fallback.
+test-nebulaos-z-adjust: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		src/nebulaos_z_adjust.cpp tests/test_nebulaos_z_adjust.cpp \
+		-o build/test_nebulaos_z_adjust
+	./build/test_nebulaos_z_adjust
 
 # GuppyScreen action -> NebulaOS macro mapping (src/nebulaos_macros.cpp).
 test-nebulaos-macros:

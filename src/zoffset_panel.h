@@ -10,14 +10,15 @@
 
 // First-layer Z-offset / baby-stepping aid. A focused live control reachable
 // from the Tune tab and by tapping the Z-offset value on the print-status
-// screen. Adjusts the live gcode offset (SET_GCODE_OFFSET Z_ADJUST ... MOVE=1),
-// same as FineTune's Z column, but with a big readout, clear closer/farther
-// direction, and fine first-layer steps.
+// screen. Adjusts the live gcode offset, same as FineTune's Z column, but with a
+// big readout, clear closer/farther direction, and fine first-layer steps.
 //
-// Persistence is handled by the Creality Helper Script's Save Z-Offset macros,
-// which override SET_GCODE_OFFSET to mirror every adjustment into variables.cfg
-// and reload it on boot. So there is no Save button or SAVE_CONFIG/restart: a
-// baby-step is saved the instant it is applied, mid-print or idle.
+// G92 (Run 17): the buttons send NEBULAOS_Z_ADJUST DELTA=/RESET=1. NebulaOS
+// (extensions, status object nebulaos_z_adjust) applies the change live, saves
+// the adjustment in its own file and re-applies it at every Klipper start, so
+// there is no Save button or SAVE_CONFIG/restart. Without that object (older
+// extensions) the panel falls back to SET_GCODE_OFFSET and says nothing about
+// saving, because nothing is saved then. Logic: src/nebulaos_z_adjust.cpp.
 class ZOffsetPanel : public NotifyConsumer {
  public:
   ZOffsetPanel(KWebSocketClient &ws, std::mutex &lock);
@@ -33,6 +34,8 @@ class ZOffsetPanel : public NotifyConsumer {
  private:
   double cur_offset();
   void update_value(double z);
+  bool saved_adjust();         // nebulaos_z_adjust present
+  void update_saved_text();
   void apply_step(bool raise); // raise = nozzle up / farther from bed
 
   KWebSocketClient &ws;
@@ -41,7 +44,7 @@ class ZOffsetPanel : public NotifyConsumer {
   lv_obj_t *up_btn;            // raise — farther from bed / less squish
   lv_obj_t *down_btn;          // lower — closer to bed / more squish
   lv_obj_t *reset_btn;
-  lv_obj_t *auto_save_hint;    // "Adjustments are saved automatically"
+  lv_obj_t *auto_save_hint;    // "Z offset adjustment: <value> mm, saved" (G92)
   lv_obj_t *back_btn;
   Selector step_selector;
 };
