@@ -51,6 +51,15 @@ class CalibrationMenuPanel {
   // nav_cont: move a highlight through the rows and activate/leave with OK/Back,
   // without needing to land a precise tap on a specific row.
   void handle_nav(lv_event_t *event);
+#ifdef SIMULATOR
+  // Screenshot tour: open a row (on-screen order) / reach a guided page.
+  void sim_tap_row(size_t i) { if (i < rows.size()) activate_row(rows[i]); }
+  GuidedCalibrationPanel &sim_guided(CalFlow f) {
+    return f == CalFlow::ESTEPS ? esteps_panel : f == CalFlow::LOAD_CELL ? load_cell_panel
+      : f == CalFlow::BED_TRAM ? bed_tram_panel : f == CalFlow::INPUT_SHAPER ? input_shaper_panel
+      : auto_calibrate_panel;
+  }
+#endif
   static void _handle_nav(lv_event_t *e) { ((CalibrationMenuPanel*)e->user_data)->handle_nav(e); }
 
  private:

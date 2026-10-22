@@ -47,6 +47,9 @@ class MainPanel : public NotifyConsumer {
    * pushes mock temperature values, so the home panel is visible without
    * a live Moonraker connection. */
   void sim_setup_mock_data();
+  // GUPPY_SIM_SHOTS=<dir>: screenshots of the main pages and every guided
+  // calibration step, then the settings tour (G94).
+  void sim_tour(const char *dir);
 #endif
   void handle_homing_cb(lv_event_t *event);
   void handle_extrude_cb(lv_event_t *event);

@@ -422,14 +422,6 @@ void MainPanel::enable_spoolman() {
 #include "config.h"
 
 void MainPanel::sim_setup_mock_data() {
-  /* GUPPY_SIM_SHOTS=<dir>: open the Settings tab and save a screenshot of
-   * every settings page into <dir>, then exit (headless with
-   * SDL_VIDEODRIVER=offscreen). No mock print, prompts or notifications. */
-  if (const char *shots = getenv("GUPPY_SIM_SHOTS")) {
-    lv_tabview_set_act(tabview, lv_obj_get_index(setting_tab), LV_ANIM_OFF);
-    setting_panel.sim_tour(shots, tabview);
-    return;
-  }
   Config *conf = Config::get_instance();
   json &user_sensors = conf->get_json(conf->df() + "monitored_sensors");
   if (user_sensors.is_null()) {
@@ -612,6 +604,14 @@ void MainPanel::sim_setup_mock_data() {
     console_panel.handle_macro_response(resp);
   }
 
+  /* GUPPY_SIM_SHOTS=<dir>: save a screenshot of every page into <dir>, then
+   * exit (headless with SDL_VIDEODRIVER=offscreen). No spoolman/extruder
+   * start-up demo, no prompts or notifications. */
+  if (const char *shots = getenv("GUPPY_SIM_SHOTS")) {
+    sim_tour(shots);
+    return;
+  }
+
   /* Drive the print status panel so its new widgets (filename label,
    * dynamic ETA, spinner-on-extruder etc.) render with sensible values. */
   print_status_panel.sim_setup_mock_data();
@@ -655,5 +655,145 @@ void MainPanel::sim_setup_mock_data() {
     }
   }, 300, this);
   (void)t;
+}
+
+// G94 (Run 17): every main page and every guided-flow step at 480x272.
+void MainPanel::sim_tour(const char *dir) {
+  auto st = [](json patch) {
+    json j = {{"params", json::array({patch})}};
+    State::get_instance()->consume(j);
+  };
+  auto objs = [](bool z_adjust) {
+    json o;
+    o["result"]["objects"] = json::array({"output_pin fan0", "output_pin MainBoardFan",
+      "heater_fan nozzle_fan", "gcode_move", "toolhead", "nebulaos_load_cell_calibration",
+      "nebulaos_bed_tram", "nebulaos_calibration"});
+    if (z_adjust) o["result"]["objects"].push_back("nebulaos_z_adjust");
+    State::get_instance()->set_data("printer_objs", o, "/result");
+  };
+  objs(true);
+  st({{"toolhead", {{"homed_axes", "xyz"}}}, {"print_stats", {{"state", "standby"}}},
+      {"nebulaos_z_adjust", {{"value", -0.04}, {"applied", true}}},
+      {"configfile", {{"settings", {{"axis_twist_compensation", {{"calibrate_start_x", 20}}},
+                                    {"skew_correction", {{"enabled", true}}}}}}}});
+  auto tab = [this](lv_obj_t *t) {
+    lv_tabview_set_act(tabview, lv_obj_get_index(t), LV_ANIM_OFF);
+    lv_obj_move_foreground(tabview);
+  };
+  auto cal = [this]() -> CalibrationMenuPanel & { return printertune_panel.sim_calibration(); };
+  auto guided = [cal, st](CalFlow f, json status) {
+    st({{cal_status_object(f), status}});
+    cal().sim_guided(f).foreground();
+  };
+  const json null_lc = {{"grams", nullptr}, {"replace_grams", nullptr}, {"finger_grams", nullptr},
+                        {"problem", nullptr}, {"counts_per_gram", nullptr},
+                        {"old_counts_per_gram", nullptr}, {"change_percent", nullptr},
+                        {"change_warning", nullptr}};
+  auto lc = [guided, null_lc](json extra) {
+    json s = null_lc;
+    s.merge_patch(extra);
+    guided(CalFlow::LOAD_CELL, s);
+  };
+  SimSteps steps = {
+    {"m01-home", [tab, this]() { tab(main_tab); }},
+    {"m02-macros", [tab, this]() { tab(macros_tab); }},
+    {"m03-console", [tab, this]() { tab(console_tab); }},
+    {"m04-tune", [tab, this]() { tab(printertune_tab); }},
+    {"m05-move", [this]() { homing_panel.foreground(); }},
+    {"m06-extruder", [this]() { extruder_panel.foreground(); }},
+    {"m07-fans", [this]() { fan_panel.foreground(); }},
+    {"m08-leds", [this]() { led_panel.foreground(); }},
+    {"m09-files", [this]() { print_panel.foreground(); }},
+    {"m10-bedmesh", [this]() { printertune_panel.sim_tap(0); }},
+    {"m11-finetune", [this]() { printertune_panel.sim_tap(1); }},
+    {"m12-limits", [this]() { printertune_panel.sim_tap(2); }},
+    {"m13-tmc-metrics", [this]() { printertune_panel.sim_tap(3); }},
+    {"m14-power", [this]() { printertune_panel.sim_tap(4); }},
+    {"m15-retraction", [this]() { printertune_panel.sim_tap(5); }},
+    {"m16-zoffset-saved", [this]() { printertune_panel.sim_tap(6); }},
+    {"m17-zoffset-save-error", [st, this]() {
+      st({{"nebulaos_z_adjust", {{"value", 0.025}, {"error", "could not write the file"}}}});
+      print_status_panel.get_zoffset_panel().foreground(); }},
+    {"m18-zoffset-older-extensions", [objs, this]() {
+      objs(false); print_status_panel.get_zoffset_panel().foreground(); objs(true); }},
+    {"m19-calibration", [this]() { printertune_panel.sim_tap(7); }},
+    {"m20-axis-twist", [cal]() { cal().sim_tap_row(1); }},
+    {"m21-skew", [cal]() { cal().sim_tap_row(6); }},
+    // Load cell (G90): every step
+    {"m30-loadcell-idle", [lc]() { lc({{"state", "idle"}}); }},
+    {"m31-loadcell-empty", [lc]() { lc({{"state", "awaiting_empty"}}); }},
+    {"m32-loadcell-weight", [lc]() { lc({{"state", "awaiting_weight"}}); }},
+    {"m33-loadcell-weight-keypad", [cal]() { cal().sim_guided(CalFlow::LOAD_CELL).sim_keypad(); }},
+    {"m34-loadcell-weight-problem", [lc]() {
+      lc({{"state", "awaiting_weight"}, {"problem", "The reading moved by more than 20 g while "
+          "settling. Make sure nothing touches the bed or the nozzle, then try again."}}); }},
+    {"m35-loadcell-replace", [lc]() { lc({{"state", "awaiting_replace"}, {"grams", 1531}}); }},
+    {"m36-loadcell-remove", [lc]() {
+      lc({{"state", "awaiting_remove"}, {"grams", 1531}, {"replace_grams", 1527}}); }},
+    {"m37-loadcell-finger", [lc]() { lc({{"state", "awaiting_finger"}, {"finger_grams", 412}}); }},
+    {"m38-loadcell-confirm", [lc]() {
+      lc({{"state", "awaiting_confirmation"}, {"counts_per_gram", 11.42}, {"old_counts_per_gram", 8.1},
+          {"change_percent", 41}, {"change_warning", true}}); }},
+    {"m39-loadcell-complete", [lc]() { lc({{"state", "complete"}, {"counts_per_gram", 11.42}}); }},
+    // Bed tramming (G89): every step, signed corner grid
+    {"m40-tram-idle", [guided]() { guided(CalFlow::BED_TRAM, {{"state", "idle"}, {"mount", "rigid"}}); }},
+    {"m41-tram-mount", [guided]() { guided(CalFlow::BED_TRAM, {{"state", "awaiting_mount"}}); }},
+    {"m42-tram-adjust-rigid", [guided]() { guided(CalFlow::BED_TRAM, {
+      {"state", "awaiting_adjustment"}, {"mount", "rigid"},
+      {"deviations", {0.23, 0.12, 0.0, 0.05}}, {"signed_deviations", {-0.23, -0.12, 0.0, -0.05}},
+      {"reference", "rear right"}, {"accepted", {false, false, true, true}}, {"target", "front left"},
+      {"message", "Front left: -0.23 mm. Add a 0.20 mm shim to raise it. Turn the printer off "
+                  "first, lift the bed plate at that corner and put the shim on the spacer."}}); }},
+    {"m43-tram-adjust-adjustable", [guided]() { guided(CalFlow::BED_TRAM, {
+      {"state", "awaiting_adjustment"}, {"mount", "adjustable"},
+      {"deviations", {0.0, 0.08, 0.1, 0.02}}, {"signed_deviations", {0.0, 0.08, -0.1, 0.02}},
+      {"reference", "front left"}, {"accepted", {true, false, false, true}}, {"target", "rear right"},
+      {"message", "Rear right: -0.10 mm. Turn the screw a quarter turn clockwise (as seen from above)."}}); }},
+    {"m44-tram-adjust-older-extensions", [guided]() { guided(CalFlow::BED_TRAM, {
+      {"state", "awaiting_adjustment"}, {"mount", "rigid"}, {"signed_deviations", nullptr},
+      {"reference", nullptr}, {"deviations", {0.15, 0.0, 0.12, 0.03}},
+      {"accepted", {false, true, false, true}}, {"target", "front left"},
+      {"message", "Front left: add a 0.10 mm shim."}}); }},
+    {"m45-tram-complete", [guided]() { guided(CalFlow::BED_TRAM, {
+      {"state", "complete"}, {"mount", "rigid"}, {"deviations", {0.02, 0.0, 0.01, 0.03}},
+      {"signed_deviations", {-0.02, 0.0, -0.01, -0.03}}, {"reference", "front right"},
+      {"accepted", {true, true, true, true}}, {"target", nullptr}, {"load_cell_corner_changed", true},
+      {"message", "Bed tramming complete. No further screw or spacer adjustments needed."}}); }},
+    {"m46-tram-stopped", [guided]() { guided(CalFlow::BED_TRAM, {
+      {"state", "stopped"}, {"load_cell_corner_changed", false},
+      {"message", "The front left corner did not improve after 3 adjustments. Check the spacer "
+                  "and the shim, then start again."}}); }},
+    // the other guided flows
+    {"m50-auto-calibrate", [guided]() { guided(CalFlow::AUTO_CALIBRATE, {{"auto_calibrate_state", "idle"}}); }},
+    {"m51-auto-calibrate-running", [guided]() { guided(CalFlow::AUTO_CALIBRATE, {
+      {"auto_calibrate_state", "running"}, {"auto_calibrate_stage", "measuring the Z offset"}}); }},
+    {"m52-esteps", [guided]() { guided(CalFlow::ESTEPS, {{"esteps_state", "idle"}}); }},
+    {"m53-esteps-measure-keypad", [guided, cal]() {
+      guided(CalFlow::ESTEPS, {{"esteps_state", "awaiting_measurement"}});
+      cal().sim_guided(CalFlow::ESTEPS).sim_keypad(); }},
+    {"m54-input-shaper", [guided]() { guided(CalFlow::INPUT_SHAPER, {{"input_shaper_state", "idle"}}); }},
+    // printing
+    {"m60-print-status", [st, this]() {
+      json mock = {{"params", {{
+        {"print_stats", {{"filename", "BunnyHighResLongFilenameTest_v3.gcode"}, {"state", "printing"},
+                         {"print_duration", 600.0}, {"filament_used", 1234.5},
+                         {"info", {{"current_layer", 12}, {"total_layer", 60}}}}},
+        {"virtual_sdcard", {{"progress", 0.20}}},
+        {"extruder", {{"temperature", 210}, {"target", 220}}},
+        {"heater_bed", {{"temperature", 62}, {"target", 65}}}}}}};
+      State::get_instance()->consume(mock);
+      // consume() takes lv_lock, which the LVGL loop holds while this runs
+      lv_lock.unlock();
+      print_status_panel.consume(mock);
+      lv_lock.lock();
+      print_status_panel.foreground(); }},
+    {"m61-finetune-printing", [this]() { print_status_panel.get_finetune_panel().foreground(); }},
+    {"m62-home-printing", [tab, this]() { tab(main_tab); }},
+  };
+  sim_run_tour(dir, std::move(steps), [this, st, dir]() {
+    st({{"print_stats", {{"state", "standby"}}}});
+    lv_tabview_set_act(tabview, lv_obj_get_index(setting_tab), LV_ANIM_OFF);
+    setting_panel.sim_tour(dir, tabview);
+  });
 }
 #endif

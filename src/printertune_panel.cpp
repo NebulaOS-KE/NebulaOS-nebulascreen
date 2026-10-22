@@ -149,3 +149,13 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
     }
   }
 }
+
+#ifdef SIMULATOR
+void PrinterTunePanel::sim_tap(int tile) {
+  ButtonContainer *tiles[] = {&bedmesh_btn, &finetune_btn, &limits_btn, &tmc_status_btn,
+                              &power_devices_btn, &retraction_btn, &zoffset_btn, &calibration_btn};
+  if (tile >= 0 && tile < 8) {
+    lv_event_send(tiles[tile]->get_container(), LV_EVENT_CLICKED, NULL);
+  }
+}
+#endif

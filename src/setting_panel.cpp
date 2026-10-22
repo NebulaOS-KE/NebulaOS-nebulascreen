@@ -90,16 +90,41 @@ void sim_screenshot(const char *path);  // main.cpp
 
 struct SimTour {
   std::string dir;
-  std::vector<std::pair<std::string, std::function<void()>>> steps;
+  SimSteps steps;
+  std::function<void()> done;
   size_t next = 0;
   bool shoot = false;
 };
 
-void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
+// One step every 600 ms: run it, then save the frame as <dir>/<name>.ppm on the
+// next tick. `done` runs after the last screenshot.
+void sim_run_tour(const std::string &dir, SimSteps steps, std::function<void()> done) {
   auto *t = new SimTour();
   t->dir = dir;
+  t->steps = std::move(steps);
+  t->done = std::move(done);
+  lv_timer_create([](lv_timer_t *timer) {
+    auto *t = (SimTour *)timer->user_data;
+    if (t->shoot) {
+      std::string path = t->dir + "/" + t->steps[t->next].first + ".ppm";
+      sim_screenshot(path.c_str());
+      t->shoot = false;
+      if (++t->next >= t->steps.size()) {
+        lv_timer_del(timer);
+        auto done = t->done;
+        delete t;
+        if (done) done();
+      }
+      return;
+    }
+    t->steps[t->next].second();
+    t->shoot = true;
+  }, 600, t);
+}
+
+void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
   auto close_dialogs = []() { SettingsUi::dismiss_confirms(); };
-  t->steps = {
+  SimSteps steps = {
     {"01-settings", [home]() { lv_obj_move_foreground(home); }},
     {"02-connections", [this]() { connections_panel.foreground(); connections_panel.sim_fill(); }},
     {"03-wifi", [this]() { connections_panel.sim_wifi(); }},
@@ -165,20 +190,20 @@ void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
       reset_panel.sim_slots(R"({"result":{"slots":{"running":"B","A":{"kernel":"Linux-6.6.157-rt79","system":"nebulaos"},
         "B":{"kernel":"Linux-6.6.157-rt79","system":"nebulaos"}}}})");
       reset_panel.sim_tap(3); }},
+    // G91 v3.4: the refusal popup and the image install's stop outcomes
+    {"31-refusal-active", [close_dialogs]() {
+      close_dialogs(); SettingsUi::show_if_refused(json::parse(
+        R"({"error":{"code":409,"message":"ACTIVE: Not possible while the printer is moving or heating."}})")); }},
+    {"32-refusal-updating", [close_dialogs]() {
+      close_dialogs(); SettingsUi::show_if_refused(json::parse(
+        R"({"error":{"code":409,"message":"UPDATING: The new system is still being checked - try again after the check."}})")); }},
+    {"33-image-stopped-print", [this, close_dialogs]() {
+      close_dialogs(); updates_panel.sim_image().foreground(); updates_panel.sim_image().sim_progress(
+        R"({"result":{"job":{"state":"failed","phase":"stopped_print","error":"PRINTING","stopped":true,"target_cleared":true}}})"); }},
+    {"34-image-next-power-on", [this, close_dialogs]() {
+      close_dialogs(); updates_panel.sim_image().sim_progress(
+        R"({"result":{"job":{"state":"finished","phase":"next_power_on","percent":100,"target":"A"}}})"); }},
   };
-  lv_timer_create([](lv_timer_t *timer) {
-    auto *t = (SimTour *)timer->user_data;
-    if (t->shoot) {
-      std::string path = t->dir + "/" + t->steps[t->next].first + ".ppm";
-      sim_screenshot(path.c_str());
-      t->shoot = false;
-      if (++t->next >= t->steps.size()) {
-        exit(0);
-      }
-      return;
-    }
-    t->steps[t->next].second();
-    t->shoot = true;
-  }, 600, t);
+  sim_run_tour(dir, std::move(steps), []() { exit(0); });
 }
 #endif

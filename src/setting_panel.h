@@ -14,6 +14,16 @@
 
 #include <mutex>
 
+#ifdef SIMULATOR
+#include <functional>
+#include <string>
+#include <utility>
+#include <vector>
+// Screenshot tours (GUPPY_SIM_SHOTS): named steps, one screenshot each.
+using SimSteps = std::vector<std::pair<std::string, std::function<void()>>>;
+void sim_run_tour(const std::string &dir, SimSteps steps, std::function<void()> done);
+#endif
+
 // Settings home (S1, 2026-10-11): six tiles, each opening one page -
 // Connections, Display, Printer, System, Updates, Reset.
 class SettingPanel {

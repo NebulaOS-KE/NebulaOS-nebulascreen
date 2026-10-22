@@ -26,6 +26,12 @@ class PrinterTunePanel {
   PowerPanel &get_power_panel();
   void init(json &j);
   void handle_callback(lv_event_t *event);
+#ifdef SIMULATOR
+  // Screenshot tour: tap a tile (0 Bed Mesh, 1 Fine Tune, 2 Limits, 3 TMC
+  // Metrics, 4 Power, 5 Retraction, 6 Z Offset, 7 Calibration).
+  void sim_tap(int tile);
+  CalibrationMenuPanel &sim_calibration() { return calibration_menu_panel; }
+#endif
 
   static void _handle_callback(lv_event_t *event) {
     PrinterTunePanel *panel = (PrinterTunePanel*)event->user_data;
