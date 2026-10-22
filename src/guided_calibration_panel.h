@@ -23,6 +23,9 @@ class GuidedCalibrationPanel : public NotifyConsumer {
 
   void foreground();
   void consume(json &j);
+#ifdef SIMULATOR
+  void sim_keypad() { show_keypad(true); }
+#endif
 
   static void _handle_callback(lv_event_t *e) {
     ((GuidedCalibrationPanel *)e->user_data)->handle_callback(e);
@@ -38,13 +41,19 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   void send(const std::string &gcode, const char *what);
   void confirm_start();
   void submit_measurement();
+  void show_keypad(bool on);
 
   KWebSocketClient &ws;
   CalFlow flow;
 
   lv_obj_t *cont;
   lv_obj_t *title;
+  // G89/G90 (Run 17): the step text and the entry row scroll inside `body`;
+  // btn_row stays pinned at the bottom, so Next/Cancel/Done never leave the
+  // screen, and the keypad opens on the right half, never over the field.
+  lv_obj_t *body;
   lv_obj_t *text;
+  std::string shown_text;      // to scroll back to the top on a new step
   lv_obj_t *measure_row;
   lv_obj_t *measure_ta;
   lv_obj_t *measure_btn;

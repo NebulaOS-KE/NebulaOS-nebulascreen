@@ -164,6 +164,8 @@ TEST(LoadCell, steps) {
     ASSERT_TRUE(v.text.find(st[1]) != std::string::npos);
     ASSERT_TRUE(v.can_cancel);
     ASSERT_EQ(v.needs_measurement, std::string(st[0]) == "awaiting_weight");
+    // G90: a page flow - its buttons are on the page, there is no prompt
+    ASSERT_TRUE(v.text.find("prompt") == std::string::npos);
   }
   s["state"] = "awaiting_weight";
   ASSERT_TRUE(cal_view(CalFlow::LOAD_CELL, s, false).text.find("front-left screw head")

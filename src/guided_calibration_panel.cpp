@@ -22,8 +22,9 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   , flow(f)
   , cont(lv_obj_create(lv_scr_act()))
   , title(lv_label_create(cont))
-  , text(lv_label_create(cont))
-  , measure_row(lv_obj_create(cont))
+  , body(lv_obj_create(cont))
+  , text(lv_label_create(body))
+  , measure_row(lv_obj_create(body))
   , measure_ta(lv_textarea_create(measure_row))
   , measure_btn(nullptr)
   , btn_row(lv_obj_create(cont))
@@ -41,12 +42,25 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
 
   lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
 
-  lv_obj_set_width(text, LV_PCT(75));
+  // The scrolling part: step text + entry row. It takes the height left over
+  // by the title and the pinned button row.
+  lv_obj_set_width(body, LV_PCT(75));
+  lv_obj_set_flex_grow(body, 1);
+  lv_obj_set_style_pad_all(body, 0, 0);
+  lv_obj_set_style_pad_right(body, 4, 0);  // room for the scrollbar
+  lv_obj_set_style_pad_row(body, 8, 0);
+  lv_obj_set_style_border_width(body, 0, 0);
+  lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, 0);
+  lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_scroll_dir(body, LV_DIR_VER);
+  lv_obj_set_scrollbar_mode(body, LV_SCROLLBAR_MODE_AUTO);
+
+  lv_obj_set_width(text, LV_PCT(100));
   lv_label_set_long_mode(text, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_font(text, &lv_font_montserrat_14, 0);
 
   for (lv_obj_t *row : {measure_row, btn_row}) {
-    lv_obj_set_size(row, LV_PCT(75), LV_SIZE_CONTENT);
+    lv_obj_set_size(row, row == btn_row ? LV_PCT(75) : LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_pad_all(row, 0, 0);
     lv_obj_set_style_pad_column(row, 8, 0);
     lv_obj_set_style_border_width(row, 0, 0);
@@ -55,6 +69,7 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   }
+  lv_obj_clear_flag(btn_row, LV_OBJ_FLAG_HIDDEN);
 
   lv_textarea_set_one_line(measure_ta, true);
   lv_textarea_set_placeholder_text(measure_ta, cal_input_hint(flow));
@@ -62,6 +77,7 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   lv_textarea_set_max_length(measure_ta, 6);
   lv_obj_set_flex_grow(measure_ta, 2);
   lv_obj_add_event_cb(measure_ta, &GuidedCalibrationPanel::_handle_kb, LV_EVENT_FOCUSED, this);
+  lv_obj_add_event_cb(measure_ta, &GuidedCalibrationPanel::_handle_kb, LV_EVENT_CLICKED, this);
   measure_btn = make_text_btn(measure_row, (std::string(LV_SYMBOL_OK " ") + cal_input_button(flow)).c_str(),
                               &GuidedCalibrationPanel::_handle_callback, this);
 
@@ -72,18 +88,21 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   start_btn = make_text_btn(btn_row, LV_SYMBOL_PLAY " Start", &GuidedCalibrationPanel::_handle_callback, this);
   cancel_btn = make_text_btn(btn_row, LV_SYMBOL_CLOSE " Cancel", &GuidedCalibrationPanel::_handle_callback, this);
 
-  // Decimal keypad (the shared Numpad is integer-only), same construction as
-  // skew_correction_panel.cpp's.
-  static const char *kb_map[] = {"1", "2", "3", "\n",
-                                 "4", "5", "6", "\n",
-                                 "7", "8", "9", "\n",
-                                 LV_SYMBOL_BACKSPACE, "0", ".", LV_SYMBOL_OK, NULL};
-  static const lv_btnmatrix_ctrl_t kb_ctrl[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+  // Decimal keypad (the shared Numpad is integer-only). It opens on the right
+  // half, between the title and the Back button, while the text, the entry
+  // field and the buttons move into the left half - so it never covers the
+  // field (Run 15 test, G90). The keyboard key closes it.
+  static const char *kb_map[] = {"1", "2", "3", LV_SYMBOL_BACKSPACE, "\n",
+                                 "4", "5", "6", LV_SYMBOL_KEYBOARD, "\n",
+                                 "7", "8", "9", ".", "\n",
+                                 "0", LV_SYMBOL_OK, NULL};
+  static const lv_btnmatrix_ctrl_t kb_ctrl[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1};
   lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_USER_1, kb_map, kb_ctrl);
   lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_USER_1);
   lv_obj_add_flag(kb, LV_OBJ_FLAG_IGNORE_LAYOUT);
-  lv_obj_set_size(kb, LV_PCT(45), LV_PCT(55));
-  lv_obj_align(kb, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+  lv_obj_add_flag(kb, LV_OBJ_FLAG_FLOATING);
+  lv_obj_set_size(kb, LV_PCT(45), LV_PCT(62));
+  lv_obj_align(kb, LV_ALIGN_TOP_RIGHT, 0, 22);
   lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_event_cb(kb, &GuidedCalibrationPanel::_handle_kb, LV_EVENT_ALL, this);
 
@@ -111,7 +130,14 @@ void GuidedCalibrationPanel::refresh() {
     json::json_pointer(std::string("/printer_state/") + cal_status_object(flow)));
   CalView v = cal_view(flow, status, KUtils::is_printing());
   lv_label_set_text(title, v.title.c_str());
-  lv_label_set_text(text, v.text.c_str());
+  bool text_changed = false;
+  if (v.text != shown_text) {
+    // a new step starts at the top of its text
+    lv_label_set_text(text, v.text.c_str());
+    lv_obj_scroll_to_y(body, 0, LV_ANIM_OFF);
+    shown_text = v.text;
+    text_changed = true;
+  }
   auto show = [](lv_obj_t *o, bool on) {
     if (on) lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
@@ -128,7 +154,34 @@ void GuidedCalibrationPanel::refresh() {
   }
   show(measure_row, v.needs_measurement);
   if (!v.needs_measurement) {
+    show_keypad(false);
+  } else if (text_changed && !lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN)) {
+    // new text above the field while typing (e.g. a problem): keep the field
+    // in view next to the keypad
+    lv_obj_update_layout(cont);
+    lv_obj_scroll_to_view(measure_row, LV_ANIM_OFF);
+  }
+}
+
+void GuidedCalibrationPanel::show_keypad(bool on) {
+  bool shown = !lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  if (on == shown) {
+    return;
+  }
+  if (on) {
+    lv_keyboard_set_textarea(kb, measure_ta);
+    lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(kb);
+  } else {
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  }
+  // (LV_PCT does not parenthesize its argument: no ?: inside it)
+  lv_coord_t w = on ? LV_PCT(52) : LV_PCT(75);
+  lv_obj_set_width(body, w);
+  lv_obj_set_width(btn_row, w);
+  if (on) {
+    lv_obj_update_layout(cont);
+    lv_obj_scroll_to_view(measure_row, LV_ANIM_OFF);
   }
 }
 
@@ -203,7 +256,7 @@ void GuidedCalibrationPanel::submit_measurement() {
                            : "Enter the distance in mm, e.g. 98.5", 3000);
     return;
   }
-  lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  show_keypad(false);
   lv_textarea_set_text(measure_ta, "");
   send(cmd, "Measurement rejected");
 }
@@ -214,7 +267,7 @@ void GuidedCalibrationPanel::handle_callback(lv_event_t *e) {
   }
   lv_obj_t *btn = lv_event_get_current_target(e);
   if (btn == back_btn.get_container()) {
-    lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    show_keypad(false);
     lv_obj_move_background(cont);
   } else if (btn == start_btn) {
     if (KUtils::is_printing()) {
@@ -237,12 +290,11 @@ void GuidedCalibrationPanel::handle_callback(lv_event_t *e) {
 void GuidedCalibrationPanel::handle_kb(lv_event_t *e) {
   lv_event_code_t code = lv_event_get_code(e);
   lv_obj_t *target = lv_event_get_target(e);
-  if (target == measure_ta && code == LV_EVENT_FOCUSED) {
-    lv_keyboard_set_textarea(kb, measure_ta);
-    lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  if (target == measure_ta && (code == LV_EVENT_FOCUSED || code == LV_EVENT_CLICKED)) {
+    show_keypad(true);
   } else if (target == kb && code == LV_EVENT_READY) {
     submit_measurement();
   } else if (target == kb && code == LV_EVENT_CANCEL) {
-    lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    show_keypad(false);
   }
 }

@@ -278,28 +278,28 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
     // E-steps cannot be cancelled while it heats; the others can.
     v.can_cancel = flow != CalFlow::ESTEPS;
   } else if (state == "awaiting_empty") {
+    // G90: the load cell is a page flow - its buttons are on this page
     v.text = "Step 1 of 5: remove everything from the bed (the nozzle must not "
-             "touch it), then tap Check in the prompt.";
+             "touch it), then tap Check.";
     v.can_cancel = true;
   } else if (state == "awaiting_weight") {
     v.text = flow == CalFlow::LOAD_CELL
       ? "Step 2 of 5: put the weighed 1.5 L bottle with its centre roughly "
         "above the front-left screw head of the bed, then enter the weight "
-        "from the kitchen scale (or use the buttons in the prompt)."
+        "from the kitchen scale and tap Weigh."
       : "Enter the weight in grams.";
     v.can_cancel = true;
     v.needs_measurement = true;
   } else if (state == "awaiting_replace") {
     v.text = "Step 3 of 5: lift the bottle and put it back in the same place, "
-             "then tap Continue in the prompt.";
+             "then tap Continue.";
     v.can_cancel = true;
   } else if (state == "awaiting_remove") {
-    v.text = "Step 4 of 5: remove the bottle from the bed, then tap Continue "
-             "in the prompt.";
+    v.text = "Step 4 of 5: remove the bottle from the bed, then tap Continue.";
     v.can_cancel = true;
   } else if (state == "awaiting_finger") {
     v.text = "Step 5 of 5 (optional): press the front-left corner gently with "
-             "a finger and tap Measure in the prompt, or tap Continue.";
+             "a finger and tap Measure, or tap Continue.";
     v.can_cancel = true;
   } else if (state == "awaiting_continue") {
     v.text = "Mark the filament where it enters the extruder, then tap "
