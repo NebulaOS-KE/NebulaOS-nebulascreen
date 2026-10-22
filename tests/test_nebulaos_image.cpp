@@ -181,6 +181,24 @@ TEST(Job, phases) {
                 {"target_cleared", false}});
   ASSERT_FALSE(has(g.text, "now empty"));
   ASSERT_TRUE(has(g.text, "keeps running as before"));
+  ASSERT_FALSE(g.stopped);
+  // G91: stopped at a point of no return because a print started
+  auto s = job({{"state", "failed"}, {"phase", "stopped_print"}, {"error", "PRINTING"},
+                {"message", "Stopped: Not possible while a print is running. Nothing was changed "
+                            "on the running system. Install again after that."},
+                {"stopped", true}, {"target_cleared", true}});
+  ASSERT_TRUE(s.failed);
+  ASSERT_TRUE(s.stopped);
+  ASSERT_EQ(s.text, std::string("Stopped because a print was started. Nothing changed. "
+                                "Install again after the print."));
+  // G91: installed, but the slot selection could not be put back - no reboot now
+  auto n = job({{"state", "finished"}, {"phase", "next_power_on"}, {"percent", 100}, {"target", "A"},
+                {"error", "PRINTING"}, {"message", "Install finished; ..."}});
+  ASSERT_TRUE(n.next_power_on);
+  ASSERT_FALSE(n.active);
+  ASSERT_FALSE(n.failed);
+  ASSERT_EQ(n.text, std::string("Install finished; the printer starts the new system at the "
+                                "next power-on."));
 }
 
 TEST(Last, results_once) {

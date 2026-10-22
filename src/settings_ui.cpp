@@ -307,6 +307,26 @@ void notice(const char *title, const char *text) {
   choice(title, text, NULL, "OK", Tone::Normal, std::function<void()>());
 }
 
+void refusal(const Refusal &r) {
+  notice(REFUSAL_TITLE, r.text.c_str());
+}
+
+bool show_if_refused(const json &reply) {
+  Refusal r = refusal_of(reply);
+  if (r.refused) {
+    refusal(r);
+  }
+  return r.refused;
+}
+
+bool refuse_if_printing() {
+  Refusal r = refusal_hint(KUtils::is_printing(), KUtils::is_paused());
+  if (r.refused) {
+    refusal(r);
+  }
+  return r.refused;
+}
+
 lv_obj_t *busy(const char *title, const char *text) {
   lv_obj_t *overlay;
   lv_obj_t *label;

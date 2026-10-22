@@ -2,6 +2,7 @@
 #define __SETTINGS_UI_H__
 
 #include "lvgl/lvgl.h"
+#include "nebulaos_refusal.h"
 
 #include <functional>
 #include <string>
@@ -73,6 +74,16 @@ void dismiss_confirms();
 
 // Modal message with a single OK button (same look as confirm()).
 void notice(const char *title, const char *text);
+
+// G91 v3.4: THE refusal popup ("Not now" + the reason text, OK). Every
+// update/maintenance action (image install, MCU flash, slot switch, clean
+// reset, boot logo, cleanup, updates) uses it.
+void refusal(const Refusal &r);
+// Shows the popup when `reply` is a NebulaOS refusal; true if it did.
+bool show_if_refused(const json &reply);
+// The client-side pre-check (a hint only; NebulaOS decides): popup and true
+// while a print runs or is paused.
+bool refuse_if_printing();
 
 // Modal "please wait" box without buttons, above everything (also above the
 // "waiting for printer" screen while Klipper restarts). Returns its text

@@ -120,6 +120,12 @@ void BootLogoPanel::show_preview() {
 void BootLogoPanel::run(const char *method, const json &params, const char *what,
                         const std::string &select) {
   ws.send_jsonrpc(method, params, [this, what, select](json &reply) {
+    if (refusal_of(reply).refused) {
+      std::lock_guard<std::mutex> lock(lv_lock);
+      SettingsUi::show_if_refused(reply);
+      refresh(select);
+      return;
+    }
     std::string err = jsonrpc_error_message(reply);
     std::string msg = err.empty() ? power_on_result(reply) : boot_logo_error_text(err);
     std::string pick = select;
@@ -136,6 +142,10 @@ void BootLogoPanel::run(const char *method, const json &params, const char *what
 }
 
 void BootLogoPanel::apply() {
+  // G91: the client-side hint (NebulaOS refuses logo writes while busy)
+  if (SettingsUi::refuse_if_printing()) {
+    return;
+  }
   std::string name = selected_name();
   if (name.empty()) {
     SettingsUi::confirm("Boot logo: NebulaOS",
@@ -244,6 +254,9 @@ void BootLogoPanel::handle_callback(lv_event_t *e) {
   } else if (obj == delete_btn) {
     delete_selected();
   } else if (obj == restore_btn) {
+    if (SettingsUi::refuse_if_printing()) {
+      return;
+    }
     SettingsUi::confirm("Restore Creality logo",
       "The original power-on logo goes back into this boot slot's RTOS. The boot screen "
       "after it stays as it is. Shown from the next start.",

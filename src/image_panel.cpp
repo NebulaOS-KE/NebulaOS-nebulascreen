@@ -147,8 +147,7 @@ void ImagePanel::show_files(const json &list_reply) {
 // listing: some seconds, so a box says so.
 void ImagePanel::check(const ImageFile &f) {
   if (working) return;
-  if (KUtils::is_printing()) {
-    KUtils::notify_locked();
+  if (SettingsUi::refuse_if_printing()) {
     return;
   }
   working = true;
@@ -166,6 +165,9 @@ void ImagePanel::checked(const json &check_reply) {
     busy_label = NULL;
   }
   working = false;
+  if (SettingsUi::show_if_refused(check_reply)) {
+    return;
+  }
   ImageCheck c = image_check(check_reply);
   if (!c.ok) {
     SettingsUi::notice(c.title.c_str(), c.text.c_str());
@@ -174,8 +176,7 @@ void ImagePanel::checked(const json &check_reply) {
   SettingsUi::Tone tone = c.system == "nebulaos" ? SettingsUi::Tone::Warning
                                                  : SettingsUi::Tone::Danger;
   SettingsUi::confirm(c.title.c_str(), c.text.c_str(), "Install & restart", tone, [this, c]() {
-    if (KUtils::is_printing()) {   // a print may have started meanwhile
-      KUtils::notify_locked();
+    if (SettingsUi::refuse_if_printing()) {   // a print may have started meanwhile
       return;
     }
     start_busy("Installing system image", "Starting...");
@@ -186,6 +187,9 @@ void ImagePanel::checked(const json &check_reply) {
       }
       std::lock_guard<std::mutex> lock(lv_lock);
       stop_busy();
+      if (SettingsUi::show_if_refused(reply)) {
+        return;
+      }
       SettingsUi::notice("Not installed", err.c_str());
     });
   });
@@ -223,7 +227,14 @@ void ImagePanel::show_job(const json &status_reply) {
   ImageJob j = image_job(status_reply);
   if (j.failed) {
     stop_busy();
-    SettingsUi::notice("Install failed", j.text.c_str());
+    // G91: a print started during the install - stopped at a point of no return
+    SettingsUi::notice(j.stopped ? "Install stopped" : "Install failed", j.text.c_str());
+    refresh();
+    return;
+  }
+  if (j.next_power_on) {
+    stop_busy();
+    SettingsUi::notice("Install finished", j.text.c_str());
     refresh();
     return;
   }

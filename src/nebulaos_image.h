@@ -95,6 +95,8 @@ struct ImageJob {
   bool active = false;      // running or restarting
   bool restarting = false;
   bool failed = false;
+  bool stopped = false;     // G91: phase stopped_print - a print started, nothing changed
+  bool next_power_on = false;  // G91: installed, starts at the next power-on (no reboot now)
   int percent = 0;
   std::string text;         // for the busy box / the failure notice
 };

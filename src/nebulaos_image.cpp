@@ -269,6 +269,19 @@ ImageJob image_job(const json &status_reply) {
     j.percent = 100;
     std::string target = str_at(job, "/target"_json_pointer);
     j.text = "Installed. Restarting into slot " + target + "...";
+  } else if (state == "finished" && phase == "next_power_on") {
+    // G91 v2.2: a print started after the slot was selected and the selection
+    // could not be put back: installed, but no reboot under the print.
+    j.next_power_on = true;
+    j.percent = 100;
+    j.text = "Install finished; the printer starts the new system at the next power-on.";
+  } else if (state == "failed" && phase == "stopped_print") {
+    // G91 v2.2: a print started during the install; the worker stopped at a
+    // point of no return (it does not wait for the print any more).
+    j.failed = true;
+    j.stopped = true;
+    j.text = "Stopped because a print was started. Nothing changed. "
+             "Install again after the print.";
   } else if (state == "failed") {
     j.failed = true;
     std::string msg = str_at(job, "/message"_json_pointer);

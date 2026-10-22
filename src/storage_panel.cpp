@@ -60,8 +60,7 @@ void StoragePanel::shown() {
 // LVGL thread: first what it would free, then the dialog.
 void StoragePanel::start_cleanup() {
   if (busy) return;
-  if (KUtils::is_printing()) {
-    KUtils::notify_locked();
+  if (SettingsUi::refuse_if_printing()) {
     return;
   }
   busy = true;
@@ -88,8 +87,7 @@ void StoragePanel::start_cleanup() {
 
 // LVGL thread.
 void StoragePanel::run_cleanup(bool videos) {
-  if (KUtils::is_printing()) {         // a print may have started meanwhile
-    KUtils::notify_locked();
+  if (SettingsUi::refuse_if_printing()) {   // a print may have started meanwhile
     return;
   }
   busy = true;
@@ -100,7 +98,9 @@ void StoragePanel::run_cleanup(bool videos) {
     std::lock_guard<std::mutex> lock(lv_lock);
     SettingsUi::close_busy(wait);
     busy = false;
-    SettingsUi::notice("Clean up Creality files", msg.c_str());
+    if (!SettingsUi::show_if_refused(reply)) {
+      SettingsUi::notice("Clean up Creality files", msg.c_str());
+    }
     shown();
   });
 }

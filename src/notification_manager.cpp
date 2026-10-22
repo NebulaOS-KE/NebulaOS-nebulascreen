@@ -1,6 +1,7 @@
 #include "notification_manager.h"
 #include "state.h"
 #include "utils.h"
+#include "nebulaos_refusal.h"
 #include "spdlog/spdlog.h"
 
 static const int    TAB_W      = 60;     // left tab bar width
@@ -89,7 +90,13 @@ void NotificationManager::handle_gcode_response(json &j) {
       continue;
     }
     std::string line = el.template get<std::string>();
-    // "!! " = Klipper error; "// action:" belongs to PromptPanel; skip the rest
+    // "!! " = Klipper error; "// action:" belongs to PromptPanel; skip the rest.
+    // G91: "!! NebulaOS refused: ..." is not a printer error but a refused
+    // action (often from Mainsail); the screen shows its own popup for its
+    // own calls, so these lines never become an error toast.
+    if (is_refusal_line(line)) {
+      continue;
+    }
     if (line.rfind("!! ", 0) == 0) {
       std::string err = line.substr(3);
       // a homing-required error becomes an actionable modal instead of a toast

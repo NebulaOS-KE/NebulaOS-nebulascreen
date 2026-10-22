@@ -233,8 +233,7 @@ void UpdatesPanel::show(const json &status_reply) {
 }
 
 void UpdatesPanel::upgrade(const std::string &name, const std::string &label) {
-  if (KUtils::is_printing()) {
-    KUtils::notify_locked();
+  if (SettingsUi::refuse_if_printing()) {
     return;
   }
   std::string text = name.empty()
@@ -262,8 +261,9 @@ void UpdatesPanel::upgrade(const std::string &name, const std::string &label) {
           std::lock_guard<std::mutex> lock(lv_lock);
           waiting_for_reply = false;
           set_busy("");
+          bool refused = SettingsUi::show_if_refused(reply);
           lv_label_set_text(status_label, err.empty() ? "Update finished."
-                                                      : ("Update failed: " + err).c_str());
+                            : refused ? "Not updated." : ("Update failed: " + err).c_str());
         }
         ws.send_jsonrpc(UPDATE_STATUS_METHOD, json::object(), [this](json &status) {
           std::lock_guard<std::mutex> lock(lv_lock);

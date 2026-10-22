@@ -1,4 +1,5 @@
 #include "filament_runout_panel.h"
+#include "nebulaos_refusal.h"
 #include "state.h"
 #include "config.h"
 #include "utils.h"
@@ -170,7 +171,8 @@ void FilamentRunoutPanel::consume(json &j) {
   if (resp_line.is_string()) {
     if (pending_m600_fallback && !filament_present() && !is_prompt_visible_fn()) {
       std::string resp = resp_line.get<std::string>();
-      if (resp.rfind("!! ", 0) == 0) {
+      // G91: a refused NebulaOS action is not a failed M600
+      if (resp.rfind("!! ", 0) == 0 && !is_refusal_line(resp)) {
         pending_m600_fallback = false;
         show();
       }

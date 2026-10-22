@@ -114,9 +114,9 @@ wpaclient:
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## the matching tests/test_*.cpp.
-.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust
+.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal
 
-test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust
+test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal
 
 # NebulaScreen rename (Run 15): device names and the legacy-config mapping.
 test-nebulascreen-paths: libhv.a
@@ -193,6 +193,14 @@ test-nebulaos-z-adjust: libhv.a
 		src/nebulaos_z_adjust.cpp tests/test_nebulaos_z_adjust.cpp \
 		-o build/test_nebulaos_z_adjust
 	./build/test_nebulaos_z_adjust
+
+# NebulaOS refusals (src/nebulaos_refusal.cpp, G91 v3.4): reason texts, the
+# JSON-RPC error parsing and the "!! NebulaOS refused:" line filter.
+test-nebulaos-refusal: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		src/nebulaos_refusal.cpp tests/test_nebulaos_refusal.cpp \
+		-o build/test_nebulaos_refusal
+	./build/test_nebulaos_refusal
 
 # GuppyScreen action -> NebulaOS macro mapping (src/nebulaos_macros.cpp).
 test-nebulaos-macros:

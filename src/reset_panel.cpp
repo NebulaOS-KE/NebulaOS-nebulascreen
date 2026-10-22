@@ -119,21 +119,29 @@ void ResetPanel::reset_touch() {
 
 // Clean reset and slot swap: NebulaOS arms the next boot and reboots; it
 // undoes the change itself when the reboot cannot be started.
+// The answer comes before the reboot: "Restarting..." only once NebulaOS has
+// accepted; a refusal gets the refusal popup, any other error a notice.
 void ResetPanel::system_call(const char *method, const char *what) {
-  if (KUtils::is_printing()) {
-    KUtils::notify_locked();
+  if (SettingsUi::refuse_if_printing()) {
     return;
   }
   ws.send_jsonrpc(method, json::object(), [this, what](json &reply) {
     auto err = jsonrpc_error_message(reply);
+    std::lock_guard<std::mutex> lock(lv_lock);
     if (err.empty()) {
+      KUtils::notify_toast("Restarting...", 4000);
       return;
     }
     spdlog::warn("{} failed: {}", what, err);
-    std::lock_guard<std::mutex> lock(lv_lock);
-    KUtils::notify_toast(std::string(what) + " not done: " + err, 6000);
+    if (SettingsUi::show_if_refused(reply)) {
+      return;
+    }
+    // "CODE: text" -> the text; nothing was changed (NebulaOS undoes itself)
+    auto pos = err.find(": ");
+    std::string text = pos == std::string::npos ? err : err.substr(pos + 2);
+    SettingsUi::notice((std::string(what) + ": not done").c_str(),
+                       (text + "\n\nNothing was changed.").c_str());
   });
-  KUtils::notify_toast("Restarting...", 4000);
 }
 
 void ResetPanel::handle_callback(lv_event_t *e) {
@@ -155,8 +163,7 @@ void ResetPanel::handle_callback(lv_event_t *e) {
       "calibrate again.",
       "Reset", Tone::Normal, [this]() { reset_touch(); });
   } else if (obj == clean_btn.get_container()) {
-    if (KUtils::is_printing()) {
-      KUtils::notify_locked();
+    if (SettingsUi::refuse_if_printing()) {
       return;
     }
     SettingsUi::confirm("Clean NebulaOS reset",
@@ -168,8 +175,7 @@ void ResetPanel::handle_callback(lv_event_t *e) {
       "Erase & restart", Tone::Danger,
       [this]() { system_call(CLEAN_RESET_METHOD, "Clean reset"); });
   } else if (obj == swap_btn.get_container()) {
-    if (KUtils::is_printing()) {
-      KUtils::notify_locked();
+    if (SettingsUi::refuse_if_printing()) {
       return;
     }
     SettingsUi::confirm("Swap boot slot (A/B)", swap_confirm_text(image_status).c_str(),

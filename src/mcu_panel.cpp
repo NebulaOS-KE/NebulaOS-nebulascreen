@@ -154,15 +154,13 @@ void McuPanel::show_files(const json &files_reply) {
 
 void McuPanel::install(const McuFile &f) {
   if (flashing) return;
-  if (KUtils::is_printing()) {
-    KUtils::notify_locked();
+  if (SettingsUi::refuse_if_printing()) {
     return;
   }
   McuFile chosen = f;
   SettingsUi::confirm(f.native ? "Reinstall built-in MCU firmware" : "Install MCU firmware",
     mcu_confirm_text(f).c_str(), "Install", SettingsUi::Tone::Danger, [this, chosen]() {
-      if (KUtils::is_printing()) {   // a print may have started meanwhile
-        KUtils::notify_locked();
+      if (SettingsUi::refuse_if_printing()) {   // a print may have started meanwhile
         return;
       }
       start_busy();
@@ -213,6 +211,14 @@ void McuPanel::finish(const json &reply) {
   if (busy_label != NULL) {
     SettingsUi::close_busy(busy_label);
     busy_label = NULL;
+  }
+  if (refusal_of(reply).refused) {
+    // G91: refused before anything was stopped - Klipper keeps running
+    flashing = false;
+    lv_obj_clear_state(refresh_btn, LV_STATE_DISABLED);
+    SettingsUi::show_if_refused(reply);
+    refresh();
+    return;
   }
   auto r = mcu_flash_result(reply);
   if (r.ok) {
