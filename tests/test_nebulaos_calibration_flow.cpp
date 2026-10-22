@@ -252,8 +252,9 @@ TEST(BedTram, page) {
   s["target"] = "front left";
   s["message"] = "Front left: add a 0.10 mm shim.";
   v = cal_view(CalFlow::BED_TRAM, s, false);
-  ASSERT_TRUE(v.text.find("Front:  left 0.15 ADJUST    right 0.00 OK") != std::string::npos);
-  ASSERT_TRUE(v.text.find("Rear:   left 0.03 OK    right 0.12 later") != std::string::npos);
+  // older extensions (unsigned deviations), rigid: shown as below the highest corner
+  ASSERT_TRUE(v.text.find("Front:  left -0.15 ADJUST    right  0.00 highest") != std::string::npos);
+  ASSERT_TRUE(v.text.find("Rear:   left -0.03 OK    right -0.12 later") != std::string::npos);
   ASSERT_TRUE(v.text.find("Rear:") < v.text.find("Front:"));            // rear row on top
   ASSERT_TRUE(v.text.find("add a 0.10 mm shim") != std::string::npos);
   ASSERT_TRUE(has_action(v, "Done - measure again", "NEBULAOS_BED_TRAM CONFIRM=1"));
@@ -265,6 +266,67 @@ TEST(BedTram, page) {
   ASSERT_TRUE(v.text.find("Bed tramming complete") != std::string::npos);
   ASSERT_TRUE(v.text.find("calibrate the load cell next") != std::string::npos);
   ASSERT_TRUE(v.can_start);
+}
+
+// Run 17 (Tim): signed values from signed_deviations + reference.
+TEST(BedTram, signed_grid_rigid) {
+  json s = json::object();
+  s["state"] = "awaiting_adjustment";
+  s["mount"] = "rigid";
+  s["deviations"] = {0.23, 0.12, 0.0, 0.05};
+  s["signed_deviations"] = {-0.23, -0.12, 0.0, -0.05};
+  s["reference"] = "rear right";
+  s["accepted"] = {false, false, true, true};
+  s["target"] = "front left";
+  s["message"] = "Front left: -0.23 mm. Add a 0.20 mm shim to raise it.";
+  auto v = cal_view(CalFlow::BED_TRAM, s, false);
+  ASSERT_TRUE(v.text.find("Rear:   left -0.05 OK    right  0.00 highest") != std::string::npos);
+  ASSERT_TRUE(v.text.find("Front:  left -0.23 ADJUST    right -0.12 later") != std::string::npos);
+  ASSERT_TRUE(v.text.find("Corners in mm vs the highest corner.\nFront = the side with the screen.") != std::string::npos);
+  ASSERT_TRUE(v.text.find("Add a 0.20 mm shim") != std::string::npos);
+}
+
+TEST(BedTram, signed_grid_adjustable) {
+  json s = json::object();
+  s["state"] = "awaiting_adjustment";
+  s["mount"] = "adjustable";
+  s["deviations"] = {0.0, 0.08, 0.1, 0.02};
+  s["signed_deviations"] = {0.0, 0.08, -0.1, 0.02};
+  s["reference"] = 0;                                    // an index works too
+  s["accepted"] = {true, false, false, true};
+  s["target"] = "rear right";
+  auto v = cal_view(CalFlow::BED_TRAM, s, false);
+  ASSERT_TRUE(v.text.find("Rear:   left +0.02 OK    right -0.10 ADJUST") != std::string::npos);
+  ASSERT_TRUE(v.text.find("Front:  left  0.00 base    right +0.08 later") != std::string::npos);
+  ASSERT_TRUE(v.text.find("+ higher") != std::string::npos);
+}
+
+TEST(BedTram, unsigned_adjustable_fallback_has_no_sign) {
+  json s = json::object();
+  s["state"] = "complete";
+  s["mount"] = "adjustable";
+  s["deviations"] = {0.0, 0.01, 0.02, 0.0};
+  s["accepted"] = {true, true, true, true};
+  s["message"] = "Bed tramming complete.";
+  auto v = cal_view(CalFlow::BED_TRAM, s, false);
+  ASSERT_TRUE(v.text.find("Rear:   left 0.00 OK    right 0.02 OK") != std::string::npos);
+  ASSERT_TRUE(v.text.find("Front:  left 0.00 OK    right 0.01 OK") != std::string::npos);
+  ASSERT_TRUE(v.text.find("Corners (mm), front = the side with the screen:") != std::string::npos);
+}
+
+TEST(BedTram, bad_signed_values_fall_back) {
+  json s = json::object();
+  s["state"] = "awaiting_adjustment";
+  s["mount"] = "rigid";
+  s["deviations"] = {0.1, 0.0, 0.0, 0.0};
+  s["signed_deviations"] = {-0.1, 0.0};                  // wrong size: use deviations
+  s["reference"] = "nowhere";
+  s["accepted"] = {false, true, true, true};
+  s["target"] = "front left";
+  auto v = cal_view(CalFlow::BED_TRAM, s, false);
+  ASSERT_TRUE(v.text.find("Front:  left -0.10 ADJUST    right  0.00 highest") != std::string::npos);
+  // only one corner is "highest"
+  ASSERT_TRUE(v.text.find("0.00 highest") == v.text.rfind("0.00 highest"));
 }
 
 int main() {

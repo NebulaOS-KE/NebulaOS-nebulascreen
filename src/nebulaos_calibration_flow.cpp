@@ -125,28 +125,80 @@ static std::string fmt(const char *f, double a) {
 }
 
 // The four corners as the bed lies in front of you (rear on top), G89.
+// Run 17 (Tim): SIGNED values, so a rigid mount reads as "lower than the
+// highest corner" and not as a height:
+//   Rear:   left -0.05 OK    right  0.00 highest
+//   Front:  left -0.23 ADJUST    right -0.12 later
+// The extensions report signed_deviations + reference (rigid: vs the highest
+// corner; adjustable: vs the base corner, + higher, - lower). Older extensions
+// only have the unsigned deviations: for a rigid mount those are "how far below
+// the highest corner", so they are shown negated; for an adjustable mount the
+// direction is unknown and the plain distance is shown.
+static int corner_index(const json &ref, const char *const names[]) {
+  if (ref.is_number_integer()) {
+    int i = ref.get<int>();
+    return i >= 0 && i < 4 ? i : -1;
+  }
+  if (!ref.is_string()) return -1;
+  std::string r = ref.get<std::string>();
+  for (auto &c : r) c = (char)std::tolower((unsigned char)c);
+  for (int i = 0; i < 4; i++) {
+    std::string n = names[i];
+    for (auto &c : n) c = (char)std::tolower((unsigned char)c);
+    if (n == r) return i;
+  }
+  return -1;
+}
+
 static std::string tram_corners(const json &st) {
-  static const char *names[] = {"Front left", "Front right", "Rear right", "Rear left"};
-  const json &dev = st.contains("deviations") ? st["deviations"] : json();
+  static const char *const names[] = {"Front left", "Front right", "Rear right", "Rear left"};
   const json &ok = st.contains("accepted") ? st["accepted"] : json();
   std::string target = str(st, "target");
+  bool rigid = str(st, "mount") != "adjustable";
+  const json empty;
+  const json &sdev = st.contains("signed_deviations") ? st["signed_deviations"] : empty;
+  const json &udev = st.contains("deviations") ? st["deviations"] : empty;
+  bool is_signed = sdev.is_array() && sdev.size() == 4;
+  const json &dev = is_signed ? sdev : udev;
   if (!dev.is_array() || dev.size() != 4) return "";
+  double v[4];
+  for (int i = 0; i < 4; i++) {
+    v[i] = dev[i].is_number() ? dev[i].get<double>() : 0;
+    if (!is_signed && rigid) v[i] = -v[i];    // unsigned rigid = below the highest
+  }
+  bool show_sign = is_signed || rigid;
+  int ref = is_signed && st.contains("reference") ? corner_index(st["reference"], names) : -1;
+  if (ref < 0 && show_sign && rigid) {
+    // older extensions: the highest corner is the one at 0
+    for (int i = 0; i < 4 && ref < 0; i++) {
+      if (std::fabs(v[i]) < 0.0005) ref = i;
+    }
+  }
   auto lower = [](std::string x) {
     for (auto &c : x) c = (char)std::tolower((unsigned char)c);
     return x;
   };
+  auto value = [&](double d) {
+    if (!show_sign) return fmt("%.2f", d);
+    if (std::fabs(d) < 0.005) return std::string(" 0.00");
+    return fmt("%+.2f", d);
+  };
   auto cell = [&](int i) {
     std::string state;
-    if (ok.is_array() && ok.size() == 4 && ok[i].is_boolean() && ok[i].get<bool>()) {
+    if (i == ref) {
+      state = rigid ? "highest" : "base";
+    } else if (ok.is_array() && ok.size() == 4 && ok[i].is_boolean() && ok[i].get<bool>()) {
       state = "OK";
     } else if (!target.empty()) {
       state = lower(names[i]) == lower(target) ? "ADJUST" : "later";
     }
-    double d = dev[i].is_number() ? dev[i].get<double>() : 0;
-    return std::string(i == 0 || i == 3 ? "left " : "right ") + fmt("%.2f", d)
+    return std::string(i == 0 || i == 3 ? "left " : "right ") + value(v[i])
            + (state.empty() ? "" : " " + state);
   };
-  return "Corners (mm), front = the side with the screen:\n"
+  std::string head = !show_sign ? "Corners (mm), front = the side with the screen:"
+    : rigid ? "Corners in mm vs the highest corner.\nFront = the side with the screen."
+    : "Corners in mm vs the base corner (+ higher).\nFront = the side with the screen.";
+  return head + "\n"
          "Rear:   " + cell(3) + "    " + cell(2) + "\n"
          "Front:  " + cell(0) + "    " + cell(1);
 }
@@ -170,10 +222,10 @@ static CalView bed_tram_view(CalView v, const json &st, bool printing) {
     v.can_cancel = true;
   } else if (state == "complete" || state == "stopped") {
     std::string head = state == "complete" ? message : "Stopped: " + message;
-    v.text = head + "\n" + tram_corners(st);
+    v.text = head + "\n\n" + tram_corners(st);
     if (state == "complete" && st.contains("load_cell_corner_changed")
         && st["load_cell_corner_changed"].is_boolean() && st["load_cell_corner_changed"].get<bool>()) {
-      v.text += "\nThe front-left corner (load cell) was changed: calibrate the load cell next.";
+      v.text += "\n\nThe front-left corner (load cell) was changed: calibrate the load cell next.";
     }
     v.can_start = !printing;
   } else {
