@@ -3,6 +3,7 @@
 
 #include "button_container.h"
 #include "mcu_panel.h"
+#include "nebulaos_refusal.h"
 #include "websocket_client.h"
 #include "lvgl/lvgl.h"
 
@@ -28,6 +29,8 @@ class PrinterSettingsPanel {
 
  private:
   void handle_callback(lv_event_t *e);
+  void request_restart(RestartKind kind);
+  void restart(const RestartDecision &d, bool mcu);
 
   KWebSocketClient &ws;
   std::mutex &lv_lock;

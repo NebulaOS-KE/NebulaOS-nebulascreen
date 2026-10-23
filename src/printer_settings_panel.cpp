@@ -1,5 +1,6 @@
 #include "printer_settings_panel.h"
 #include "config.h"
+#include "nebulaos_display.h"
 #include "settings_ui.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
@@ -78,6 +79,64 @@ void PrinterSettingsPanel::foreground() {
   lv_obj_move_foreground(cont);
 }
 
+// G98 (Run 18): ask NebulaOS first, like Mainsail's restart (see
+// restart_decision in nebulaos_refusal.h). Replies arrive on the websocket
+// thread.
+void PrinterSettingsPanel::request_restart(RestartKind kind) {
+  ws.send_jsonrpc(BUSY_METHOD, busy_params_restart(), [this, kind](json &reply) {
+    std::lock_guard<std::mutex> lock(lv_lock);
+    RestartDecision d = restart_decision(kind, reply);
+    spdlog::info("restart {}: busy check {} -> {}", kind == RestartKind::MCU ? "MCU" : "Klipper",
+                 d.refused ? "refused" : d.check_unavailable ? "unavailable" : "allowed",
+                 d.refused ? d.refusal.reason : d.method);
+    if (d.refused) {
+      SettingsUi::refusal(d.refusal);
+      return;
+    }
+    bool mcu = kind == RestartKind::MCU;
+    if (d.check_unavailable) {
+      // older firmware without the check: the screen's own question, as before
+      KUtils::confirm_if_printing(
+        mcu ? "A print is running. Restart the MCU and stop it?"
+            : "A print is running. Restart Klipper and stop it?",
+        [this, d, mcu]() { restart(d, mcu); });
+      return;
+    }
+    restart(d, mcu);
+  });
+}
+
+void PrinterSettingsPanel::restart(const RestartDecision &d, bool mcu) {
+  std::string fallback = d.fallback_method;
+  json fallback_params = d.fallback_params;
+  ws.send_jsonrpc(d.method, d.params, [this, fallback, fallback_params](json &reply) {
+    if (!reply.contains("error")) {
+      return;
+    }
+    std::lock_guard<std::mutex> lock(lv_lock);
+    if (SettingsUi::show_if_refused(reply)) {
+      return;
+    }
+    if (fallback.empty()) {
+      KUtils::notify_toast("Restart failed: " + jsonrpc_error_message(reply), 6000);
+      return;
+    }
+    // Klippy did not take it (hung, disconnected): restart the service
+    spdlog::info("restart: {} failed ({}), trying {}", "printer restart",
+                 jsonrpc_error_message(reply), fallback);
+    ws.send_jsonrpc(fallback, fallback_params, [this](json &r) {
+      if (!r.contains("error")) {
+        return;
+      }
+      std::lock_guard<std::mutex> lock(lv_lock);
+      if (!SettingsUi::show_if_refused(r)) {
+        KUtils::notify_toast("Restart failed: " + jsonrpc_error_message(r), 6000);
+      }
+    });
+  });
+  KUtils::notify_toast(mcu ? "Restarting the MCU..." : "Restarting Klipper...", 3000);
+}
+
 void PrinterSettingsPanel::handle_callback(lv_event_t *e) {
   lv_event_code_t code = lv_event_get_code(e);
   lv_obj_t *obj = lv_event_get_current_target(e);
@@ -89,14 +148,7 @@ void PrinterSettingsPanel::handle_callback(lv_event_t *e) {
     } else if (obj == mcu_fw_btn) {
       mcu_panel.foreground();
     } else if (obj == restart_klipper_btn || obj == restart_mcu_btn) {
-      bool mcu = obj == restart_mcu_btn;
-      KUtils::confirm_if_printing(
-        mcu ? "A print is running. Restart the MCU and stop it?"
-            : "A print is running. Restart Klipper and stop it?",
-        [this, mcu]() {
-          ws.send_jsonrpc(mcu ? "printer.firmware_restart" : "printer.restart");
-          KUtils::notify_toast(mcu ? "Restarting the MCU..." : "Restarting Klipper...", 3000);
-        });
+      request_restart(obj == restart_mcu_btn ? RestartKind::MCU : RestartKind::KLIPPER);
     }
     return;
   }

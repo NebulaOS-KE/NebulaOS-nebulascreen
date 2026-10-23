@@ -96,6 +96,88 @@ TEST(Filter, refusal_lines) {
   ASSERT_FALSE(is_refusal_line(""));
 }
 
+// G98 (Run 18): the screen's Restart Klipper / Restart MCU.
+static json busy_reply(bool busy, const char *reason, const char *klippy, const char *msg = "") {
+  json r = {{"busy", busy}, {"message", msg}, {"profile", "restart"}};
+  r["reason"] = reason ? json(reason) : json(nullptr);
+  r["klippy"] = klippy ? json(klippy) : json(nullptr);
+  return {{"result", r}};
+}
+
+TEST(Restart, asks_the_restart_profile) {
+  ASSERT_EQ(std::string(BUSY_METHOD), std::string("machine.nebulaos.system.busy"));
+  ASSERT_EQ(busy_params_restart().dump(), std::string("{\"profile\":\"restart\"}"));
+}
+
+TEST(Restart, busy_refuses_with_the_popup_text) {
+  for (auto kind : {RestartKind::KLIPPER, RestartKind::MCU}) {
+    auto d = restart_decision(kind, busy_reply(true, "PRINTING", "ready",
+                                               "Not possible while a print is running."));
+    ASSERT_TRUE(d.refused);
+    ASSERT_TRUE(d.refusal.refused);
+    ASSERT_EQ(d.refusal.reason, std::string("PRINTING"));
+    ASSERT_EQ(d.refusal.text, std::string("Not possible while a print is running."));
+    ASSERT_TRUE(d.method.empty());
+  }
+  auto d = restart_decision(RestartKind::KLIPPER, busy_reply(true, "ACTIVE", "ready", "x"));
+  ASSERT_EQ(d.refusal.text, refusal_reason_text("ACTIVE"));          // the table's words
+  d = restart_decision(RestartKind::KLIPPER,
+                       busy_reply(true, "UPDATING", "ready", "An MCU flash is running."));
+  ASSERT_EQ(d.refusal.text, std::string("An MCU flash is running."));  // what runs
+  d = restart_decision(RestartKind::KLIPPER, busy_reply(true, "NEWCODE", "ready", "Something new."));
+  ASSERT_EQ(d.refusal.reason, std::string("UNKNOWN"));
+  ASSERT_EQ(d.refusal.text, std::string("Something new."));
+  d = restart_decision(RestartKind::KLIPPER, busy_reply(true, nullptr, "unknown"));
+  ASSERT_TRUE(d.refused);
+  ASSERT_EQ(d.refusal.text, refusal_reason_text("UNKNOWN"));
+}
+
+TEST(Restart, not_busy_and_ready_uses_klipper) {
+  auto d = restart_decision(RestartKind::KLIPPER, busy_reply(false, nullptr, "ready"));
+  ASSERT_FALSE(d.refused);
+  ASSERT_FALSE(d.check_unavailable);
+  ASSERT_EQ(d.method, std::string("printer.restart"));
+  ASSERT_EQ(d.fallback_method, std::string("machine.services.restart"));
+  ASSERT_EQ(d.fallback_params["service"].get<std::string>(), std::string("klipper"));
+  d = restart_decision(RestartKind::MCU, busy_reply(false, nullptr, "ready"));
+  ASSERT_EQ(d.method, std::string("printer.firmware_restart"));
+}
+
+TEST(Restart, hung_klippy_is_restarted_as_a_service) {
+  for (const char *k : {"not_ready", "unknown", "something_new"}) {
+    auto d = restart_decision(RestartKind::KLIPPER, busy_reply(false, nullptr, k));
+    ASSERT_FALSE(d.refused);
+    ASSERT_EQ(d.method, std::string("machine.services.restart"));
+    ASSERT_EQ(d.params["service"].get<std::string>(), std::string("klipper"));
+    ASSERT_TRUE(d.fallback_method.empty());
+  }
+  auto d = restart_decision(RestartKind::KLIPPER, busy_reply(false, nullptr, nullptr));
+  ASSERT_EQ(d.method, std::string("machine.services.restart"));
+  // a shut-down MCU needs FIRMWARE_RESTART; the service restart if Klippy does not answer
+  d = restart_decision(RestartKind::MCU, busy_reply(false, nullptr, "not_ready"));
+  ASSERT_EQ(d.method, std::string("printer.firmware_restart"));
+  ASSERT_EQ(d.fallback_method, std::string("machine.services.restart"));
+}
+
+TEST(Restart, missing_or_failing_check_never_blocks) {
+  json missing = {{"error", {{"code", 404}, {"message", "Method not found"}}}};
+  json timeout = {{"error", {{"code", 504}, {"message", "timed out"}}}};
+  json refusal_shaped = {{"error", {{"code", 409}, {"message", "PRINTING: printing"}}}};
+  for (const json &r : {missing, timeout, refusal_shaped, json(), json::object(),
+                        json({{"result", "odd"}})}) {
+    for (auto kind : {RestartKind::KLIPPER, RestartKind::MCU}) {
+      auto d = restart_decision(kind, r);
+      ASSERT_FALSE(d.refused);
+      ASSERT_TRUE(d.check_unavailable);
+      ASSERT_EQ(d.method, std::string(kind == RestartKind::KLIPPER ? "printer.restart"
+                                                                   : "printer.firmware_restart"));
+    }
+  }
+  // busy must be a real true
+  json odd = {{"result", {{"busy", "yes"}, {"klippy", "ready"}}}};
+  ASSERT_FALSE(restart_decision(RestartKind::KLIPPER, odd).refused);
+}
+
 int main() {
   return minitest::run_all("nebulaos_refusal") > 0 ? 1 : 0;
 }

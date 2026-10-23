@@ -47,4 +47,39 @@ Refusal refusal_hint(bool printing, bool paused);
 // True for a "!! NebulaOS refused: ..." console line.
 bool is_refusal_line(const std::string &line);
 
+// G98 (Run 18): the screen's Restart Klipper / Restart MCU follow the same rule
+// as Mainsail. Before the restart the screen asks
+//   machine.nebulaos.system.busy {"profile": "restart"}
+//   -> {"busy": bool, "reason": "PRINTING"|..., "message": str,
+//       "klippy": "ready"|"not_ready"|"unknown", "profile": "restart"}
+// (NebulaOS-firmware 3088ea5; the restart profile follows G95: a hung Klippy
+// or a failed check is not busy).
+//   - busy: the "Not now" popup, nothing is restarted;
+//   - the endpoint is missing or fails (older firmware, timeout): the restart
+//     is allowed - a restart is never blocked because the check is unavailable
+//     (older firmware: the screen's own "a print is running" confirmation);
+//   - Klippy not ready / unknown (hung, shut down, disconnected): Klipper is
+//     restarted as a service (machine.services.restart klipper), which works
+//     even when Klippy does not answer (Tim G95). Restart MCU always tries
+//     printer.firmware_restart first (what a shut-down MCU needs);
+//   - every printer.* restart falls back to the service restart when Klippy
+//     does not take it (error reply); NebulaOS's supervisorctl shim still
+//     refuses that while a print runs.
+extern const char *const BUSY_METHOD;   // machine.nebulaos.system.busy
+json busy_params_restart();             // {"profile": "restart"}
+
+enum class RestartKind { KLIPPER, MCU };
+
+struct RestartDecision {
+  bool refused = false;            // show `refusal`, restart nothing
+  Refusal refusal;
+  bool check_unavailable = false;  // endpoint missing/failed: confirm while printing, as before
+  std::string method;              // the JSON-RPC call that restarts
+  json params = json::object();
+  std::string fallback_method;     // "" or the call to use if `method` fails
+  json fallback_params = json::object();
+};
+
+RestartDecision restart_decision(RestartKind kind, const json &busy_reply);
+
 #endif  // __NEBULAOS_REFUSAL_H__

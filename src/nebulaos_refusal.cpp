@@ -106,3 +106,53 @@ bool is_refusal_line(const std::string &line) {
   size_t n = std::strlen(REFUSAL_LINE_PREFIX) - 1;
   return line.compare(0, n, REFUSAL_LINE_PREFIX, n) == 0;
 }
+
+const char *const BUSY_METHOD = "machine.nebulaos.system.busy";
+
+json busy_params_restart() {
+  return {{"profile", "restart"}};
+}
+
+RestartDecision restart_decision(RestartKind kind, const json &busy_reply) {
+  RestartDecision d;
+  const json service_params = {{"service", "klipper"}};
+  const json *res = nullptr;
+  if (busy_reply.is_object() && busy_reply.contains("result")
+      && busy_reply["result"].is_object()) {
+    res = &busy_reply["result"];
+  }
+  bool busy = res != nullptr && res->contains("busy") && (*res)["busy"].is_boolean()
+              && (*res)["busy"].get<bool>();
+  if (busy) {
+    d.refused = true;
+    d.refusal.refused = true;
+    std::string reason = res->contains("reason") && (*res)["reason"].is_string()
+                         ? (*res)["reason"].get<std::string>() : "";
+    std::string message = res->contains("message") && (*res)["message"].is_string()
+                          ? trim((*res)["message"].get<std::string>()) : "";
+    const char *k = known(reason);
+    d.refusal.reason = k != nullptr ? k : "UNKNOWN";
+    // the table's words; the printer's own text where the table has none
+    // that says what runs (UPDATING) or the reason is new to this screen
+    d.refusal.text = (k == nullptr || d.refusal.reason == "UPDATING") && !message.empty()
+                     ? message : refusal_reason_text(d.refusal.reason);
+    return d;
+  }
+  d.check_unavailable = res == nullptr;
+  std::string klippy = res != nullptr && res->contains("klippy") && (*res)["klippy"].is_string()
+                       ? (*res)["klippy"].get<std::string>() : "";
+  // no answer at all: Klippy's state is not known either - the plain call,
+  // as before the check existed
+  bool ready = d.check_unavailable || klippy == "ready";
+  if (kind == RestartKind::KLIPPER && !ready) {
+    d.method = "machine.services.restart";
+    d.params = service_params;
+    return d;
+  }
+  d.method = kind == RestartKind::KLIPPER ? "printer.restart" : "printer.firmware_restart";
+  // Klippy did not take it (hung, disconnected): restart the service. NebulaOS's
+  // supervisorctl shim still refuses that while a print runs.
+  d.fallback_method = "machine.services.restart";
+  d.fallback_params = service_params;
+  return d;
+}
