@@ -1,4 +1,3 @@
-#include "settings_ui.h"
 #include "static_ip_panel.h"
 #include "nebulaos_network.h"
 #include "utils.h"
@@ -270,7 +269,7 @@ StaticIpPanel::StaticIpPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
+  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
 
   lv_obj_move_background(cont);
 }
