@@ -153,6 +153,9 @@ void GuidedCalibrationPanel::refresh() {
     show(action_btns[i], on);
   }
   show(measure_row, v.needs_measurement);
+  if (!cal_input_keep(v) && *lv_textarea_get_text(measure_ta) != '\0') {
+    lv_textarea_set_text(measure_ta, "");   // the flow is over: a new run starts empty
+  }
   if (!v.needs_measurement) {
     show_keypad(false);
   } else if (text_changed && !lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN)) {
@@ -208,6 +211,7 @@ void GuidedCalibrationPanel::consume(json &j) {
 // Called from LVGL callbacks; the reply arrives on the websocket thread.
 void GuidedCalibrationPanel::send(const std::string &gcode, const char *what) {
   std::string label(what);
+  spdlog::info("guided calibration: {}", gcode);
   ws.gcode_script(gcode, [this, label](json &reply) {
     if (!reply.contains("error")) {
       return;
@@ -248,17 +252,28 @@ void GuidedCalibrationPanel::confirm_start() {
   KUtils::style_lock_mbox(mbox, 90);
 }
 
+// G94 (Run 18): Weigh / Submit sends the typed value and keeps it in the
+// field (a problem means "try again", usually with the same number).
 void GuidedCalibrationPanel::submit_measurement() {
   std::string cmd = cal_input_command(flow, lv_textarea_get_text(measure_ta));
   if (cmd.empty()) {
-    KUtils::notify_toast(flow == CalFlow::LOAD_CELL
-                           ? "Enter the weight from the scale in grams (1000-5000), e.g. 1531"
-                           : "Enter the distance in mm, e.g. 98.5", 3000);
+    KUtils::notify_toast(cal_input_problem(flow), 3000);
+    show_keypad(true);
     return;
   }
   show_keypad(false);
-  lv_textarea_set_text(measure_ta, "");
   send(cmd, "Measurement rejected");
+}
+
+// The keypad's OK key commits the typed value: the keypad closes, the value
+// stays in the field for Weigh / Submit.
+void GuidedCalibrationPanel::commit_input() {
+  CalKeypadOk ok = cal_keypad_ok(flow, lv_textarea_get_text(measure_ta));
+  if (!ok.close) {
+    KUtils::notify_toast(ok.problem, 3000);
+    return;
+  }
+  show_keypad(false);
 }
 
 void GuidedCalibrationPanel::handle_callback(lv_event_t *e) {
@@ -293,8 +308,25 @@ void GuidedCalibrationPanel::handle_kb(lv_event_t *e) {
   if (target == measure_ta && (code == LV_EVENT_FOCUSED || code == LV_EVENT_CLICKED)) {
     show_keypad(true);
   } else if (target == kb && code == LV_EVENT_READY) {
-    submit_measurement();
+    commit_input();
   } else if (target == kb && code == LV_EVENT_CANCEL) {
     show_keypad(false);
   }
 }
+
+#ifdef SIMULATOR
+void GuidedCalibrationPanel::sim_type(const char *keys) {
+  for (const char *k = keys; *k; k++) {
+    std::string want = *k == 'K' ? std::string(LV_SYMBOL_OK) : std::string(1, *k);
+    for (uint16_t i = 0; i < 32; i++) {
+      const char *t = lv_btnmatrix_get_btn_text(kb, i);
+      if (t == NULL) break;
+      if (want == t) {
+        lv_btnmatrix_set_selected_btn(kb, i);
+        lv_event_send(kb, LV_EVENT_VALUE_CHANGED, NULL);
+        break;
+      }
+    }
+  }
+}
+#endif

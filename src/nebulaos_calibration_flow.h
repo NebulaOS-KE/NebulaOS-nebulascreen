@@ -66,5 +66,20 @@ std::string cal_measure_command(const std::string &text);
 std::string cal_input_command(CalFlow flow, const std::string &text);
 // Placeholder / hint for that entry field.
 const char *cal_input_hint(CalFlow flow);
+// What the screen says when the typed number is not usable.
+const char *cal_input_problem(CalFlow flow);
+
+// G94 (Run 18, Tim's Run 17 test): the typed number stays in the field. The
+// keypad's OK key commits it (closes the keypad, the value stays for Weigh /
+// Submit); the Weigh / Submit button sends the typed value and leaves it in
+// the field, so a retry after a problem ("not stable", ...) needs no retyping.
+// The field is cleared only when the flow is over (idle, done, cancelled,
+// failed): cal_input_keep() is false then.
+bool cal_input_keep(const CalView &v);
+struct CalKeypadOk {
+  bool close = true;    // close the keypad, keep the value
+  std::string problem;  // non-empty: the value is not usable; keypad stays open
+};
+CalKeypadOk cal_keypad_ok(CalFlow flow, const std::string &text);
 
 #endif // __NEBULAOS_CALIBRATION_FLOW_H__

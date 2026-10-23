@@ -25,6 +25,10 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   void consume(json &j);
 #ifdef SIMULATOR
   void sim_keypad() { show_keypad(true); }
+  // presses keypad keys like a finger would ('K' = the OK key)
+  void sim_type(const char *keys);
+  void sim_weigh() { lv_event_send(measure_btn, LV_EVENT_CLICKED, NULL); }
+  std::string sim_input() const { return lv_textarea_get_text(measure_ta); }
 #endif
 
   static void _handle_callback(lv_event_t *e) {
@@ -41,6 +45,7 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   void send(const std::string &gcode, const char *what);
   void confirm_start();
   void submit_measurement();
+  void commit_input();
   void show_keypad(bool on);
 
   KWebSocketClient &ws;

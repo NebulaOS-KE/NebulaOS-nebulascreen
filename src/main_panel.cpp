@@ -725,6 +725,18 @@ void MainPanel::sim_tour(const char *dir) {
     {"m31-loadcell-empty", [lc]() { lc({{"state", "awaiting_empty"}}); }},
     {"m32-loadcell-weight", [lc]() { lc({{"state", "awaiting_weight"}}); }},
     {"m33-loadcell-weight-keypad", [cal]() { cal().sim_guided(CalFlow::LOAD_CELL).sim_keypad(); }},
+    // G94 (Run 18): typed value, OK key commits it, Weigh keeps it after a problem
+    {"m33b-loadcell-weight-typed", [cal]() { cal().sim_guided(CalFlow::LOAD_CELL).sim_type("1531"); }},
+    {"m33c-loadcell-weight-ok", [cal]() {
+      auto &g = cal().sim_guided(CalFlow::LOAD_CELL);
+      g.sim_type("K");
+      spdlog::info("SIM-CHECK after OK: field='{}'", g.sim_input()); }},
+    {"m33d-loadcell-weigh-problem", [lc, cal]() {
+      auto &g = cal().sim_guided(CalFlow::LOAD_CELL);
+      g.sim_weigh();
+      lc({{"state", "awaiting_weight"}, {"problem", "The reading is not stable. Wait until the "
+          "bottle stands still, then tap Weigh again."}});
+      spdlog::info("SIM-CHECK after Weigh + problem: field='{}'", g.sim_input()); }},
     {"m34-loadcell-weight-problem", [lc]() {
       lc({{"state", "awaiting_weight"}, {"problem", "The reading moved by more than 20 g while "
           "settling. Make sure nothing touches the bed or the nozzle, then try again."}}); }},

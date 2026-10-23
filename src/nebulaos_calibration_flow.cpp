@@ -96,6 +96,26 @@ const char *cal_input_hint(CalFlow flow) {
   return flow == CalFlow::LOAD_CELL ? "weight in grams" : "mm the mark moved";
 }
 
+const char *cal_input_problem(CalFlow flow) {
+  return flow == CalFlow::LOAD_CELL
+    ? "Enter the weight from the scale in grams (1000-5000), e.g. 1531"
+    : "Enter the distance in mm, e.g. 98.5";
+}
+
+bool cal_input_keep(const CalView &v) {
+  return v.needs_measurement || v.can_cancel;
+}
+
+CalKeypadOk cal_keypad_ok(CalFlow flow, const std::string &text) {
+  CalKeypadOk r;
+  // An empty field: OK just closes the keypad.
+  if (!text.empty() && cal_input_command(flow, text).empty()) {
+    r.close = false;
+    r.problem = cal_input_problem(flow);
+  }
+  return r;
+}
+
 static const char *const DESCRIPTION_LOAD_CELL =
   "Teaches the nozzle touch sensor (load cell) how much force it measures. "
   "Takes about 2 minutes.\n"

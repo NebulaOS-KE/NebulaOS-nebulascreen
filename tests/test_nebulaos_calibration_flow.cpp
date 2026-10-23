@@ -331,6 +331,60 @@ TEST(BedTram, bad_signed_values_fall_back) {
   ASSERT_TRUE(v.text.find("0.00 highest") == v.text.rfind("0.00 highest"));
 }
 
+// G94 (Run 18, Tim's Run 17 test): the typed grams were lost on OK / Weigh.
+TEST(Input, load_cell_grams_command_uses_the_typed_value) {
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "1531"),
+            std::string("NEBULAOS_LOAD_CELL_CALIBRATE GRAMS=1531.0"));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "1531.5"),
+            std::string("NEBULAOS_LOAD_CELL_CALIBRATE GRAMS=1531.5"));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, ""), std::string(""));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "153"), std::string(""));
+  ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "."), std::string(""));
+}
+
+TEST(Input, keypad_ok_commits_a_usable_value) {
+  auto ok = cal_keypad_ok(CalFlow::LOAD_CELL, "1531");
+  ASSERT_TRUE(ok.close);
+  ASSERT_TRUE(ok.problem.empty());
+  ok = cal_keypad_ok(CalFlow::ESTEPS, "98.5");
+  ASSERT_TRUE(ok.close);
+}
+
+TEST(Input, keypad_ok_on_an_empty_field_just_closes) {
+  auto ok = cal_keypad_ok(CalFlow::LOAD_CELL, "");
+  ASSERT_TRUE(ok.close);
+  ASSERT_TRUE(ok.problem.empty());
+}
+
+TEST(Input, keypad_ok_keeps_the_keypad_for_an_unusable_value) {
+  auto ok = cal_keypad_ok(CalFlow::LOAD_CELL, "15");
+  ASSERT_FALSE(ok.close);
+  ASSERT_TRUE(ok.problem.find("1000-5000") != std::string::npos);
+  ok = cal_keypad_ok(CalFlow::ESTEPS, "600");
+  ASSERT_FALSE(ok.close);
+}
+
+TEST(Input, value_kept_while_the_flow_runs_cleared_when_over) {
+  json s = json::object();
+  s["state"] = "awaiting_weight";
+  ASSERT_TRUE(cal_input_keep(cal_view(CalFlow::LOAD_CELL, s, false)));
+  s["problem"] = "The reading is not stable.";                  // retry: keep the grams
+  ASSERT_TRUE(cal_input_keep(cal_view(CalFlow::LOAD_CELL, s, false)));
+  s["problem"] = nullptr;
+  for (const char *st : {"awaiting_replace", "awaiting_remove", "awaiting_finger",
+                         "awaiting_confirmation"}) {
+    s["state"] = st;
+    ASSERT_TRUE(cal_input_keep(cal_view(CalFlow::LOAD_CELL, s, false)));
+  }
+  for (const char *st : {"idle", "complete", "cancelled", "error"}) {
+    s["state"] = st;
+    ASSERT_FALSE(cal_input_keep(cal_view(CalFlow::LOAD_CELL, s, false)));
+  }
+  json e = idle();
+  e["esteps_state"] = "awaiting_measurement";
+  ASSERT_TRUE(cal_input_keep(cal_view(CalFlow::ESTEPS, e, false)));
+}
+
 int main() {
   return minitest::run_all("nebulaos_calibration_flow") > 0 ? 1 : 0;
 }
