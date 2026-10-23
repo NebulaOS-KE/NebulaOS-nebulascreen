@@ -3,6 +3,10 @@
 The full run, in the order that actually matters. Do it **top to bottom** and stop when your prints look
 the way you want — you don't need every step.
 
+> **Just want the first layer right?** The [Calibration guide](Calibration-Guide) is the short
+> version: Bed Tramming, Load Cell, Z-Offset & Bed Mesh, then fine-tune the Z offset on the first
+> print - and when to redo which step.
+
 > **Golden rule: change one thing, then print a test.** If you tweak five settings and the next print is
 > worse, you won't know which one did it.
 
@@ -20,7 +24,7 @@ then slicer. Doing it out of order means redoing work.
 | 1b. Bed tramming | One corner of the bed higher or lower than the others |
 | 2. Temperature (PID) | Inconsistent extrusion from wobbly heater temps |
 | 3. Axis Twist | First layer uneven left-to-right |
-| 3b. Load cell calibration | Needed once before the automatic Z offset (water bottle, 2 min) |
+| 3b. Load cell | Automatic by default (no bottle); Manual = water bottle, 2 min |
 | 4. Z-Offset & Bed Mesh | First layer height everywhere (bed mesh + Z-offset, one guided flow) |
 | 5. Input shaper | Ghosting/ringing on fast prints |
 | 6. E-Steps Calibration | Prints uniformly over- or under-extruded |
@@ -115,11 +119,15 @@ result corrects the probe readings so the bed mesh is accurate. Takes ~15 minute
 
 ---
 
-## Step 3b — Load cell calibration (once)
+## Step 3b — Load cell (Automatic or Manual)
 
-The automatic Z offset feels the bed with the load cell under the front-left bed screw. Teach it once
-with a 1.5 L water bottle and a kitchen scale: **Calibration → 3 Load Cell**, about 2 minutes, nothing
-moves. Redo it after changing the front-left bed corner. See [Load cell calibration](Load-Cell-Calibration).
+The automatic Z offset feels the bed with the load cell under the front-left bed screw.
+**Calibration → 3 Load Cell** offers two modes. **Automatic** (the default) needs no bottle: the
+printer checks the sensor by itself on an empty bed (**Run**), and Z-Offset & Bed Mesh runs the same
+check first. **Manual** is the calibration with a 1.5 L water bottle and a kitchen scale (about 2
+minutes, nothing moves) - see [Load cell calibration](Load-Cell-Calibration); its value is used until
+you choose Automatic again. Redo it after changing the front-left bed corner. Short version:
+[Calibration guide](Calibration-Guide).
 
 ---
 
@@ -128,8 +136,9 @@ moves. Redo it after changing the front-left bed corner. See [Load cell calibrat
 This is 80% of whether prints "look good." **Tune → Calibration → 4 Z-Offset & Bed Mesh** on the
 screen does both in one guided run (the NebulaOS workflow `NEBULAOS_AUTO_CALIBRATE`): it cleans the
 nozzle, measures the Z offset with the load cell, probes a bed mesh, and saves everything with one
-Klipper restart. It takes several minutes and the bed must be empty. Do the
-[load cell calibration](Load-Cell-Calibration) (Step 3b) first.
+Klipper restart. It takes several minutes and the bed must be empty. In Automatic load-cell mode
+(Step 3b) it checks the load cell first; in Manual mode do the bottle calibration before it. It sets
+the saved Z offset adjustment back to 0.
 
 ![Bed Mesh panel](images/bed-mesh.png)
 

@@ -183,8 +183,8 @@ Opens from the Home tab **LED** button.
 
 Each LED/light Klipper reports appears as a row with **Off**, a brightness slider, and **Max** — unless
 it's a simple on/off light (no PWM dimming), in which case the slider is hidden and you get **Off**/**On**
-only. **If your printer.cfg has no `[led]`/`[neopixel]`/output-pin light section at all, this screen is
-completely empty** except the Back button — there's no "nothing configured" message, it's just blank.
+only. **If your printer.cfg has no `[led]`/`[neopixel]`/output-pin light section at all, this screen
+only says "No LEDs or lights are set up in Klipper."**
 This is common: not every KE has a case light wired into Klipper, so don't be surprised if yours is empty.
 
 ---
@@ -516,7 +516,7 @@ needed for normal printing or normal troubleshooting. If you suspect a driver is
 One menu for every calibration routine, reached from the **Calibration** tile. It is a scrollable
 list: the numbered **IN ORDER** steps follow the order of the
 [Calibration walkthrough](Calibration-Explained), then an **OTHER** section. **Up / ✓ / Down** on the
-right move through the list; **Back** is at the top right.
+right move through the list; **Back** is the tile in the bottom-right corner, like on every page.
 
 | # | Row | Opens |
 |---|---|---|

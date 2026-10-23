@@ -5,6 +5,7 @@
 - [Installation and updates](Installation)
 
 **Get great prints**
+- [Calibration guide (4 steps)](Calibration-Guide)
 - [Calibration walkthrough (A→Z)](Calibration-Explained)
 - [Bed tramming](Bed-Tramming)
 - [Load cell calibration (water bottle)](Load-Cell-Calibration)
