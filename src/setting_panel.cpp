@@ -81,6 +81,7 @@ void SettingPanel::handle_callback(lv_event_t *event) {
 
 #ifdef SIMULATOR
 #include "settings_ui.h"
+#include "nebulaos_refusal.h"
 #include <cstdlib>
 #include <functional>
 #include <string>
@@ -203,6 +204,13 @@ void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
     {"34-image-next-power-on", [this, close_dialogs]() {
       close_dialogs(); updates_panel.sim_image().sim_progress(
         R"({"result":{"job":{"state":"finished","phase":"next_power_on","percent":100,"target":"A"}}})"); }},
+    // G98 (Run 18): Settings > Printer > Restart Klipper while heating
+    {"35-restart-klipper-refused", [this, close_dialogs]() {
+      close_dialogs(); printer_panel.foreground();
+      RestartDecision d = restart_decision(RestartKind::KLIPPER, json::parse(
+        R"({"result":{"busy":true,"reason":"ACTIVE","klippy":"ready","profile":"restart",
+            "message":"Not possible while the printer is moving or heating."}})"));
+      SettingsUi::refusal(d.refusal); }},
   };
   sim_run_tour(dir, std::move(steps), []() { exit(0); });
 }
