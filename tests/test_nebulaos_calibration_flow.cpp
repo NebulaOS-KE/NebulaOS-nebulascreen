@@ -385,6 +385,98 @@ TEST(Input, value_kept_while_the_flow_runs_cleared_when_over) {
   ASSERT_TRUE(cal_input_keep(cal_view(CalFlow::ESTEPS, e, false)));
 }
 
+// G99 (Run 18): Calibration > Load Cell, Automatic (default) / Manual.
+static json lc_status(const char *state, const char *mode, const char *check = "never",
+                      bool ready = false, const char *reason = "") {
+  json s = {{"state", state}, {"auto_check", check}, {"auto_ready", ready},
+            {"auto_check_reason", reason}, {"mode_choice", mode ? json(mode) : json(nullptr)}};
+  s["mode"] = mode ? json(mode) : json(nullptr);
+  return s;
+}
+
+TEST(LoadCellMode, older_extensions_show_only_the_bottle_flow) {
+  json old = {{"state", "idle"}};
+  auto v = cal_view(CalFlow::LOAD_CELL, old, false);
+  ASSERT_FALSE(v.has_modes);
+  ASSERT_FALSE(v.show_modes);
+  ASSERT_TRUE(v.can_start);
+  ASSERT_TRUE(v.text.find("bottle") != std::string::npos);
+  // no load cell probe: the extensions report the fields as null
+  v = cal_view(CalFlow::LOAD_CELL, lc_status("idle", nullptr), false);
+  ASSERT_FALSE(v.has_modes);
+  ASSERT_TRUE(v.can_start);
+}
+
+TEST(LoadCellMode, automatic_offers_run_not_start) {
+  auto v = cal_view(CalFlow::LOAD_CELL, lc_status("idle", "auto"), false);
+  ASSERT_TRUE(v.has_modes);
+  ASSERT_TRUE(v.show_modes);
+  ASSERT_TRUE(v.mode_auto);
+  ASSERT_FALSE(v.can_start);
+  ASSERT_EQ(v.actions.size(), (size_t)1);
+  ASSERT_EQ(v.actions[0].first, std::string("Run"));
+  ASSERT_EQ(v.actions[0].second, std::string("NEBULAOS_LOAD_CELL_AUTO_CHECK"));
+  ASSERT_TRUE(v.text.find("Not checked yet") != std::string::npos);
+}
+
+TEST(LoadCellMode, automatic_check_result) {
+  auto v = cal_view(CalFlow::LOAD_CELL, lc_status("idle", "auto", "ok", true), false);
+  ASSERT_TRUE(v.text.find("passed - ready") != std::string::npos);
+  ASSERT_EQ(v.actions.size(), (size_t)1);
+  v = cal_view(CalFlow::LOAD_CELL,
+               lc_status("idle", "auto", "failed", false, "the load cell reading is too close to its limit"),
+               false);
+  ASSERT_TRUE(v.text.find("FAILED: the load cell reading is too close to its limit.") != std::string::npos);
+  ASSERT_EQ(v.actions.size(), (size_t)2);
+  ASSERT_EQ(v.actions[1].first, std::string("Use Manual"));
+  ASSERT_EQ(v.actions[1].second, std::string("NEBULAOS_LOAD_CELL_MODE MODE=manual"));
+}
+
+TEST(LoadCellMode, manual_is_the_bottle_flow) {
+  auto v = cal_view(CalFlow::LOAD_CELL, lc_status("idle", "manual"), false);
+  ASSERT_TRUE(v.show_modes);
+  ASSERT_FALSE(v.mode_auto);
+  ASSERT_TRUE(v.can_start);
+  ASSERT_TRUE(v.actions.empty());
+  ASSERT_TRUE(v.text.find("bottle") != std::string::npos);
+}
+
+TEST(LoadCellMode, running_bottle_flow_hides_the_choice) {
+  auto v = cal_view(CalFlow::LOAD_CELL, lc_status("awaiting_weight", "manual"), false);
+  ASSERT_TRUE(v.has_modes);
+  ASSERT_FALSE(v.show_modes);
+  ASSERT_TRUE(v.needs_measurement);
+}
+
+TEST(LoadCellMode, choice_wins_over_forced_mode) {
+  json s = lc_status("idle", "manual");
+  s["mode_choice"] = "auto";               // contact_detection_mode forces manual
+  auto v = cal_view(CalFlow::LOAD_CELL, s, false);
+  ASSERT_TRUE(v.mode_auto);
+  ASSERT_TRUE(v.text.find("forces manual") != std::string::npos);
+}
+
+TEST(LoadCellMode, printing_blocks_the_check) {
+  auto v = cal_view(CalFlow::LOAD_CELL, lc_status("idle", "auto", "failed"), true);
+  ASSERT_TRUE(v.actions.empty());
+  ASSERT_TRUE(v.text.find("Not available while printing.") != std::string::npos);
+}
+
+TEST(LoadCellMode, commands_and_running_text) {
+  ASSERT_EQ(cal_mode_command(true), std::string("NEBULAOS_LOAD_CELL_MODE MODE=auto"));
+  ASSERT_EQ(cal_mode_command(false), std::string("NEBULAOS_LOAD_CELL_MODE MODE=manual"));
+  auto v = cal_view(CalFlow::LOAD_CELL, lc_status("idle", "auto"), false);
+  cal_auto_check_running(v);
+  ASSERT_TRUE(v.actions.empty());
+  ASSERT_TRUE(v.text.find("Checking the load cell") != std::string::npos);
+}
+
+TEST(LoadCellMode, auto_calibrate_text_mentions_the_check) {
+  json s = {{"auto_calibrate_state", "idle"}};
+  auto v = cal_view(CalFlow::AUTO_CALIBRATE, s, false);
+  ASSERT_TRUE(v.text.find("Automatic mode it checks the load cell") != std::string::npos);
+}
+
 int main() {
   return minitest::run_all("nebulaos_calibration_flow") > 0 ? 1 : 0;
 }

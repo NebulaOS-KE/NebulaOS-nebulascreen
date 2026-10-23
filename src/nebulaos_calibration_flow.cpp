@@ -131,7 +131,8 @@ static const char *const DESCRIPTION_ESTEPS =
   "extrudes a fixed length, and you enter how far the mark moved.";
 static const char *const DESCRIPTION_AUTO =
   "Cleans the nozzle, measures the Z offset with the load cell and probes a "
-  "bed mesh, then saves everything with one Klipper restart.\n"
+  "bed mesh, then saves everything with one Klipper restart. With the load "
+  "cell in Automatic mode it checks the load cell first (no bottle needed).\n"
   "Takes several minutes. The bed must be empty.";
 static const char *const DESCRIPTION_SHAPER =
   "Measures resonances with the accelerometer: first mounted on the toolhead "
@@ -263,6 +264,84 @@ static CalView bed_tram_view(CalView v, const json &st, bool printing) {
     v.text += "\n\nNot available while printing.";
   }
   return v;
+}
+
+// ---- G99 (Run 18): load cell Automatic (default) / Manual ----------------
+// Extensions 2c099f1: nebulaos_load_cell_calibration reports mode (effective),
+// mode_choice (the persisted choice), auto_check never|ok|failed,
+// auto_check_reason, auto_ready. Without 'mode' (older extensions, or no load
+// cell probe: all None) the page is the bottle flow as before.
+
+const char *const CAL_AUTO_CHECK_COMMAND = "NEBULAOS_LOAD_CELL_AUTO_CHECK";
+
+std::string cal_mode_command(bool automatic) {
+  return std::string("NEBULAOS_LOAD_CELL_MODE MODE=") + (automatic ? "auto" : "manual");
+}
+
+static const char *const AUTO_INTRO =
+  "Automatic (default): the printer checks the load cell by itself on an "
+  "empty bed - no bottle, nothing moves or heats. Z-Offset & Bed Mesh runs "
+  "this check too.";
+
+static void load_cell_modes(CalView &v, const json &status, bool printing) {
+  std::string mode = str(status, "mode");
+  if (mode != "auto" && mode != "manual") {
+    return;   // older extensions: the bottle flow only
+  }
+  v.has_modes = true;
+  std::string choice = str(status, "mode_choice");
+  if (choice != "auto" && choice != "manual") choice = mode;
+  v.mode_auto = choice == "auto";
+  // the choice is part of the idle page; a running bottle flow shows its steps
+  v.show_modes = !v.can_cancel;
+  if (!v.show_modes) {
+    return;
+  }
+  if (!v.mode_auto) {
+    // Manual: today's bottle flow page
+    if (mode != choice) {
+      v.text += "\n\nNote: the printer configuration forces automatic mode.";
+    }
+    return;
+  }
+  v.can_start = false;
+  v.actions.clear();
+  std::string check = str(status, "auto_check");
+  bool ready = status.contains("auto_ready") && status["auto_ready"].is_boolean()
+               && status["auto_ready"].get<bool>();
+  std::string reason = str(status, "auto_check_reason");
+  std::string t = AUTO_INTRO;
+  bool failed = check == "failed";
+  if (failed) {
+    t += "\n\nAutomatic check FAILED";
+    t += reason.empty() ? std::string(".") : ": " + reason + ".";
+    t += "\nRemove everything from the bed and tap Run again, or use Manual "
+         "(bottle calibration).";
+  } else if (check == "ok" && ready) {
+    t += "\n\nLast check: passed - ready.";
+  } else if (check == "ok") {
+    t += "\n\nLast check passed, but automatic contact is not available "
+         "right now. Tap Run to check again.";
+  } else {
+    t += "\n\nNot checked yet. Remove everything from the bed, then tap Run.";
+  }
+  if (mode != choice) {
+    t += "\n\nNote: the printer configuration forces manual mode.";
+  }
+  v.text = t;
+  if (!printing) {
+    v.actions = {{"Run", CAL_AUTO_CHECK_COMMAND}};
+    if (failed) {
+      v.actions.push_back({"Use Manual", cal_mode_command(false)});
+    }
+  }
+}
+
+void cal_auto_check_running(CalView &v) {
+  v.text = std::string(AUTO_INTRO) + "\n\nChecking the load cell (a few seconds) - "
+           "do not touch the printer...";
+  v.actions.clear();
+  v.can_start = false;
 }
 
 CalView cal_view(CalFlow flow, const json &status, bool printing) {
@@ -405,11 +484,15 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
       v.actions = {{"Apply & Save", std::string(cmd) + " ACCEPT=1"}};
     }
   }
+  if (flow == CalFlow::LOAD_CELL) {
+    load_cell_modes(v, status, printing);
+  }
   std::string problem = str(status, p + "problem");
   if (flow == CalFlow::LOAD_CELL && v.can_cancel && !problem.empty()) {
     v.text = "Problem: " + problem + "\n\n" + v.text;
   }
-  if (printing && (v.can_start || state.empty() || state == "idle")) {
+  if (printing && (v.can_start || state.empty() || state == "idle"
+                   || (v.show_modes && v.mode_auto))) {
     v.text += "\n\nNot available while printing.";
   }
   return v;

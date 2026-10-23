@@ -34,7 +34,8 @@ LV_IMG_DECLARE(bedmesh_img);
 // compact "Play" button look so the tap affordance still stands out. Number
 // is nullptr for the unordered utility section.
 static lv_obj_t *make_row(lv_obj_t *parent, const void *icon, const char *label,
-                           lv_event_cb_t cb, void *user_data, const char *number = nullptr) {
+                           lv_event_cb_t cb, void *user_data, const char *number = nullptr,
+                           const char *sub = nullptr) {
   lv_obj_t *row = lv_obj_create(parent);
   lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_style_radius(row, 0, 0);
@@ -73,7 +74,22 @@ static lv_obj_t *make_row(lv_obj_t *parent, const void *icon, const char *label,
     lv_obj_center(num_lbl);
   }
 
-  lv_obj_t *lbl = lv_label_create(row);
+  // G99 (Run 18): an optional grey second line under the label
+  lv_obj_t *text_parent = row;
+  if (sub != nullptr) {
+    text_parent = lv_obj_create(row);
+    lv_obj_set_size(text_parent, 10, LV_SIZE_CONTENT);
+    lv_obj_set_flex_grow(text_parent, 1);
+    lv_obj_set_style_pad_all(text_parent, 0, 0);
+    lv_obj_set_style_pad_row(text_parent, 1, 0);
+    lv_obj_set_style_border_width(text_parent, 0, 0);
+    lv_obj_set_style_bg_opa(text_parent, LV_OPA_TRANSP, 0);
+    lv_obj_clear_flag(text_parent, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(text_parent, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(text_parent, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_set_flex_flow(text_parent, LV_FLEX_FLOW_COLUMN);
+  }
+  lv_obj_t *lbl = lv_label_create(text_parent);
   lv_label_set_text(lbl, label);
   // Ellipsis, not wrap, if a label is ever too long for the row - a wrapped
   // 2-line label would make just that one row taller than the rest, breaking
@@ -81,7 +97,17 @@ static lv_obj_t *make_row(lv_obj_t *parent, const void *icon, const char *label,
   lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
   lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(lbl, lv_palette_darken(LV_PALETTE_GREY, 1), LV_STATE_DISABLED);
-  lv_obj_set_flex_grow(lbl, 1);
+  if (sub != nullptr) {
+    lv_obj_set_width(lbl, LV_PCT(100));
+    lv_obj_t *sl = lv_label_create(text_parent);
+    lv_obj_set_width(sl, LV_PCT(100));
+    lv_label_set_text(sl, sub);
+    lv_label_set_long_mode(sl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(sl, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_color(sl, lv_palette_main(LV_PALETTE_GREY), 0);
+  } else {
+    lv_obj_set_flex_grow(lbl, 1);
+  }
 
   // compact chevron "chip" - same visual weight as macro_item.cpp's Play
   // button, but purely decorative here (the whole row is one tap target).
@@ -173,8 +199,10 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   // cell mounting, so the load cell and Z offset come after it.
   bed_tram_row    = make_row(list_cont, &bedmesh_img,     "Bed Tramming",            &CalibrationMenuPanel::_handle_callback, this, "1");
   axis_twist_row  = make_row(list_cont, &layers_img,      "Axis Twist",              &CalibrationMenuPanel::_handle_callback, this, "2");
-  load_cell_row   = make_row(list_cont, &home_z,          "Load Cell",               &CalibrationMenuPanel::_handle_callback, this, "3");
-  wizard_row      = make_row(list_cont, &home_z,          "Z-Offset & Bed Mesh",     &CalibrationMenuPanel::_handle_callback, this, "4");
+  load_cell_row   = make_row(list_cont, &home_z,          "Load Cell",               &CalibrationMenuPanel::_handle_callback, this, "3",
+                             "Automatic (default) or Manual with a bottle");
+  wizard_row      = make_row(list_cont, &home_z,          "Z-Offset & Bed Mesh",     &CalibrationMenuPanel::_handle_callback, this, "4",
+                             "Includes the load cell check in Automatic mode");
   inputshaper_row = make_row(list_cont, &inputshaper_img, "Input Shaper",            &CalibrationMenuPanel::_handle_callback, this, "5");
   esteps_row      = make_row(list_cont, &extrude_img,     "E-Steps Calibration",     &CalibrationMenuPanel::_handle_callback, this, "6");
   skew_row        = make_row(list_cont, &skew_img,        "Skew Correction",         &CalibrationMenuPanel::_handle_callback, this, "7");

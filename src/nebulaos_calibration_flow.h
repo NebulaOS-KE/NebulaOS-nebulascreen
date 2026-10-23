@@ -38,7 +38,19 @@ struct CalView {
   // G89/G90: the step's own buttons on this page (label, G-code), so the
   // screen never needs the Mainsail-style action prompt for these flows.
   std::vector<std::pair<std::string, std::string>> actions;
+  // G99 (Run 18): Calibration > Load Cell offers Automatic (default) / Manual.
+  // Only with extensions that report 'mode' (older ones: the bottle flow only).
+  bool has_modes = false;
+  bool show_modes = false;   // the choice is shown (the bottle flow is not running)
+  bool mode_auto = false;    // the selected mode: automatic
 };
+
+// G99: the load-cell mode commands and the automatic check.
+std::string cal_mode_command(bool automatic);   // NEBULAOS_LOAD_CELL_MODE MODE=auto|manual
+extern const char *const CAL_AUTO_CHECK_COMMAND; // NEBULAOS_LOAD_CELL_AUTO_CHECK
+// While the screen waits for the automatic check's answer (a few seconds,
+// nothing moves): what the page says instead.
+void cal_auto_check_running(CalView &v);
 
 CalView cal_view(CalFlow flow, const json &status, bool printing);
 

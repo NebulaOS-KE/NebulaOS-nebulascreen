@@ -720,8 +720,20 @@ void MainPanel::sim_tour(const char *dir) {
     {"m19-calibration", [this]() { printertune_panel.sim_tap(7); }},
     {"m20-axis-twist", [cal]() { cal().sim_tap_row(1); }},
     {"m21-skew", [cal]() { cal().sim_tap_row(6); }},
-    // Load cell (G90): every step
-    {"m30-loadcell-idle", [lc]() { lc({{"state", "idle"}}); }},
+    // Load cell G99 (Run 18): Automatic (default) / Manual
+    {"m29a-loadcell-auto-never", [lc]() { lc({{"state", "idle"}, {"mode", "auto"}, {"mode_choice", "auto"},
+        {"auto_check", "never"}, {"auto_ready", false}, {"auto_check_reason", ""}}); }},
+    {"m29b-loadcell-auto-checking", [cal]() { cal().sim_guided(CalFlow::LOAD_CELL).sim_auto_checking(true); }},
+    {"m29c-loadcell-auto-ok", [lc, cal]() { cal().sim_guided(CalFlow::LOAD_CELL).sim_auto_checking(false);
+        lc({{"state", "idle"}, {"mode", "auto"}, {"auto_check", "ok"}, {"auto_ready", true}}); }},
+    {"m29d-loadcell-auto-failed", [lc]() { lc({{"state", "idle"}, {"mode", "auto"}, {"auto_check", "failed"},
+        {"auto_ready", false}, {"auto_check_reason", "the load cell is not working properly: the reading "
+        "does not settle (drift 1450 counts/s)"}}); }},
+    {"m29e-loadcell-manual", [lc]() { lc({{"state", "idle"}, {"mode", "manual"}, {"mode_choice", "manual"}}); }},
+    {"m29f-loadcell-manual-step", [lc]() { lc({{"state", "awaiting_empty"}, {"mode", "manual"}}); }},
+    // Load cell (G90): every step, older extensions (no mode fields)
+    {"m30-loadcell-idle", [lc]() { lc({{"state", "idle"}, {"mode", nullptr}, {"mode_choice", nullptr},
+        {"auto_check", nullptr}, {"auto_ready", nullptr}, {"auto_check_reason", nullptr}}); }},
     {"m31-loadcell-empty", [lc]() { lc({{"state", "awaiting_empty"}}); }},
     {"m32-loadcell-weight", [lc]() { lc({{"state", "awaiting_weight"}}); }},
     {"m33-loadcell-weight-keypad", [cal]() { cal().sim_guided(CalFlow::LOAD_CELL).sim_keypad(); }},

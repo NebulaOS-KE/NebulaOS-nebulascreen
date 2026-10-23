@@ -28,6 +28,7 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   // presses keypad keys like a finger would ('K' = the OK key)
   void sim_type(const char *keys);
   void sim_weigh() { lv_event_send(measure_btn, LV_EVENT_CLICKED, NULL); }
+  void sim_auto_checking(bool on) { auto_checking = on; refresh(); }
   std::string sim_input() const { return lv_textarea_get_text(measure_ta); }
 #endif
 
@@ -46,6 +47,8 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   void confirm_start();
   void submit_measurement();
   void commit_input();
+  void select_mode(bool automatic);
+  void run_auto_check();
   void show_keypad(bool on);
 
   KWebSocketClient &ws;
@@ -57,6 +60,11 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   // btn_row stays pinned at the bottom, so Next/Cancel/Done never leave the
   // screen, and the keypad opens on the right half, never over the field.
   lv_obj_t *body;
+  // G99 (Run 18): Load Cell only - Automatic / Manual (hidden with older
+  // extensions and while the bottle flow runs)
+  lv_obj_t *mode_sel = nullptr;
+  std::string pending_mode;    // tapped, not yet reported back ("auto"/"manual")
+  bool auto_checking = false;  // NEBULAOS_LOAD_CELL_AUTO_CHECK sent, no answer yet
   lv_obj_t *text;
   std::string shown_text;      // to scroll back to the top on a new step
   lv_obj_t *measure_row;

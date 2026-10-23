@@ -55,6 +55,26 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   lv_obj_set_scroll_dir(body, LV_DIR_VER);
   lv_obj_set_scrollbar_mode(body, LV_SCROLLBAR_MODE_AUTO);
 
+  if (flow == CalFlow::LOAD_CELL) {
+    static const char *mode_map[] = {"Automatic", "Manual", ""};
+    mode_sel = lv_btnmatrix_create(body);
+    lv_btnmatrix_set_map(mode_sel, mode_map);
+    lv_btnmatrix_set_btn_ctrl_all(mode_sel, LV_BTNMATRIX_CTRL_CHECKABLE);
+    lv_btnmatrix_set_one_checked(mode_sel, true);
+    lv_btnmatrix_set_btn_ctrl(mode_sel, 0, LV_BTNMATRIX_CTRL_CHECKED);
+    lv_obj_set_size(mode_sel, LV_PCT(100), 36);
+    lv_obj_set_style_pad_all(mode_sel, 2, 0);
+    lv_obj_set_style_pad_column(mode_sel, 4, 0);
+    lv_obj_set_style_text_font(mode_sel, &lv_font_montserrat_12, LV_PART_ITEMS);
+    lv_obj_move_to_index(mode_sel, 0);
+    lv_obj_add_flag(mode_sel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(mode_sel, [](lv_event_t *e) {
+      auto *self = (GuidedCalibrationPanel *)lv_event_get_user_data(e);
+      uint16_t i = lv_btnmatrix_get_selected_btn(self->mode_sel);
+      if (i == 0 || i == 1) self->select_mode(i == 0);
+    }, LV_EVENT_VALUE_CHANGED, this);
+  }
+
   lv_obj_set_width(text, LV_PCT(100));
   lv_label_set_long_mode(text, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_font(text, &lv_font_montserrat_14, 0);
@@ -129,6 +149,21 @@ void GuidedCalibrationPanel::refresh() {
   auto status = State::get_instance()->get_data(
     json::json_pointer(std::string("/printer_state/") + cal_status_object(flow)));
   CalView v = cal_view(flow, status, KUtils::is_printing());
+  if (mode_sel != nullptr) {
+    // G99: the tapped mode shows at once; the status confirms it
+    bool want_auto = v.mode_auto;
+    if (!pending_mode.empty()) {
+      if ((pending_mode == "auto") == v.mode_auto) pending_mode.clear();
+      else want_auto = pending_mode == "auto";
+    }
+    lv_btnmatrix_set_btn_ctrl(mode_sel, want_auto ? 0 : 1, LV_BTNMATRIX_CTRL_CHECKED);
+    lv_btnmatrix_clear_btn_ctrl(mode_sel, want_auto ? 1 : 0, LV_BTNMATRIX_CTRL_CHECKED);
+    if (v.show_modes) lv_obj_clear_flag(mode_sel, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(mode_sel, LV_OBJ_FLAG_HIDDEN);
+    if (v.show_modes && want_auto && auto_checking) {
+      cal_auto_check_running(v);
+    }
+  }
   lv_label_set_text(title, v.title.c_str());
   bool text_changed = false;
   if (v.text != shown_text) {
@@ -252,6 +287,55 @@ void GuidedCalibrationPanel::confirm_start() {
   KUtils::style_lock_mbox(mbox, 90);
 }
 
+// G99 (Run 18): Automatic / Manual, saved by the extensions at once.
+void GuidedCalibrationPanel::select_mode(bool automatic) {
+  if (KUtils::is_printing()) {
+    KUtils::notify_locked();
+    refresh();
+    return;
+  }
+  pending_mode = automatic ? "auto" : "manual";
+  std::string cmd = cal_mode_command(automatic);
+  spdlog::info("guided calibration: {}", cmd);
+  ws.gcode_script(cmd, [this](json &reply) {
+    if (!reply.contains("error")) {
+      return;
+    }
+    std::lock_guard<std::mutex> lock(lv_lock);
+    pending_mode.clear();
+    std::string msg = reply["/error/message"_json_pointer].is_string()
+      ? reply["/error/message"_json_pointer].template get<std::string>() : reply["error"].dump();
+    KUtils::notify_toast("Mode not changed: " + msg, 6000);
+    refresh();
+  });
+  refresh();
+}
+
+// G99: the automatic check (no motion). Its result comes back in the status
+// (auto_check, auto_check_reason), so a failure is shown on the page, not as
+// a toast; other errors (printing, bottle flow running) are toasted.
+void GuidedCalibrationPanel::run_auto_check() {
+  if (KUtils::is_printing()) {
+    KUtils::notify_locked();
+    return;
+  }
+  auto_checking = true;
+  spdlog::info("guided calibration: {}", CAL_AUTO_CHECK_COMMAND);
+  ws.gcode_script(CAL_AUTO_CHECK_COMMAND, [this](json &reply) {
+    std::lock_guard<std::mutex> lock(lv_lock);
+    auto_checking = false;
+    if (reply.contains("error")) {
+      std::string msg = reply["/error/message"_json_pointer].is_string()
+        ? reply["/error/message"_json_pointer].template get<std::string>() : reply["error"].dump();
+      if (msg.find("automatic check FAILED") == std::string::npos) {
+        KUtils::notify_toast("Check not run: " + msg, 6000);
+      }
+    }
+    refresh();
+  });
+  refresh();
+}
+
 // G94 (Run 18): Weigh / Submit sends the typed value and keeps it in the
 // field (a problem means "try again", usually with the same number).
 void GuidedCalibrationPanel::submit_measurement() {
@@ -294,7 +378,9 @@ void GuidedCalibrationPanel::handle_callback(lv_event_t *e) {
     send(cal_cancel_command(flow), "Cancel failed");
   } else if (btn == action_btns[0] || btn == action_btns[1]) {
     int i = btn == action_btns[0] ? 0 : 1;
-    if (!action_cmds[i].empty()) {
+    if (action_cmds[i] == CAL_AUTO_CHECK_COMMAND) {
+      run_auto_check();
+    } else if (!action_cmds[i].empty()) {
       send(action_cmds[i], "Step failed");
     }
   } else if (btn == measure_btn) {
