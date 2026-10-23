@@ -19,6 +19,7 @@ class BedMeshPanel : public NotifyConsumer {
   void foreground();
   void refresh_views_with_lock(json &);
   void refresh_views(json &);
+  void refresh_mesh(json &);
   void refresh_profile_info(std::string pname);
   void handle_callback(lv_event_t *event);
   void handle_profile_action(lv_event_t *event);
@@ -279,6 +280,7 @@ class BedMeshPanel : public NotifyConsumer {
   lv_obj_t *msgbox;
   lv_obj_t *input;
   lv_obj_t *kb;
+  lv_obj_t *empty_label;   // G94: "No bed mesh yet" cover instead of empty boxes
   std::string active_profile;
   std::vector<std::vector<double>> mesh;
   int current_view_angle;

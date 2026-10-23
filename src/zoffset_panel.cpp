@@ -1,4 +1,5 @@
 #include "zoffset_panel.h"
+#include "settings_ui.h"
 #include "state.h"
 #include "spdlog/spdlog.h"
 #include "utils.h"
@@ -13,7 +14,7 @@ ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
   , down_btn(lv_btn_create(panel_cont))
   , reset_btn(lv_btn_create(panel_cont))
   , auto_save_hint(lv_label_create(panel_cont))
-  , back_btn(lv_btn_create(panel_cont))
+  , back_btn(nullptr)
   , step_selector(panel_cont, "Step (mm)", {"0.001", "0.005", "0.01", "0.025", "0.05", ""}, 2,
       &ZOffsetPanel::_handle_callback, this)
 {
@@ -21,17 +22,21 @@ ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
   lv_obj_set_size(panel_cont, LV_PCT(100), LV_PCT(100));
   lv_obj_clear_flag(panel_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_flex_flow(panel_cont, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(panel_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_flex_align(panel_cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_set_style_pad_all(panel_cont, 6, 0);
   lv_obj_set_style_pad_row(panel_cont, 6, 0);
 
-  // big live readout
+  // G94 (Run 18): the page title and the Back tile like every page; the big
+  // live readout sits in the title row
+  SettingsUi::page_title(panel_cont, "Z Offset");
   lv_label_set_text(value_label, "0.000 mm");
   lv_obj_set_style_text_font(value_label, &lv_font_montserrat_20, 0);
+  lv_obj_add_flag(value_label, LV_OBJ_FLAG_FLOATING);
+  lv_obj_align(value_label, LV_ALIGN_TOP_MID, 0, 2 - SettingsUi::kTitleSpace);
 
   // raise / lower buttons: full-width, clear physical direction
   auto style_dir_btn = [](lv_obj_t *b, const char *txt) {
-    lv_obj_set_width(b, LV_PCT(94));
+    lv_obj_set_width(b, LV_PCT(100));
     lv_obj_set_height(b, 42);
     lv_obj_set_style_bg_color(b, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
     lv_obj_t *lbl = lv_label_create(b);
@@ -44,21 +49,22 @@ ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
   lv_obj_add_event_cb(up_btn, &ZOffsetPanel::_handle_callback, LV_EVENT_CLICKED, this);
   lv_obj_add_event_cb(down_btn, &ZOffsetPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
-  lv_obj_set_width(step_selector.get_container(), LV_PCT(94));
+  // the selector and the bottom row stop left of the Back tile
+  lv_obj_set_width(step_selector.get_container(), LV_PCT(84));
 
   // G92: NebulaOS saves every adjustment (nebulaos_z_adjust), so there is no
   // Save button. The line says what NebulaOS reports - and nothing with older
   // extensions, where the adjustment is only kept until Klipper restarts.
   lv_label_set_text(auto_save_hint, "");
-  lv_obj_set_width(auto_save_hint, LV_PCT(94));
+  lv_obj_set_width(auto_save_hint, LV_PCT(100));
   lv_label_set_long_mode(auto_save_hint, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(auto_save_hint, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(auto_save_hint, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(auto_save_hint, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
 
-  // bottom row: Reset | Back
+  // bottom row: Reset (Back is the tile next to it)
   lv_obj_t *bottom = lv_obj_create(panel_cont);
-  lv_obj_set_width(bottom, LV_PCT(94));
+  lv_obj_set_width(bottom, LV_PCT(84));
   lv_obj_set_height(bottom, LV_SIZE_CONTENT);
   lv_obj_clear_flag(bottom, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_pad_all(bottom, 0, 0);
@@ -66,10 +72,9 @@ ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
   lv_obj_set_style_border_width(bottom, 0, 0);
   lv_obj_set_flex_flow(bottom, LV_FLEX_FLOW_ROW);
 
-  // the two buttons were created as children of panel_cont so the members stay
-  // simple; move them into the bottom row now and size them evenly.
+  // the button was created as a child of panel_cont so the members stay
+  // simple; move it into the bottom row now.
   lv_obj_set_parent(reset_btn, bottom);
-  lv_obj_set_parent(back_btn, bottom);
 
   auto style_action_btn = [](lv_obj_t *b, const char *txt, lv_color_t col) {
     lv_obj_set_flex_grow(b, 1);
@@ -78,11 +83,11 @@ ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
     lv_obj_t *lbl = lv_label_create(b);
     lv_label_set_text(lbl, txt);
     lv_obj_center(lbl);
+    SettingsUi::style_text_button(b);
   };
   style_action_btn(reset_btn, LV_SYMBOL_REFRESH "  Reset", lv_palette_darken(LV_PALETTE_GREY, 2));
-  style_action_btn(back_btn, LV_SYMBOL_LEFT "  Back", lv_palette_darken(LV_PALETTE_GREY, 2));
   lv_obj_add_event_cb(reset_btn, &ZOffsetPanel::_handle_callback, LV_EVENT_CLICKED, this);
-  lv_obj_add_event_cb(back_btn, &ZOffsetPanel::_handle_callback, LV_EVENT_CLICKED, this);
+  back_btn = SettingsUi::back_tile(panel_cont, &ZOffsetPanel::_handle_callback, this);
 
   ws.register_notify_update(this);
 }

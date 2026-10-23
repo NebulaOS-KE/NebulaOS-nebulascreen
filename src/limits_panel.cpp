@@ -1,3 +1,4 @@
+#include "settings_ui.h"
 #include "limits_panel.h"
 #include "state.h"
 #include "spdlog/spdlog.h"
@@ -34,11 +35,15 @@ LimitsPanel::LimitsPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
   lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
 
-  lv_obj_center(limit_cont);
-  lv_obj_set_size(limit_cont, lv_pct(100), lv_pct(100));
+  // G94 (Run 18): the list stops left of the Back tile (66 px + margins), so
+  // Back never sits over a slider
+  lv_obj_align(limit_cont, LV_ALIGN_TOP_LEFT, 0, 0);
+  lv_obj_set_size(limit_cont, lv_pct(84), lv_pct(100));
   lv_obj_set_flex_flow(limit_cont, LV_FLEX_FLOW_COLUMN);
 
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
+  // G94 (Run 18): the one title and Back button of every page
+  SettingsUi::page_title(cont, "Limits");
+  SettingsUi::place_back(back_btn.get_container());
 
   // Klipper accepts 0 <= MINIMUM_CRUISE_RATIO < 1.
   min_cruise_ratio.set_range(0, 99);

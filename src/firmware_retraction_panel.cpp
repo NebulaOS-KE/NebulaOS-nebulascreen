@@ -1,4 +1,5 @@
 #include "firmware_retraction_panel.h"
+#include "settings_ui.h"
 #include "state.h"
 #include "spdlog/spdlog.h"
 
@@ -14,7 +15,7 @@ FirmwareRetractionPanel::FirmwareRetractionPanel(KWebSocketClient &websocket_cli
   , bottom_row(lv_obj_create(body))
   , empty_cont(lv_obj_create(panel_cont))
   , reset_all_btn(lv_btn_create(bottom_row))
-  , back_btn(lv_btn_create(bottom_row))
+  , back_btn(nullptr)
   , empty_back_btn(lv_btn_create(empty_cont))
   , length_step_selector(step_row, "Length step (mm)", {"0.05", "0.10", "0.25", ""}, 1,
       &FirmwareRetractionPanel::_handle_callback, this)
@@ -53,7 +54,6 @@ FirmwareRetractionPanel::FirmwareRetractionPanel(KWebSocketClient &websocket_cli
   }
 
   // ---- step selectors row ----
-  lv_obj_set_width(step_row, LV_PCT(100));
   lv_obj_set_height(step_row, LV_SIZE_CONTENT);
   lv_obj_clear_flag(step_row, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_pad_all(step_row, 0, 0);
@@ -63,8 +63,7 @@ FirmwareRetractionPanel::FirmwareRetractionPanel(KWebSocketClient &websocket_cli
   lv_obj_set_flex_grow(length_step_selector.get_container(), 1);
   lv_obj_set_flex_grow(speed_step_selector.get_container(), 1);
 
-  // ---- bottom row: Reset all | Back ----
-  lv_obj_set_width(bottom_row, LV_PCT(100));
+  // ---- bottom row: Reset all (Back is the tile next to it) ----
   lv_obj_set_height(bottom_row, LV_SIZE_CONTENT);
   lv_obj_clear_flag(bottom_row, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_pad_all(bottom_row, 0, 0);
@@ -80,12 +79,7 @@ FirmwareRetractionPanel::FirmwareRetractionPanel(KWebSocketClient &websocket_cli
   lv_obj_center(ra_lbl);
   lv_obj_add_event_cb(reset_all_btn, &FirmwareRetractionPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
-  lv_obj_set_flex_grow(back_btn, 1);
-  lv_obj_set_height(back_btn, 36);
-  lv_obj_t *bk_lbl = lv_label_create(back_btn);
-  lv_label_set_text(bk_lbl, LV_SYMBOL_LEFT "  Back");
-  lv_obj_center(bk_lbl);
-  lv_obj_add_event_cb(back_btn, &FirmwareRetractionPanel::_handle_callback, LV_EVENT_CLICKED, this);
+  SettingsUi::style_text_button(reset_all_btn);
 
   // ---- empty state ----
   lv_obj_set_size(empty_cont, LV_PCT(100), LV_PCT(100));
@@ -107,6 +101,14 @@ FirmwareRetractionPanel::FirmwareRetractionPanel(KWebSocketClient &websocket_cli
   lv_obj_center(eb_lbl);
   lv_obj_add_event_cb(empty_back_btn, &FirmwareRetractionPanel::_handle_callback, LV_EVENT_CLICKED, this);
   lv_obj_add_flag(empty_cont, LV_OBJ_FLAG_HIDDEN);
+  // G94 (Run 18): title and the one Back tile (both states); the step and
+  // bottom rows stop left of the tile
+  lv_obj_add_flag(empty_back_btn, LV_OBJ_FLAG_HIDDEN);
+  SettingsUi::page_title(panel_cont, "Retraction", false);
+  lv_obj_set_style_pad_top(body, SettingsUi::kTitleSpace, 0);
+  lv_obj_set_width(step_row, LV_PCT(84));
+  lv_obj_set_width(bottom_row, LV_PCT(84));
+  back_btn = SettingsUi::back_tile(panel_cont, &FirmwareRetractionPanel::_handle_callback, this);
 
   ws.register_notify_update(this);
 }

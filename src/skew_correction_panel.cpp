@@ -1,4 +1,5 @@
 #include "skew_correction_panel.h"
+#include "settings_ui.h"
 #include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
@@ -28,12 +29,12 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
   lv_obj_set_style_pad_all(panel_cont, 8, 0);
   lv_obj_set_flex_flow(panel_cont, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(panel_cont, LV_FLEX_ALIGN_START,
-                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+                        LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_set_style_pad_row(panel_cont, 6, 0);
 
-  lv_obj_t *title = lv_label_create(panel_cont);
-  lv_label_set_text(title, "Skew Correction");
-  lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
+  // G94 (Run 18): the page title and the Back tile like every page; the
+  // rows stop left of the tile
+  SettingsUi::page_title(panel_cont, "Skew Correction");
 
   lv_obj_t *body = lv_label_create(panel_cont);
   lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
@@ -42,11 +43,11 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
     "Print a skew calibration object, measure the three lengths (mm) with "
     "calipers, and enter them. A-C and B-D are the diagonals; A-D the edge.");
   lv_obj_set_style_text_font(body, &lv_font_montserrat_14, 0);
-  lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_LEFT, 0);
 
   for (int i = 0; i < 3; i++) {
     lv_obj_t *row = lv_obj_create(panel_cont);
-    lv_obj_set_size(row, LV_PCT(96), LV_SIZE_CONTENT);
+    lv_obj_set_size(row, LV_PCT(84), LV_SIZE_CONTENT);
     lv_obj_set_style_pad_all(row, 2, 0);
     lv_obj_set_style_border_width(row, 0, 0);
     lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
@@ -66,7 +67,7 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
   }
 
   lv_obj_t *btnrow = lv_obj_create(panel_cont);
-  lv_obj_set_size(btnrow, LV_PCT(96), LV_SIZE_CONTENT);
+  lv_obj_set_size(btnrow, LV_PCT(84), LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(btnrow, 2, 0);
   lv_obj_set_style_border_width(btnrow, 0, 0);
   lv_obj_clear_flag(btnrow, LV_OBJ_FLAG_SCROLLABLE);
@@ -74,19 +75,14 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
   lv_obj_set_flex_align(btnrow, LV_FLEX_ALIGN_SPACE_EVENLY,
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-  back_btn = lv_btn_create(btnrow);
-  lv_obj_set_size(back_btn, 140, 44);
-  lv_obj_set_style_bg_color(back_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
-  lv_obj_t *bl = lv_label_create(back_btn);
-  lv_label_set_text(bl, LV_SYMBOL_LEFT "  Back");
-  lv_obj_center(bl);
-  lv_obj_add_event_cb(back_btn, &SkewCorrectionPanel::_handle_callback, LV_EVENT_CLICKED, this);
+  back_btn = SettingsUi::back_tile(panel_cont, &SkewCorrectionPanel::_handle_callback, this);
 
   apply_btn = lv_btn_create(btnrow);
-  lv_obj_set_size(apply_btn, 190, 44);
+  lv_obj_set_size(apply_btn, LV_PCT(100), 44);
   lv_obj_t *al = lv_label_create(apply_btn);
   lv_label_set_text(al, LV_SYMBOL_OK "  Apply & Save");
   lv_obj_center(al);
+  SettingsUi::style_text_button(apply_btn);
   lv_obj_add_event_cb(apply_btn, &SkewCorrectionPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
   // Own decimal numeric keyboard (the shared Numpad is integer-only). Digits +

@@ -1,3 +1,4 @@
+#include "settings_ui.h"
 #include "guided_calibration_panel.h"
 #include "state.h"
 #include "utils.h"
@@ -12,6 +13,7 @@ static lv_obj_t *make_text_btn(lv_obj_t *parent, const char *label, lv_event_cb_
   lv_obj_t *l = lv_label_create(b);
   lv_label_set_text(l, label);
   lv_obj_center(l);
+  SettingsUi::style_text_button(b);   // G94: one text-button font
   lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, user);
   return b;
 }
@@ -40,7 +42,8 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
 
-  lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
+  // G94 (Run 18): the title at the same place as on every other page
+  SettingsUi::place_title(title);
 
   // The scrolling part: step text + entry row. It takes the height left over
   // by the title and the pinned button row.
@@ -127,7 +130,7 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   lv_obj_add_event_cb(kb, &GuidedCalibrationPanel::_handle_kb, LV_EVENT_ALL, this);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -10);
+  SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
 
   ws.register_notify_update(this);
 }

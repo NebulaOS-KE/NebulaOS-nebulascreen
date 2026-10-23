@@ -91,6 +91,29 @@ bool refuse_if_printing();
 lv_obj_t *busy(const char *title, const char *text);
 void close_busy(lv_obj_t *label);
 
+// ---- G94 (Run 18): one look for every page ----------------------------------
+// The page title: top-left, montserrat_16, at the same place as on the Settings
+// pages (8 px from the left, 6 px from the top). Floating, so it works for flex,
+// grid and absolute pages; the page's top padding becomes kTitleSpace so its
+// content starts below the title (reserve=false: the page already keeps the
+// space free).
+constexpr lv_coord_t kTitleSpace = 28;
+lv_obj_t *page_title(lv_obj_t *page, const char *text, bool reserve = true);
+// The same for a label the page already owns (its parent is the page).
+void place_title(lv_obj_t *label, bool reserve = true);
+// The Back button: the icon tile (ButtonContainer with the "back" image) in the
+// bottom-right corner, 6 px from both edges, whatever the page's padding.
+void place_back(lv_obj_t *back_tile);
+// For pages that do not own a ButtonContainer member: creates the Back tile on
+// `page` (kept for the program's lifetime, like the pages), places it and
+// returns its container - the object `cb` sees as the event's current target.
+lv_obj_t *back_tile(lv_obj_t *page, lv_event_cb_t cb, void *user);
+// The text size of every text button (Settings, guided pages, Z offset, ...);
+// icon tiles keep their 10 px labels.
+const lv_font_t *button_font();
+// A text button's label in button_font() (the first label child).
+void style_text_button(lv_obj_t *btn);
+
 }  // namespace SettingsUi
 
 #endif // __SETTINGS_UI_H__

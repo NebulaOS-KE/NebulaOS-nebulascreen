@@ -1,4 +1,5 @@
 #include "finetune_panel.h"
+#include "settings_ui.h"
 #include "state.h"
 #include "spdlog/spdlog.h"
 #include "utils.h"
@@ -62,6 +63,8 @@ FineTunePanel::FineTunePanel(KWebSocketClient &websocket_client, std::mutex &l)
     LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
 
   lv_obj_set_grid_dsc_array(panel_cont, grid_main_col_dsc, grid_main_row_dsc);
+  // G94 (Run 18): the page title like every page
+  SettingsUi::page_title(panel_cont, "Fine Tune");
 
   // col 1
   lv_obj_set_grid_cell(zreset_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0, 1);

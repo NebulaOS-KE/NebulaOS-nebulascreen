@@ -1,3 +1,4 @@
+#include "settings_ui.h"
 #include "homing_panel.h"
 #include "state.h"
 #include "spdlog/spdlog.h"
@@ -70,7 +71,9 @@ HomingPanel::HomingPanel(KWebSocketClient &websocket_client, std::mutex &lock)
   lv_obj_set_grid_cell(distance_selector.get_container(), LV_GRID_ALIGN_STRETCH, 0, 4, LV_GRID_ALIGN_STRETCH, 3, 1);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 10, 0);
+  // G94 (Run 18): the one title and Back button of every page
+  SettingsUi::page_title(homing_cont, "Move");
+  SettingsUi::place_back(back_btn.get_container());
 
   ws.register_notify_update(this);
 }

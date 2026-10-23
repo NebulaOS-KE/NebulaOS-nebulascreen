@@ -49,7 +49,9 @@ MiniPrintStatus::MiniPrintStatus(lv_obj_t *parent,
   lv_obj_set_style_pad_all(cont, 4, 0);
   lv_obj_set_style_pad_column(cont, 6, 0);
   lv_obj_set_style_border_width(cont, 2, 0);
-  lv_obj_set_style_radius(cont, 4, 0);
+  lv_obj_set_style_border_color(cont, lv_palette_darken(LV_PALETTE_GREY, 3), 0);
+  // the tiles' corner radius (ButtonContainer)
+  lv_obj_set_style_radius(cont, 10 * scale, 0);
 
   lv_obj_add_flag(cont, LV_OBJ_FLAG_FLOATING);
   lv_obj_align(cont, LV_ALIGN_TOP_RIGHT, 0, -14 * scale);

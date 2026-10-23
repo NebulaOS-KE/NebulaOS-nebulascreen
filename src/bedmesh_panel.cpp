@@ -1,4 +1,5 @@
 #include "bedmesh_panel.h"
+#include "settings_ui.h"
 #include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
@@ -68,6 +69,7 @@ BedMeshPanel::BedMeshPanel(KWebSocketClient &c, std::mutex &l)
   , msgbox(lv_obj_create(prompt))
   , input(lv_textarea_create(msgbox))
   , kb(lv_keyboard_create(prompt))
+  , empty_label(nullptr)
   , current_view_angle(VIEW_ANGLE_Z_DEGREES)
   , canvas_draw_buf(nullptr)
   , show_3d_view(false)
@@ -268,6 +270,24 @@ BedMeshPanel::BedMeshPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_set_style_pad_top(profile_info, 2, LV_PART_ITEMS | LV_STATE_DEFAULT);
   lv_obj_set_style_pad_bottom(profile_info, 2, LV_PART_ITEMS | LV_STATE_DEFAULT);
 
+  // G94 (Run 18): the page title like every page, and a text instead of
+  // empty boxes while there is no mesh
+  SettingsUi::page_title(cont, "Bed Mesh");
+  // an opaque cover over the (empty) table and profile boxes
+  empty_label = lv_obj_create(top_cont);
+  lv_obj_add_flag(empty_label, LV_OBJ_FLAG_FLOATING);
+  lv_obj_set_size(empty_label, LV_PCT(100), LV_PCT(100));
+  lv_obj_clear_flag(empty_label, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_border_width(empty_label, 0, 0);
+  lv_obj_t *empty_text = lv_label_create(empty_label);
+  lv_obj_set_width(empty_text, LV_PCT(90));
+  lv_label_set_long_mode(empty_text, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_align(empty_text, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_font(empty_text, &lv_font_montserrat_14, 0);
+  lv_label_set_text(empty_text,
+    "No bed mesh loaded yet.\n\nTap Calibrate, or run Calibration > Z-Offset & Bed Mesh.");
+  lv_obj_center(empty_text);
+
   // button controls
   lv_obj_set_size(controls_cont, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_flex_align(controls_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
@@ -366,6 +386,23 @@ void BedMeshPanel::refresh_views_with_lock(json &bm) {
 }
 
 void BedMeshPanel::refresh_views(json &bm) {
+  refresh_mesh(bm);
+  // only when this update says which profile is loaded (notifications carry
+  // just the changed fields)
+  if (empty_label != nullptr && bm.is_object() && bm.contains("profile_name")) {
+    auto name = bm["/profile_name"_json_pointer];
+    bool has_mesh = name.is_string() && !name.template get<std::string>().empty()
+                    && !mesh.empty();
+    if (has_mesh) {
+      lv_obj_add_flag(empty_label, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_clear_flag(empty_label, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_move_foreground(empty_label);
+    }
+  }
+}
+
+void BedMeshPanel::refresh_mesh(json &bm) {
   if (!bm.is_null()) {
     auto active_profile_j = bm["/profile_name"_json_pointer];
     size_t row_idx = 0;

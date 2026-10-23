@@ -25,7 +25,9 @@ PowerPanel::PowerPanel(KWebSocketClient &websocket_client, std::mutex &l)
   build_recovery_section();
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  // G94 (Run 18): the one title and Back button of every page
+  SettingsUi::page_title(cont, "Power");
+  SettingsUi::place_back(back_btn.get_container());
 
   ws.register_notify_update(this);
 }

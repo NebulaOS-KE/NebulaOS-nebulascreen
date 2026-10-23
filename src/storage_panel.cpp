@@ -34,7 +34,7 @@ StoragePanel::StoragePanel(KWebSocketClient &c, std::mutex &lock)
                           "Shows what it frees first.");
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
 }
 
 StoragePanel::~StoragePanel() {

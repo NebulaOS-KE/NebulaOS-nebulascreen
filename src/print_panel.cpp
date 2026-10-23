@@ -1,4 +1,5 @@
 #include "print_panel.h"
+#include "settings_ui.h"
 #include "file_panel.h"
 #include "spoolman_panel.h"
 #include "state.h"
@@ -56,6 +57,8 @@ PrintPanel::PrintPanel(KWebSocketClient &websocket, std::mutex &lock, PrintStatu
   lv_obj_clear_flag(files_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_flex_flow(files_cont, LV_FLEX_FLOW_ROW);
   lv_obj_set_style_pad_all(files_cont, 0, 0);
+  // G94 (Run 18): the page title like every page
+  SettingsUi::page_title(files_cont, "Files");
 
   // left side cont
   lv_obj_set_height(left_cont, LV_PCT(100));

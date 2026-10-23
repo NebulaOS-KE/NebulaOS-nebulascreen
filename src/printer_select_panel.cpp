@@ -1,3 +1,4 @@
+#include "settings_ui.h"
 #include "printer_select_panel.h"
 #include "nebulascreen_paths.h"
 #include "guppyscreen.h"
@@ -273,7 +274,7 @@ PrinterSelectPanel::PrinterSelectPanel()
   lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);  
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
+  SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
 }
 
 PrinterSelectPanel::~PrinterSelectPanel() {

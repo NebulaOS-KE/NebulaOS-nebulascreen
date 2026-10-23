@@ -1,9 +1,12 @@
 #include "settings_ui.h"
+#include "button_container.h"
 #include "utils.h"
 
 #include <map>
 #include <memory>
 #include <set>
+
+LV_IMG_DECLARE(back);
 
 namespace SettingsUi {
 
@@ -50,6 +53,60 @@ lv_obj_t *page(const char *title, lv_obj_t **body) {
   lv_obj_set_flex_flow(b, LV_FLEX_FLOW_ROW);
   *body = b;
   return cont;
+}
+
+lv_obj_t *page_title(lv_obj_t *page, const char *text, bool reserve) {
+  lv_obj_t *t = lv_label_create(page);
+  lv_label_set_text(t, text);
+  place_title(t, reserve);
+  return t;
+}
+
+void place_title(lv_obj_t *t, bool reserve) {
+  lv_obj_t *page = lv_obj_get_parent(t);
+  lv_obj_set_style_text_font(t, &lv_font_montserrat_16, 0);
+  lv_obj_set_style_pad_all(t, 0, 0);
+  lv_obj_add_flag(t, LV_OBJ_FLAG_FLOATING);
+  lv_obj_add_flag(t, LV_OBJ_FLAG_IGNORE_LAYOUT);
+  lv_obj_clear_flag(t, LV_OBJ_FLAG_CLICKABLE);
+  if (reserve) {
+    lv_obj_set_style_pad_top(page, kTitleSpace, 0);
+  }
+  // aligned within the content area: undo the page's padding
+  lv_coord_t pl = lv_obj_get_style_pad_left(page, LV_PART_MAIN)
+                  + lv_obj_get_style_border_width(page, LV_PART_MAIN);
+  lv_coord_t pt = lv_obj_get_style_pad_top(page, LV_PART_MAIN)
+                  + lv_obj_get_style_border_width(page, LV_PART_MAIN);
+  lv_obj_align(t, LV_ALIGN_TOP_LEFT, 8 - pl, 6 - pt);
+}
+
+void place_back(lv_obj_t *back_tile) {
+  lv_obj_t *page = lv_obj_get_parent(back_tile);
+  lv_obj_add_flag(back_tile, LV_OBJ_FLAG_FLOATING);
+  lv_coord_t pr = lv_obj_get_style_pad_right(page, LV_PART_MAIN);
+  lv_coord_t pb = lv_obj_get_style_pad_bottom(page, LV_PART_MAIN);
+  lv_obj_align(back_tile, LV_ALIGN_BOTTOM_RIGHT, pr - 6, pb - 6);
+  lv_obj_move_foreground(back_tile);
+}
+
+lv_obj_t *back_tile(lv_obj_t *page, lv_event_cb_t cb, void *user) {
+  auto *b = new ButtonContainer(page, &back, "Back", cb, user);
+  place_back(b->get_container());
+  return b->get_container();
+}
+
+const lv_font_t *button_font() {
+  return &lv_font_montserrat_12;
+}
+
+void style_text_button(lv_obj_t *btn) {
+  for (uint32_t i = 0; i < lv_obj_get_child_cnt(btn); i++) {
+    lv_obj_t *c = lv_obj_get_child(btn, i);
+    if (lv_obj_check_type(c, &lv_label_class)) {
+      lv_obj_set_style_text_font(c, button_font(), 0);
+      return;
+    }
+  }
 }
 
 lv_obj_t *column(lv_obj_t *parent, lv_coord_t width_pct) {

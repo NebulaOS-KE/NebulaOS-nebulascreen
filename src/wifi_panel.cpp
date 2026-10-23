@@ -1,3 +1,4 @@
+#include "settings_ui.h"
 #include "wifi_panel.h"
 #include "nebulaos_display.h"
 #include "utils.h"
@@ -41,7 +42,9 @@ WifiPanel::WifiPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_align(spinner, LV_ALIGN_CENTER, 0, 0);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
+  // G94 (Run 18): the one title and Back button of every page
+  SettingsUi::page_title(cont, "Wi-Fi");
+  SettingsUi::place_back(back_btn.get_container());
 
   lv_obj_set_flex_grow(top_cont, 1);
   lv_obj_set_flex_flow(top_cont, LV_FLEX_FLOW_ROW);

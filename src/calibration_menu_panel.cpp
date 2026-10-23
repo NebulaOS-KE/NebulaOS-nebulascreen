@@ -1,4 +1,5 @@
 #include "calibration_menu_panel.h"
+#include "settings_ui.h"
 #include "utils.h"
 #include "state.h"
 
@@ -157,33 +158,23 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   lv_obj_set_size(panel_cont, LV_PCT(100), LV_PCT(100));
   lv_obj_clear_flag(panel_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_pad_all(panel_cont, 8, 0);
+  // the nav column ends where the Back tile does (6 px from the edges)
+  lv_obj_set_style_pad_right(panel_cont, 6, 0);
+  lv_obj_set_style_pad_bottom(panel_cont, 6, 0);
   lv_obj_set_style_pad_row(panel_cont, 4, 0);
   lv_obj_set_style_border_width(panel_cont, 0, 0);
-  // 2x2 grid: row 0 (content-height) is the header - "Calibration" on the
-  // left, Back on the right, level with the title as asked. Row 1 (FR(1),
-  // fills the rest) is the list on the left, Up/OK/Down on the right.
-  // LV_GRID_ALIGN_STRETCH sizes matching cells directly - same technique
-  // printertune_panel.cpp's own Tune-tab grid relies on.
-  static lv_coord_t panel_col_dsc[] = {LV_GRID_FR(1), 48, LV_GRID_TEMPLATE_LAST};
-  static lv_coord_t panel_row_dsc[] = {LV_GRID_CONTENT, LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+  // G94 (Run 18): the page title and the Back tile like every page. One grid
+  // row below the title: the list on the left, Up/OK/Down on the right, the
+  // Back tile under them in the bottom-right corner.
+  static lv_coord_t panel_col_dsc[] = {LV_GRID_FR(1), 66, LV_GRID_TEMPLATE_LAST};
+  static lv_coord_t panel_row_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
   lv_obj_set_grid_dsc_array(panel_cont, panel_col_dsc, panel_row_dsc);
 
-  lv_obj_t *title = lv_label_create(panel_cont);
-  lv_obj_set_grid_cell(title, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER, 0, 1);
-  lv_label_set_text(title, "Calibration");
-  lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
-
-  back_btn = lv_btn_create(panel_cont);
-  lv_obj_set_grid_cell(back_btn, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
-  lv_obj_set_style_bg_color(back_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
-  lv_obj_t *back_lbl = lv_label_create(back_btn);
-  lv_label_set_text(back_lbl, LV_SYMBOL_LEFT);
-  lv_obj_set_style_text_font(back_lbl, &lv_font_montserrat_16, LV_PART_MAIN);
-  lv_obj_center(back_lbl);
-  lv_obj_add_event_cb(back_btn, &CalibrationMenuPanel::_handle_callback, LV_EVENT_CLICKED, this);
+  SettingsUi::page_title(panel_cont, "Calibration");
+  back_btn = SettingsUi::back_tile(panel_cont, &CalibrationMenuPanel::_handle_callback, this);
 
   list_cont = lv_obj_create(panel_cont);
-  lv_obj_set_grid_cell(list_cont, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
+  lv_obj_set_grid_cell(list_cont, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
   lv_obj_set_flex_flow(list_cont, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_row(list_cont, 2, 0);
   lv_obj_set_style_border_width(list_cont, 0, 0);
@@ -214,12 +205,11 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   rows = {bed_tram_row, axis_twist_row, load_cell_row, wizard_row, inputshaper_row, esteps_row, skew_row, tmc_tune_row, bedmesh_row};
 
   // Right-side nav column - same construction as macros_panel.cpp's nav_cont
-  // (Up/OK/Down). Back moved up to the header row (grid_cell above, level
-  // with "Calibration") since having it as a 4th button down here read as
-  // just another list control instead of the way out of the screen.
+  // (Up/OK/Down), above the Back tile (66 px + a gap).
   nav_cont = lv_obj_create(panel_cont);
-  lv_obj_set_grid_cell(nav_cont, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_style_pad_all(nav_cont, 2, 0);
+  lv_obj_set_grid_cell(nav_cont, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
+  lv_obj_set_style_pad_all(nav_cont, 0, 0);
+  lv_obj_set_style_pad_bottom(nav_cont, 72, 0);
   lv_obj_set_style_border_width(nav_cont, 0, 0);
   lv_obj_clear_flag(nav_cont, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -258,6 +248,7 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   lv_img_set_src(down_img, &arrow_down);
   lv_obj_center(down_img);
   lv_obj_add_event_cb(down_btn, &CalibrationMenuPanel::_handle_nav, LV_EVENT_CLICKED, this);
+  lv_obj_move_foreground(back_btn);   // above the nav column's background
 }
 
 CalibrationMenuPanel::~CalibrationMenuPanel() {

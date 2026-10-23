@@ -1,3 +1,4 @@
+#include "settings_ui.h"
 #include "fan_panel.h"
 #include "state.h"
 #include "utils.h"
@@ -29,7 +30,9 @@ FanPanel::FanPanel(KWebSocketClient &websocket_client, std::mutex &lock)
   lv_obj_set_style_pad_bottom(fans_cont, 60, 0);
 #endif
 
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
+  // G94 (Run 18): the one title and Back button of every page
+  SettingsUi::page_title(fanpanel_cont, "Fans");
+  SettingsUi::place_back(back_btn.get_container());
   ws.register_notify_update(this);
 }
 

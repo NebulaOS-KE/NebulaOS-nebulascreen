@@ -40,7 +40,7 @@ UpdatesPanel::UpdatesPanel(KWebSocketClient &c, std::mutex &lock)
   image_btn = SettingsUi::icon_button(right, &sd_img, "System image", &UpdatesPanel::_handle_callback, this);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
 
   // G6: Moonraker's own progress lines while an update runs. They arrive on
   // the websocket thread. When Moonraker updates itself it restarts, the

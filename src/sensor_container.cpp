@@ -20,7 +20,7 @@ SensorContainer::SensorContainer(KWebSocketClient &c,
   , sensor_img(lv_img_create(sensor_cont))
   , sensor_label(lv_label_create(sensor_cont))
   , value_label(lv_label_create(sensor_cont))
-  , value(0)
+  , value(INT32_MIN)
   , divider_label(lv_label_create(sensor_cont))
   , target_label(lv_label_create(sensor_cont))
   , target(-1)
@@ -64,7 +64,7 @@ SensorContainer::SensorContainer(KWebSocketClient &c,
   // Right-anchored block: [value] [/] [target]. Sized so 3-digit values ("210") fit inside
   // the bordered target box without wrapping. Targets/values use LV_LABEL_LONG_CLIP to
   // suppress wrap even if a future value somehow exceeds the box.
-  lv_label_set_text(value_label, "0");
+  lv_label_set_text(value_label, "-");   // G94: no "0" before the first value
   lv_obj_set_width(value_label, 50 * width_scale);
   lv_obj_align(value_label, LV_ALIGN_RIGHT_MID, -90 * width_scale, 0);
   lv_label_set_long_mode(value_label, LV_LABEL_LONG_CLIP);
@@ -78,7 +78,7 @@ SensorContainer::SensorContainer(KWebSocketClient &c,
   lv_obj_set_style_text_font(divider_label, row_font, 0);
 
   if (show_target || can_edit) {
-    lv_label_set_text(target_label, "0");
+    lv_label_set_text(target_label, "-");
     lv_obj_set_width(target_label, 60 * width_scale);
     lv_obj_align(target_label, LV_ALIGN_RIGHT_MID, -5 * width_scale, 0);
     lv_obj_set_style_pad_all(target_label, 2 * width_scale, 0);

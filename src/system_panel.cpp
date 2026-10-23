@@ -76,7 +76,7 @@ SystemPanel::SystemPanel(KWebSocketClient &c, std::mutex &lock)
   SettingsUi::set_tone(shutdown_btn, SettingsUi::Tone::Danger);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
 }
 
 SystemPanel::~SystemPanel() {

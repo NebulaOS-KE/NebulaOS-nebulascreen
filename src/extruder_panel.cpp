@@ -1,3 +1,4 @@
+#include "settings_ui.h"
 #include "extruder_panel.h"
 #include "nebulaos_macros.h"
 #include "state.h"
@@ -49,7 +50,7 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
   , panel_cont(lv_obj_create(lv_scr_act()))
   , spoolman_panel(sm)
   , extruder_temp(ws, panel_cont, &extruder, 150,
-    "Extruder", lv_palette_main(LV_PALETTE_RED), false, true, numpad, "extruder", NULL, NULL)
+    "Nozzle", lv_palette_main(LV_PALETTE_RED), false, true, numpad, "extruder", NULL, NULL)
   , temp_selector(panel_cont, "Hotend target (°C)",
     {"180", "200", "220", "240", "260", "280", "300", ""}, 3, &ExtruderPanel::_handle_callback, this)
   , length_selector(panel_cont, "Extrude / Retract length (mm)",
@@ -141,7 +142,10 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
 
   lv_obj_set_grid_dsc_array(panel_cont, grid_main_col_dsc, grid_main_row_dsc);
   lv_obj_add_flag(extruder_temp.get_sensor(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(extruder_temp.get_sensor(), LV_ALIGN_TOP_LEFT, 20, 0);
+  // G94 (Run 18): the page title like every page, the nozzle temperature
+  // next to it (the header row keeps the space free)
+  SettingsUi::page_title(panel_cont, "Extruder", false);
+  lv_obj_align(extruder_temp.get_sensor(), LV_ALIGN_TOP_LEFT, 96, 4);
 
   // lv_obj_set_size(extruder_temp.get_sensor(), 350, 60);
   // col 0
@@ -212,6 +216,19 @@ ExtruderPanel::~ExtruderPanel() {
 
 void ExtruderPanel::foreground() {
   apply_default_temp();
+  // G94 (Run 18): show the current temperatures at once - the header said
+  // "0 / 0" until the next temperature notification arrived
+  auto *st = State::get_instance();
+  auto t = st->get_data("/printer_state/extruder/temperature"_json_pointer);
+  if (t.is_number()) {
+    current_temp = t.template get<int>();
+    extruder_temp.update_value(current_temp);
+  }
+  auto tg = st->get_data("/printer_state/extruder/target"_json_pointer);
+  if (tg.is_number()) {
+    current_target = tg.template get<int>();
+    extruder_temp.update_target(current_target);
+  }
   lv_obj_move_foreground(panel_cont);
 }
 

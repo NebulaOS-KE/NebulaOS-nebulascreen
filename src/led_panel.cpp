@@ -1,3 +1,4 @@
+#include "settings_ui.h"
 #include "led_panel.h"
 #include "state.h"
 #include "utils.h"
@@ -27,7 +28,9 @@ LedPanel::LedPanel(KWebSocketClient &websocket_client, std::mutex &lock)
     lv_obj_set_style_pad_bottom(leds_cont, 60, 0);
 #endif
 
-    lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
+    // G94 (Run 18): the one title and Back button of every page
+    SettingsUi::page_title(ledpanel_cont, "LEDs");
+    SettingsUi::place_back(back_btn.get_container());
 
     // G94: an empty page said nothing at all
     empty_label = lv_label_create(ledpanel_cont);

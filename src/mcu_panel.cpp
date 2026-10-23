@@ -19,9 +19,9 @@ McuPanel::McuPanel(KWebSocketClient &c, std::mutex &lock)
   , back_btn(cont, &back, "Back", &McuPanel::_handle_callback, this)
 {
   SettingsUi::on_shown(cont, [this]() { shown(); });
-  lv_obj_t *left = SettingsUi::column(body, 68);
+  lv_obj_t *left = SettingsUi::column(body, 64);
   lv_obj_set_style_pad_row(left, 3, 0);
-  lv_obj_t *right = SettingsUi::column(body, 29);
+  lv_obj_t *right = SettingsUi::column(body, 33);
 
   running_value = SettingsUi::info_line(left, "Running");
   reported_value = SettingsUi::info_line(left, "Version");
@@ -40,13 +40,14 @@ McuPanel::McuPanel(KWebSocketClient &c, std::mutex &lock)
 
   refresh_btn = SettingsUi::icon_button(right, &refresh_img, "Refresh",
                                         &McuPanel::_handle_callback, this);
-  native_btn = SettingsUi::icon_button(right, &chip_img, "Reinstall built-in MCU firmware",
+  // G94 (Run 18): two lines, not three (the page title already says MCU)
+  native_btn = SettingsUi::icon_button(right, &chip_img, "Reinstall\nbuilt-in firmware",
                                        &McuPanel::_handle_callback, this);
-  lv_obj_set_height(native_btn, 52);
+  lv_obj_set_height(native_btn, 44);
   lv_obj_add_state(native_btn, LV_STATE_DISABLED);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
 }
 
 McuPanel::~McuPanel() {

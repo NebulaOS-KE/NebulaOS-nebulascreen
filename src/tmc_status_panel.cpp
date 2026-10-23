@@ -1,3 +1,4 @@
+#include "settings_ui.h"
 #include "tmc_status_panel.h"
 #include "spdlog/spdlog.h"
 
@@ -47,7 +48,9 @@ TmcStatusPanel::TmcStatusPanel(KWebSocketClient &c,
   }, LV_EVENT_VALUE_CHANGED, this);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);  
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
+  // G94 (Run 18): the one title and Back button of every page
+  SettingsUi::page_title(cont, "TMC Metrics");
+  SettingsUi::place_back(back_btn.get_container());
 
   ws.register_notify_update(this);    
 }

@@ -1,4 +1,5 @@
 #include "axis_twist_panel.h"
+#include "settings_ui.h"
 #include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
@@ -54,9 +55,8 @@ AxisTwistPanel::AxisTwistPanel(KWebSocketClient &websocket_client, std::mutex &l
   lv_obj_set_style_pad_all(intro_cont, 10, 0);
   lv_obj_set_style_pad_row(intro_cont, 10, 0);
 
-  lv_obj_t *title = lv_label_create(intro_cont);
-  lv_label_set_text(title, "Axis Twist Compensation");
-  lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
+  // G94 (Run 18): the page title and the Back tile like every page
+  SettingsUi::page_title(intro_cont, "Axis Twist Compensation");
 
   lv_obj_t *intro_body = lv_label_create(intro_cont);
   lv_label_set_long_mode(intro_body, LV_LABEL_LONG_WRAP);
@@ -73,17 +73,11 @@ AxisTwistPanel::AxisTwistPanel(KWebSocketClient &websocket_client, std::mutex &l
   lv_obj_set_size(start_btn, 220, 46);
   lv_obj_t *sb_lbl = lv_label_create(start_btn);
   lv_label_set_text(sb_lbl, LV_SYMBOL_OK "  Start Calibration");
-  lv_obj_set_style_text_font(sb_lbl, &lv_font_montserrat_16, 0);
   lv_obj_center(sb_lbl);
+  SettingsUi::style_text_button(start_btn);
   lv_obj_add_event_cb(start_btn, &AxisTwistPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
-  intro_back_btn = lv_btn_create(intro_cont);
-  lv_obj_set_size(intro_back_btn, 140, 36);
-  lv_obj_set_style_bg_color(intro_back_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
-  lv_obj_t *ib_lbl = lv_label_create(intro_back_btn);
-  lv_label_set_text(ib_lbl, LV_SYMBOL_LEFT "  Back");
-  lv_obj_center(ib_lbl);
-  lv_obj_add_event_cb(intro_back_btn, &AxisTwistPanel::_handle_callback, LV_EVENT_CLICKED, this);
+  intro_back_btn = SettingsUi::back_tile(intro_cont, &AxisTwistPanel::_handle_callback, this);
 
   // ---------- PROBING ----------
   fill(probe_cont);
@@ -157,8 +151,8 @@ AxisTwistPanel::AxisTwistPanel(KWebSocketClient &websocket_client, std::mutex &l
   lv_obj_set_style_bg_color(abort_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
   lv_obj_t *ab_lbl = lv_label_create(abort_btn);
   lv_label_set_text(ab_lbl, LV_SYMBOL_CLOSE "  Abort");
-  lv_obj_set_style_text_font(ab_lbl, &lv_font_montserrat_16, 0);
   lv_obj_center(ab_lbl);
+  SettingsUi::style_text_button(abort_btn);
   lv_obj_add_event_cb(abort_btn, &AxisTwistPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
   accept_btn = lv_btn_create(act);
@@ -166,8 +160,8 @@ AxisTwistPanel::AxisTwistPanel(KWebSocketClient &websocket_client, std::mutex &l
   lv_obj_set_height(accept_btn, 44);
   lv_obj_t *ac_lbl = lv_label_create(accept_btn);
   lv_label_set_text(ac_lbl, LV_SYMBOL_OK "  Accept");
-  lv_obj_set_style_text_font(ac_lbl, &lv_font_montserrat_16, 0);
   lv_obj_center(ac_lbl);
+  SettingsUi::style_text_button(accept_btn);
   lv_obj_add_event_cb(accept_btn, &AxisTwistPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
   // ---------- DONE ----------
@@ -193,17 +187,11 @@ AxisTwistPanel::AxisTwistPanel(KWebSocketClient &websocket_client, std::mutex &l
   lv_obj_set_size(save_btn, 240, 46);
   lv_obj_t *sv_lbl = lv_label_create(save_btn);
   lv_label_set_text(sv_lbl, LV_SYMBOL_SAVE "  Save & Restart");
-  lv_obj_set_style_text_font(sv_lbl, &lv_font_montserrat_16, 0);
   lv_obj_center(sv_lbl);
+  SettingsUi::style_text_button(save_btn);
   lv_obj_add_event_cb(save_btn, &AxisTwistPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
-  done_back_btn = lv_btn_create(done_cont);
-  lv_obj_set_size(done_back_btn, 140, 36);
-  lv_obj_set_style_bg_color(done_back_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
-  lv_obj_t *db_lbl = lv_label_create(done_back_btn);
-  lv_label_set_text(db_lbl, LV_SYMBOL_LEFT "  Done");
-  lv_obj_center(db_lbl);
-  lv_obj_add_event_cb(done_back_btn, &AxisTwistPanel::_handle_callback, LV_EVENT_CLICKED, this);
+  done_back_btn = SettingsUi::back_tile(done_cont, &AxisTwistPanel::_handle_callback, this);
 
   // ---------- EMPTY (not configured) ----------
   fill(empty_cont);
@@ -216,12 +204,8 @@ AxisTwistPanel::AxisTwistPanel(KWebSocketClient &websocket_client, std::mutex &l
     "printer.cfg and restart Klipper.");
   lv_obj_set_style_text_align(empty_lbl, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(empty_lbl, &lv_font_montserrat_16, 0);
-  empty_back_btn = lv_btn_create(empty_cont);
-  lv_obj_set_size(empty_back_btn, 140, 40);
-  lv_obj_t *eb_lbl = lv_label_create(empty_back_btn);
-  lv_label_set_text(eb_lbl, LV_SYMBOL_LEFT "  Back");
-  lv_obj_center(eb_lbl);
-  lv_obj_add_event_cb(empty_back_btn, &AxisTwistPanel::_handle_callback, LV_EVENT_CLICKED, this);
+  SettingsUi::page_title(empty_cont, "Axis Twist Compensation");
+  empty_back_btn = SettingsUi::back_tile(empty_cont, &AxisTwistPanel::_handle_callback, this);
 
   show_stage(INTRO);
 

@@ -35,20 +35,21 @@ ResetPanel::ResetPanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
   lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
 
-  lv_obj_t *title = lv_label_create(cont);
-  lv_label_set_text(title, "Reset");
-  lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
-  lv_obj_add_flag(title, LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(title, LV_ALIGN_TOP_LEFT, 0, -6);
+  // G94 (Run 18): the title and the Back tile at the same place as on every
+  // other page (the theme's default padding put both a few px off)
+  lv_obj_set_style_pad_all(cont, 6, 0);
+  lv_obj_set_style_pad_row(cont, 8, 0);
+  lv_obj_set_style_pad_column(cont, 8, 0);
+  SettingsUi::page_title(cont, "Reset");
 
-  static lv_coord_t rows[] = {LV_GRID_FR(1), LV_GRID_FR(5), LV_GRID_FR(5), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+  static lv_coord_t rows[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
   static lv_coord_t cols[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
   lv_obj_set_grid_dsc_array(cont, cols, rows);
-  lv_obj_set_grid_cell(gui_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(touch_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(clean_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-  lv_obj_set_grid_cell(swap_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-  lv_obj_set_grid_cell(back_btn.get_container(), LV_GRID_ALIGN_END, 2, 1, LV_GRID_ALIGN_END, 2, 2);
+  lv_obj_set_grid_cell(gui_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
+  lv_obj_set_grid_cell(touch_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
+  lv_obj_set_grid_cell(clean_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
+  lv_obj_set_grid_cell(swap_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
+  SettingsUi::place_back(back_btn.get_container());
 
   // The two that change the whole system stand out: red and orange frames.
   lv_obj_set_style_border_color(clean_btn.get_container(), lv_color_hex(0xC62828), 0);

@@ -284,10 +284,13 @@ void MainPanel::create_main(lv_obj_t *parent)
   lv_obj_set_grid_cell(print_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 2, 1);
 
   // The print overlay (shown only while printing, when Homing/Extrude are
-  // locked) lives in the button cluster, left-aligned with the Homing box.
+  // locked) lives in the button cluster. G94 (Run 18): it takes the whole
+  // top row, exactly over the Homing and Extrude tiles, instead of a box
+  // that covered half of the Homing icon.
   lv_obj_t *mini = print_status_panel.get_mini_container();
   lv_obj_set_parent(mini, btn_wrapper);
-  lv_obj_align(mini, LV_ALIGN_TOP_LEFT, 0, 0);
+  lv_obj_clear_flag(mini, LV_OBJ_FLAG_FLOATING);
+  lv_obj_set_grid_cell(mini, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
 
   // The "Paused" chip (shown only while paused, when the buttons are live)
   // parks in the top-right corner. It's small enough to leave the buttons

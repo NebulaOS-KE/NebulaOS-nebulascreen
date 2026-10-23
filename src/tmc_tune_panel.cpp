@@ -1,3 +1,4 @@
+#include "settings_ui.h"
 #include "tmc_tune_panel.h"
 #include "state.h"
 #include "spdlog/spdlog.h"
@@ -213,7 +214,7 @@ TmcTunePanel::TmcTunePanel(KWebSocketClient &c)
   lv_obj_set_size(btns_cont, LV_SIZE_CONTENT, LV_PCT(100)); 
   lv_obj_set_flex_align(btns_cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER);
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);  
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
+  SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
   
 }
 

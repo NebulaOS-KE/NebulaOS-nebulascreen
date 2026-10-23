@@ -65,7 +65,7 @@ PrinterSettingsPanel::PrinterSettingsPanel(KWebSocketClient &c, std::mutex &lock
   }
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
 }
 
 PrinterSettingsPanel::~PrinterSettingsPanel() {
