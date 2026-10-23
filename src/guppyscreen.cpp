@@ -1,5 +1,6 @@
 #include "guppyscreen.h"
 #include "nebulascreen_paths.h"
+#include "nebulascreen_fb.h"
 #include "nebulaos_display.h"
 
 #include "config.h"
@@ -109,9 +110,12 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
   lv_init();
 
 #if !defined(SIMULATOR) && !defined(OS_ANDROID)
-  /*Linux frame buffer device init*/
-  fbdev_init();
-  fbdev_unblank();
+  /* Linux frame buffer (G97): mapped without FBIOBLANK and without clearing,
+   * so the boot card stays on the glass while the pages are built; loop()
+   * draws the first frame, then unblanks once (see nebulascreen_fb.h). */
+  if (!nsfb::open("/dev/fb0", nsfb::device())) {
+    spdlog::error("cannot open the framebuffer /dev/fb0");
+  }
 #endif  // OS_ANDROID
 
   hal_init(primary_color, secondary_color);
@@ -237,6 +241,17 @@ void GuppyScreen::loop() {
   uint32_t sleep_cfg_refresh_ms = 0;
 #endif
 
+#if !defined(SIMULATOR) && !defined(OS_ANDROID)
+  // G97: the first frame goes straight into the framebuffer, over the boot
+  // card; only then make sure the display is on (on the Ingenic DPU an
+  // unblank restarts the controller, which used to show black until the
+  // first frame - ~0.5 s while all pages were built).
+  lv_lock.lock();
+  lv_refr_now(NULL);
+  lv_lock.unlock();
+  nsfb::unblank(nsfb::device());
+#endif
+
   while (1) {
     lv_lock.lock();
     lv_timer_handler();
@@ -262,7 +277,7 @@ void GuppyScreen::loop() {
       } else {
         if (is_sleeping.load()) {
           spdlog::debug("waking up display");
-          fbdev_unblank();
+          nsfb::unblank(nsfb::device());
           lv_obj_move_background(screen_saver);
           lv_obj_invalidate(lv_scr_act());
           // NebulaOS's touch watcher has usually woken the backlight

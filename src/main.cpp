@@ -1,5 +1,6 @@
 #include "lvgl/lvgl.h"
 #include "nebulascreen_paths.h"
+#include "nebulascreen_fb.h"
 #include "lv_drivers/display/fbdev.h"
 #include "lv_drivers/indev/evdev.h"
 #include "lv_tc.h"
@@ -102,6 +103,13 @@ static void evdev_read_smoothed(lv_indev_drv_t *drv, lv_indev_data_t *data) {
     }
 }
 
+// G97: NebulaScreen's own framebuffer output (nebulascreen_fb.h) - no
+// FBIOBLANK at start, so the boot card stays until the first frame.
+static void nsfb_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p) {
+    nsfb::blit(nsfb::device(), area->x1, area->y1, area->x2, area->y2, color_p);
+    lv_disp_flush_ready(drv);
+}
+
 static void hal_init(lv_color_t primary, lv_color_t secondary) {
     /*A small buffer for LittlevGL to draw the screen's content*/
     static lv_color_t buf[DISP_BUF_SIZE];
@@ -115,12 +123,10 @@ static void hal_init(lv_color_t primary, lv_color_t secondary) {
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
     disp_drv.draw_buf   = &disp_buf;
-    disp_drv.flush_cb   = fbdev_flush;
+    disp_drv.flush_cb   = nsfb_flush;
 
-    uint32_t width;
-    uint32_t height;
-    uint32_t dpi;
-    fbdev_get_sizes(&width, &height, &dpi);
+    uint32_t width = nsfb::device().xres;
+    uint32_t height = nsfb::device().yres;
     
     disp_drv.hor_res    = width;
     disp_drv.ver_res    = height;

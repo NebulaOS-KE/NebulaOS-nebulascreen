@@ -114,9 +114,9 @@ wpaclient:
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## the matching tests/test_*.cpp.
-.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal
+.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb
 
-test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal
+test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb
 
 # NebulaScreen rename (Run 15): device names and the legacy-config mapping.
 test-nebulascreen-paths: libhv.a
@@ -201,6 +201,15 @@ test-nebulaos-refusal: libhv.a
 		src/nebulaos_refusal.cpp tests/test_nebulaos_refusal.cpp \
 		-o build/test_nebulaos_refusal
 	./build/test_nebulaos_refusal
+
+# NebulaScreen framebuffer output (src/nebulascreen_fb.cpp, G97): the blit,
+# open() failing cleanly.
+test-nebulascreen-fb:
+	@mkdir -p build
+	g++ -std=c++17 -Wall -Wextra -I. \
+		src/nebulascreen_fb.cpp tests/test_nebulascreen_fb.cpp \
+		-o build/test_nebulascreen_fb
+	./build/test_nebulascreen_fb
 
 # GuppyScreen action -> NebulaOS macro mapping (src/nebulaos_macros.cpp).
 test-nebulaos-macros:
