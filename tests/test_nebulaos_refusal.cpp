@@ -157,6 +157,13 @@ TEST(Restart, hung_klippy_is_restarted_as_a_service) {
   d = restart_decision(RestartKind::MCU, busy_reply(false, nullptr, "not_ready"));
   ASSERT_EQ(d.method, std::string("printer.firmware_restart"));
   ASSERT_EQ(d.fallback_method, std::string("machine.services.restart"));
+  // ...but a Klippy that does not answer cannot run FIRMWARE_RESTART (the call
+  // could hang): the service restart, also for Restart MCU (verifier finding 2)
+  for (const char *k : {"unknown", "something_new"}) {
+    d = restart_decision(RestartKind::MCU, busy_reply(false, nullptr, k));
+    ASSERT_EQ(d.method, std::string("machine.services.restart"));
+    ASSERT_EQ(d.params["service"].get<std::string>(), std::string("klipper"));
+  }
 }
 
 TEST(Restart, missing_or_failing_check_never_blocks) {

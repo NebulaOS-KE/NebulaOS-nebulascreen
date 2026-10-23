@@ -144,7 +144,14 @@ RestartDecision restart_decision(RestartKind kind, const json &busy_reply) {
   // no answer at all: Klippy's state is not known either - the plain call,
   // as before the check existed
   bool ready = d.check_unavailable || klippy == "ready";
-  if (kind == RestartKind::KLIPPER && !ready) {
+  // Restart Klipper: anything but a ready Klippy -> the service restart (G95).
+  // Restart MCU: a shut-down MCU (Klippy answers, "not_ready") needs
+  // FIRMWARE_RESTART; but a Klippy that does not answer at all ("unknown" or a
+  // state this screen does not know) cannot run it and the call may never
+  // return - restart the service instead (Run 18 verifier finding 2).
+  bool mcu_unreachable = kind == RestartKind::MCU && !d.check_unavailable
+                         && klippy != "ready" && klippy != "not_ready";
+  if ((kind == RestartKind::KLIPPER && !ready) || mcu_unreachable) {
     d.method = "machine.services.restart";
     d.params = service_params;
     return d;
