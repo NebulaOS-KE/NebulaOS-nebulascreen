@@ -5,6 +5,7 @@
 #include "spdlog/spdlog.h"
 
 LV_IMG_DECLARE(back);
+LV_IMG_DECLARE(load_cell_img);
 
 static lv_obj_t *make_text_btn(lv_obj_t *parent, const char *label, lv_event_cb_t cb, void *user) {
   lv_obj_t *b = lv_btn_create(parent);
@@ -128,6 +129,15 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   lv_obj_align(kb, LV_ALIGN_TOP_RIGHT, 0, 22);
   lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_event_cb(kb, &GuidedCalibrationPanel::_handle_kb, LV_EVENT_ALL, this);
+
+  if (flow == CalFlow::LOAD_CELL) {
+    // Run 19: Tim's load-cell icon in the free top-right corner (46 px on
+    // the small screen, 64 px otherwise - the Makefile's ASSET_DIR)
+    lv_obj_t *icon = lv_img_create(cont);
+    lv_img_set_src(icon, &load_cell_img);
+    lv_obj_add_flag(icon, LV_OBJ_FLAG_FLOATING);
+    lv_obj_align(icon, LV_ALIGN_TOP_RIGHT, -8, 30);
+  }
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
   SettingsUi::place_back(back_btn.get_container());  // G94: one Back position

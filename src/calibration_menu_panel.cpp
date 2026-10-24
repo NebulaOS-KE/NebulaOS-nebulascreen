@@ -19,6 +19,7 @@ LV_IMG_DECLARE(inputshaper_img);
 LV_IMG_DECLARE(skew_img);
 LV_IMG_DECLARE(motor_img);
 LV_IMG_DECLARE(bedmesh_img);
+LV_IMG_DECLARE(load_cell_img);
 
 // Icons are shown at native size (46x46, same material_46 assets the Tune-tab
 // tiles use) - no lv_img_set_zoom/LV_IMG_SIZE_MODE_REAL this time. That
@@ -190,7 +191,7 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   // cell mounting, so the load cell and Z offset come after it.
   bed_tram_row    = make_row(list_cont, &bedmesh_img,     "Bed Tramming",            &CalibrationMenuPanel::_handle_callback, this, "1");
   axis_twist_row  = make_row(list_cont, &layers_img,      "Axis Twist",              &CalibrationMenuPanel::_handle_callback, this, "2");
-  load_cell_row   = make_row(list_cont, &home_z,          "Load Cell",               &CalibrationMenuPanel::_handle_callback, this, "3",
+  load_cell_row   = make_row(list_cont, &load_cell_img,         "Load Cell",               &CalibrationMenuPanel::_handle_callback, this, "3",
                              "Automatic (default) or Manual with a bottle");
   wizard_row      = make_row(list_cont, &home_z,          "Z-Offset & Bed Mesh",     &CalibrationMenuPanel::_handle_callback, this, "4",
                              "Includes the load cell check in Automatic mode");
