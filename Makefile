@@ -195,7 +195,8 @@ test-nebulaos-z-adjust: libhv.a
 	./build/test_nebulaos_z_adjust
 
 # NebulaOS refusals (src/nebulaos_refusal.cpp, G91 v3.4): reason texts, the
-# JSON-RPC error parsing and the "!! NebulaOS refused:" line filter.
+# JSON-RPC error parsing, the "!! NebulaOS refused:" line filter and (G107) the
+# one-popup-per-action dedupe of refusal lines.
 test-nebulaos-refusal: libhv.a
 	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
 		src/nebulaos_refusal.cpp tests/test_nebulaos_refusal.cpp \

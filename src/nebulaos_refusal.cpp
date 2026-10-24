@@ -27,6 +27,19 @@ const ReasonText REASONS[] = {
   {"UNKNOWN", "Printer state unknown - not possible right now."},
 };
 
+// The firmware's own words (nebulaos_osconfig.common.BUSY_MESSAGES and the
+// supervisorctl shim): the reason of a console line without "(REASON)".
+const ReasonText FIRMWARE_TEXTS[] = {
+  {"PRINTING", "Not possible while a print is running."},
+  {"PAUSED", "Not possible while a print is paused."},
+  {"ACTIVE", "Not possible while the printer is moving or heating."},
+  {"CALIBRATING", "Not possible while a calibration is running."},
+  {"UPDATING", "Another update is running."},
+  {"UPDATING", "The new system is still being checked - try again after the check."},
+  {"LOW_MEMORY", "Not possible right now: the printer is low on memory."},
+  {"UNKNOWN", "Printer state unknown - not possible right now."},
+};
+
 const char *known(const std::string &code) {
   for (const auto &r : REASONS) {
     if (code == r.reason) return r.reason;
@@ -162,4 +175,84 @@ RestartDecision restart_decision(RestartKind kind, const json &busy_reply) {
   d.fallback_method = "machine.services.restart";
   d.fallback_params = service_params;
   return d;
+}
+
+// ---- G107: one refusal popup per action ----
+
+Refusal refusal_from_line(const std::string &line) {
+  Refusal r;
+  if (!is_refusal_line(line)) {
+    return r;
+  }
+  std::string text = trim(line.substr(std::strlen(REFUSAL_LINE_PREFIX) - 1));
+  // "... (REASON)"
+  std::string reason;
+  if (text.size() > 2 && text.back() == ')') {
+    size_t open = text.rfind(" (");
+    if (open != std::string::npos) {
+      const char *k = known(text.substr(open + 2, text.size() - open - 3));
+      if (k != nullptr) {
+        reason = k;
+        text = trim(text.substr(0, open));
+      }
+    }
+  }
+  // "<action> - <text>": the action is lower case ("update (git reset)",
+  // "restart klipper"); a text starts upper case and may hold " - " itself
+  size_t dash = text.find(" - ");
+  if (dash != std::string::npos && !text.empty() && text[0] >= 'a' && text[0] <= 'z') {
+    text = trim(text.substr(dash + 3));
+  }
+  if (!text.empty() && text[0] >= 'a' && text[0] <= 'z') {
+    text[0] = (char)(text[0] - 'a' + 'A');
+  }
+  if (reason.empty()) {
+    for (const auto &f : FIRMWARE_TEXTS) {
+      if (text == f.text) {
+        reason = f.reason;
+        break;
+      }
+    }
+  }
+  r.refused = true;
+  r.reason = reason.empty() ? "UNKNOWN" : reason;
+  // the table's words; the printer's own text for UPDATING or a text this
+  // screen does not know (no reason found)
+  bool own_text = (reason.empty() || reason == "UPDATING") && !text.empty();
+  r.text = own_text ? text : refusal_reason_text(r.reason);
+  return r;
+}
+
+std::string refusal_key(const Refusal &r) {
+  return r.reason + "|" + r.text;
+}
+
+const uint32_t REFUSAL_DEDUPE_MS = 10000;
+
+void RefusalGate::own(const Refusal &r, uint32_t now_ms) {
+  if (!r.refused) return;
+  seen_ = true;
+  key_ = refusal_key(r);
+  last_ms_ = now_ms;
+}
+
+RefusalGate::Action RefusalGate::line(const Refusal &r, uint32_t now_ms) {
+  if (!r.refused) return Action::DROP;
+  std::string key = refusal_key(r);
+  bool recent = seen_ && (uint32_t)(now_ms - last_ms_) < REFUSAL_DEDUPE_MS;
+  bool same = recent && key == key_;
+  seen_ = true;
+  key_ = key;
+  last_ms_ = now_ms;  // the window slides with every refusal
+  if (same) {
+    return Action::DROP;
+  }
+  Action a = open_ ? Action::REPLACE : Action::SHOW;
+  open_ = true;
+  return a;
+}
+
+RefusalGate &refusal_gate() {
+  static RefusalGate gate;
+  return gate;
 }

@@ -1,5 +1,6 @@
 #include "prompt_panel.h"
 #include "nebulaos_calibration_flow.h"
+#include "nebulaos_refusal.h"
 #include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
@@ -249,6 +250,9 @@ void PromptPanel::consume(json &j) {
   //     must not trigger a toast - checking for "// {" specifically (not just
   //     "// ") is what distinguishes a structured error notice from ordinary
   //     human-readable chatter.
+  // G107: "!! NebulaOS refused: ..." lines are NotificationManager's (one
+  // "Not now" popup per action), never a message box here.
+  if (is_refusal_line(resp)) return;
   bool is_error_notice = resp.rfind("!! ", 0) == 0;
   if (!is_error_notice && resp.rfind("// {", 0) == 0) {
     is_error_notice = true;

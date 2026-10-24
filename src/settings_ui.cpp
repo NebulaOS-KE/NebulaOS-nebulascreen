@@ -365,6 +365,8 @@ void notice(const char *title, const char *text) {
 }
 
 void refusal(const Refusal &r) {
+  // G107: remembered, so the console line of the same refusal adds no second popup
+  refusal_gate().own(r, lv_tick_get());
   notice(REFUSAL_TITLE, r.text.c_str());
 }
 

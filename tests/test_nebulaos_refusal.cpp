@@ -185,6 +185,126 @@ TEST(Restart, missing_or_failing_check_never_blocks) {
   ASSERT_FALSE(restart_decision(RestartKind::KLIPPER, odd).refused);
 }
 
+// ---- G107: one action, one popup ----
+
+TEST(Line, git_wrapper_line_drops_action_and_reason) {
+  auto r = refusal_from_line(
+    "!! NebulaOS refused: update (git reset) - Not possible while a print is paused. (PAUSED)");
+  ASSERT_TRUE(r.refused);
+  ASSERT_EQ(r.reason, std::string("PAUSED"));
+  ASSERT_EQ(r.text, std::string("Not possible while a print is paused."));
+  // the firmware's ACTIVE words -> the screen's ACTIVE words
+  r = refusal_from_line("!! NebulaOS refused: update (git checkout) - "
+                        "Not possible while the printer is moving or heating. (ACTIVE)");
+  ASSERT_EQ(r.reason, std::string("ACTIVE"));
+  ASSERT_EQ(r.text, refusal_reason_text("ACTIVE"));
+}
+
+TEST(Line, reason_from_the_firmware_text_without_suffix) {
+  // supervisorctl shim (no "(REASON)") and the [nebulaos] component (no action)
+  auto r = refusal_from_line("!! NebulaOS refused: restart klipper - "
+                             "Not possible while the printer is moving or heating.");
+  ASSERT_EQ(r.reason, std::string("ACTIVE"));
+  ASSERT_EQ(r.text, refusal_reason_text("ACTIVE"));
+  r = refusal_from_line("!! NebulaOS refused: Not possible while a print is running.");
+  ASSERT_EQ(r.reason, std::string("PRINTING"));
+  // a text with " - " in it and no action prefix stays whole
+  r = refusal_from_line("!! NebulaOS refused: Printer state unknown - not possible right now.");
+  ASSERT_EQ(r.reason, std::string("UNKNOWN"));
+  ASSERT_EQ(r.text, refusal_reason_text("UNKNOWN"));
+  r = refusal_from_line("!! NebulaOS refused: "
+                        "The new system is still being checked - try again after the check.");
+  ASSERT_EQ(r.reason, std::string("UPDATING"));
+  ASSERT_EQ(r.text,
+            std::string("The new system is still being checked - try again after the check."));
+  // a text the screen does not know: shown as the printer says it
+  r = refusal_from_line("!! NebulaOS refused: update (git pull) - something new happened");
+  ASSERT_EQ(r.reason, std::string("UNKNOWN"));
+  ASSERT_EQ(r.text, std::string("Something new happened"));
+  ASSERT_FALSE(refusal_from_line("!! Must home axis first").refused);
+  ASSERT_FALSE(refusal_from_line("// NebulaOS refused: x").refused);
+}
+
+TEST(Line, git_commands_of_one_update_are_identical) {
+  const char *lines[] = {
+    "!! NebulaOS refused: update (git reset) - Not possible while the printer is moving or heating. (ACTIVE)",
+    "!! NebulaOS refused: update (git checkout) - Not possible while the printer is moving or heating. (ACTIVE)",
+    "!! NebulaOS refused: update (git pull) - Not possible while the printer is moving or heating. (ACTIVE)",
+  };
+  std::string key = refusal_key(refusal_from_line(lines[0]));
+  for (const char *l : lines) {
+    ASSERT_EQ(refusal_key(refusal_from_line(l)), key);
+  }
+}
+
+using A = RefusalGate::Action;
+
+static Refusal line_of(const std::string &tail) {
+  return refusal_from_line(std::string(REFUSAL_LINE_PREFIX) + tail);
+}
+
+TEST(Gate, moonraker_retries_give_one_popup) {
+  RefusalGate g;
+  Refusal r = line_of("update (git reset) - Not possible while a print is paused. (PAUSED)");
+  ASSERT_TRUE(g.line(r, 1000) == A::SHOW);
+  ASSERT_TRUE(g.line(r, 1200) == A::DROP);
+  ASSERT_TRUE(g.line(r, 6000) == A::DROP);
+  // the window slides: each retry within 10 s of the previous one
+  ASSERT_TRUE(g.line(r, 15000) == A::DROP);
+  ASSERT_TRUE(g.line(r, 24999) == A::DROP);
+  // closed by the user: the same retry chain still adds nothing
+  g.closed();
+  ASSERT_TRUE(g.line(r, 30000) == A::DROP);
+  // quiet for 10 s: a new attempt is a new popup
+  ASSERT_TRUE(g.line(r, 40000) == A::SHOW);
+}
+
+TEST(Gate, a_new_reason_replaces_the_open_popup) {
+  RefusalGate g;
+  Refusal paused = line_of("Not possible while a print is paused.");
+  Refusal low = line_of("Not possible right now: the printer is low on memory.");
+  ASSERT_TRUE(g.line(paused, 0) == A::SHOW);
+  ASSERT_TRUE(g.popup_open());
+  ASSERT_TRUE(g.line(low, 500) == A::REPLACE);
+  ASSERT_TRUE(g.line(low, 900) == A::DROP);
+  ASSERT_TRUE(g.line(paused, 1000) == A::REPLACE);
+  g.closed();
+  ASSERT_FALSE(g.popup_open());
+  ASSERT_TRUE(g.line(low, 2000) == A::SHOW);
+}
+
+TEST(Gate, own_refusal_swallows_its_console_line) {
+  RefusalGate g;
+  // the screen's own call: its popup comes from the JSON-RPC error ...
+  Refusal own = refusal_of(error_reply("ACTIVE: Not possible while the printer is moving or heating."));
+  g.own(own, 5000);
+  // ... and the same refusal's console line adds nothing
+  Refusal line = line_of("Not possible while the printer is moving or heating.");
+  ASSERT_TRUE(g.line(line, 5100) == A::DROP);
+  ASSERT_FALSE(g.popup_open());
+  // a later Mainsail action with another reason still shows
+  ASSERT_TRUE(g.line(line_of("update (git pull) - Not possible while a print is running. (PRINTING)"),
+                     6000) == A::SHOW);
+  // an own refusal is only remembered, never suppressed (the caller shows it)
+  g.own(own, 6100);
+  ASSERT_TRUE(g.line(line, 6200) == A::DROP);
+  g.own(Refusal(), 7000);  // not a refusal: ignored
+  ASSERT_TRUE(g.line(line, 7100) == A::DROP);
+}
+
+TEST(Gate, clock_wrap_is_safe) {
+  RefusalGate g;
+  Refusal r = line_of("Not possible while a print is running.");
+  ASSERT_TRUE(g.line(r, 0xFFFFF000u) == A::SHOW);
+  ASSERT_TRUE(g.line(r, 0x00000800u) == A::DROP);   // 6 s later, after the wrap
+  // still open after the window: the popup is refreshed in place, never a second one
+  ASSERT_TRUE(g.line(r, 0x00003000u + REFUSAL_DEDUPE_MS) == A::REPLACE);
+  g.closed();
+  ASSERT_TRUE(g.line(r, 0x00006000u + 2 * REFUSAL_DEDUPE_MS) == A::SHOW);
+  ASSERT_TRUE(g.line(Refusal(), 1) == A::DROP);     // not a refusal
+  ASSERT_TRUE(&refusal_gate() == &refusal_gate());
+}
+
 int main() {
   return minitest::run_all("nebulaos_refusal") > 0 ? 1 : 0;
 }

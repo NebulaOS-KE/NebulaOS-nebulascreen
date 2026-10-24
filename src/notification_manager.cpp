@@ -2,16 +2,23 @@
 #include "state.h"
 #include "utils.h"
 #include "nebulaos_refusal.h"
+#include "settings_ui.h"
 #include "spdlog/spdlog.h"
 
 static const int    TAB_W      = 60;     // left tab bar width
 static const size_t MAX_TOASTS = 3;
 static const uint32_t INFO_MS  = 4000;   // info auto-dismiss
+// G107: a refused call of the screen itself produces its console line just
+// before the JSON-RPC error that shows the screen's own popup; the line waits
+// this long so the gate knows the own refusal and drops the duplicate.
+static const uint32_t REFUSAL_LINE_DELAY_MS = 1000;
 
 NotificationManager::NotificationManager(KWebSocketClient &websocket_client, std::mutex &lock)
   : NotifyConsumer(lock)
   , ws(websocket_client)
   , cont(lv_obj_create(lv_layer_top()))
+  , refusal_timer(NULL)
+  , refusal_overlay(NULL)
   , baselined(false)
 {
   // toast stack: top of screen, right of the tab bar, stacking downward.
@@ -60,6 +67,15 @@ void NotificationManager::sim_demo() {
 
 NotificationManager::~NotificationManager() {
   ws.unregister_notify_update(this);
+  if (refusal_timer != NULL) {
+    lv_timer_del(refusal_timer);
+    refusal_timer = NULL;
+  }
+  if (refusal_overlay != NULL) {
+    lv_obj_remove_event_cb_with_user_data(refusal_overlay, &NotificationManager::_refusal_deleted_cb,
+                                          this);
+    refusal_overlay = NULL;
+  }
   if (cont != NULL) {
     lv_obj_del(cont);
     cont = NULL;
@@ -92,9 +108,10 @@ void NotificationManager::handle_gcode_response(json &j) {
     std::string line = el.template get<std::string>();
     // "!! " = Klipper error; "// action:" belongs to PromptPanel; skip the rest.
     // G91: "!! NebulaOS refused: ..." is not a printer error but a refused
-    // action (often from Mainsail); the screen shows its own popup for its
-    // own calls, so these lines never become an error toast.
+    // action (often from Mainsail): never an error toast. G107: one action
+    // gives ONE "Not now" popup, however many lines it produces.
     if (is_refusal_line(line)) {
+      queue_refusal(line);
       continue;
     }
     if (line.rfind("!! ", 0) == 0) {
@@ -250,6 +267,63 @@ void NotificationManager::_timer_cb(lv_timer_t *t) {
   lv_obj_t *card = (lv_obj_t *)t->user_data;
   auto *self = (NotificationManager *)lv_obj_get_user_data(card);
   self->remove_card(card, true);
+}
+
+// ---- G107: refusal lines -> one popup ----
+
+void NotificationManager::queue_refusal(const std::string &line) {
+  Refusal r = refusal_from_line(line);
+  if (!r.refused) {
+    return;
+  }
+  pending_refusals.push_back(r);
+  if (refusal_timer == NULL) {
+    refusal_timer = lv_timer_create(&NotificationManager::_refusal_timer_cb,
+                                    REFUSAL_LINE_DELAY_MS, this);
+    lv_timer_set_repeat_count(refusal_timer, 1);
+  }
+}
+
+void NotificationManager::show_refusals() {
+  std::vector<Refusal> lines;
+  lines.swap(pending_refusals);
+  RefusalGate &gate = refusal_gate();
+  for (const Refusal &r : lines) {
+    RefusalGate::Action a = gate.line(r, lv_tick_get());
+    if (a == RefusalGate::Action::DROP) {
+      continue;
+    }
+    if (a == RefusalGate::Action::REPLACE && refusal_overlay != NULL) {
+      // a different refusal: the open popup says the new reason (no stacking)
+      // overlay -> box -> [title, text, buttons]
+      lv_obj_t *box = lv_obj_get_child(refusal_overlay, 0);
+      lv_obj_t *text = box != NULL ? lv_obj_get_child(box, 1) : NULL;
+      if (text != NULL) {
+        lv_label_set_text(text, r.text.c_str());
+      }
+      continue;
+    }
+    SettingsUi::refusal(r);
+    // refusal() built its overlay as the last child of the top layer
+    refusal_overlay = lv_obj_get_child(lv_layer_top(), lv_obj_get_child_cnt(lv_layer_top()) - 1);
+    lv_obj_add_event_cb(refusal_overlay, &NotificationManager::_refusal_deleted_cb,
+                        LV_EVENT_DELETE, this);
+  }
+}
+
+void NotificationManager::_refusal_timer_cb(lv_timer_t *t) {
+  // lv_timer_handler holds lv_lock; the one-shot timer deletes itself
+  auto *self = (NotificationManager *)t->user_data;
+  self->refusal_timer = NULL;
+  self->show_refusals();
+}
+
+void NotificationManager::_refusal_deleted_cb(lv_event_t *e) {
+  auto *self = (NotificationManager *)lv_event_get_user_data(e);
+  if (lv_event_get_target(e) == self->refusal_overlay) {
+    self->refusal_overlay = NULL;
+    refusal_gate().closed();
+  }
 }
 
 // ---- homing-required modal ----

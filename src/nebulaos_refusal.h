@@ -3,6 +3,7 @@
 
 #include "hv/json.hpp"
 
+#include <cstdint>
 #include <string>
 
 using json = nlohmann::json;
@@ -81,5 +82,56 @@ struct RestartDecision {
 };
 
 RestartDecision restart_decision(RestartKind kind, const json &busy_reply);
+
+// G107 (Run 19): one user action gives ONE refusal popup.
+// A single refused action can produce several "!! NebulaOS refused:" lines:
+// Moonraker's "Update" runs several git commands and retries a refused one;
+// each refusal is one line. The screen shows one "Not now" popup for them.
+//
+// A console line as a refusal: "[<action> - ]<text>[ (<REASON>)]", e.g.
+//   "!! NebulaOS refused: update (git reset) - Not possible while a print is paused. (PAUSED)"
+//   "!! NebulaOS refused: restart klipper - Not possible while the printer is moving or heating."
+//   "!! NebulaOS refused: Not possible while a print is running."
+// The action prefix is dropped (the popup says "Not now"), the reason comes
+// from the "(REASON)" suffix or, without one, from the firmware's own text.
+// The popup text follows refusal_from_message: the table's words, the
+// printer's own text for UPDATING or a text this screen does not know.
+// Not a refusal line -> refused = false.
+Refusal refusal_from_line(const std::string &line);
+
+// Identical refusals = same reason + same popup text.
+std::string refusal_key(const Refusal &r);
+
+// The dedupe rule, pure and time-injected (now_ms: any monotonic ms clock,
+// wrap-safe in 32 bits, e.g. lv_tick_get()).
+//   - own(): a refusal of the screen's own call. Its popup is shown at once
+//     (by the caller, as before); it is only remembered here, so the console
+//     line the same refusal produces does not pop up a second one.
+//   - line(): a "!! NebulaOS refused:" line. DROP when the same refusal was
+//     seen (own or line) less than REFUSAL_DEDUPE_MS before - the window
+//     slides with every identical one, so a retry chain stays one popup, also
+//     after the popup was closed. A different refusal SHOWs a popup, or
+//     REPLACEs the one still open (never a second popup on top).
+//   - closed(): the line popup was dismissed.
+extern const uint32_t REFUSAL_DEDUPE_MS;  // 10 s
+
+class RefusalGate {
+ public:
+  enum class Action { SHOW, REPLACE, DROP };
+  void own(const Refusal &r, uint32_t now_ms);
+  Action line(const Refusal &r, uint32_t now_ms);
+  void closed() { open_ = false; }
+  bool popup_open() const { return open_; }
+
+ private:
+  bool seen_ = false;
+  std::string key_;
+  uint32_t last_ms_ = 0;
+  bool open_ = false;
+};
+
+// The screen's one gate (LVGL thread, under lv_lock): settings_ui notes its
+// own refusals, NotificationManager asks it for the console lines.
+RefusalGate &refusal_gate();
 
 #endif  // __NEBULAOS_REFUSAL_H__

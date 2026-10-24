@@ -4,10 +4,12 @@
 #include "lvgl/lvgl.h"
 #include "websocket_client.h"
 #include "notify_consumer.h"
+#include "nebulaos_refusal.h"
 
 #include <mutex>
 #include <list>
 #include <string>
+#include <vector>
 
 // Session-lived manager that turns Klipper/Moonraker events into on-screen
 // toasts. Subscribes to notify_status_update (webhooks, print_stats, filament
@@ -30,6 +32,8 @@ class NotificationManager : public NotifyConsumer {
 
   static void _tap_cb(lv_event_t *e);
   static void _timer_cb(lv_timer_t *t);
+  static void _refusal_timer_cb(lv_timer_t *t);
+  static void _refusal_deleted_cb(lv_event_t *e);
 
  private:
   enum Severity { INFO, WARNING, ERROR };
@@ -40,10 +44,16 @@ class NotificationManager : public NotifyConsumer {
   void push(const std::string &text, Severity sev);
   void show_homing_prompt();         // delegates to KUtils (Klipper "Must home axis first")
   bool is_printing() const { return last_print_state == "printing"; }
+  // G107: "!! NebulaOS refused:" lines -> at most one "Not now" popup
+  void queue_refusal(const std::string &line);
+  void show_refusals();
 
   KWebSocketClient &ws;
   lv_obj_t *cont;                    // toast stack on lv_layer_top()
   std::list<Toast> toasts;           // front = oldest
+  std::vector<Refusal> pending_refusals;
+  lv_timer_t *refusal_timer;         // short delay, see queue_refusal
+  lv_obj_t *refusal_overlay;         // the open line popup, or NULL
 
   bool baselined;
   std::string last_webhooks_state;
