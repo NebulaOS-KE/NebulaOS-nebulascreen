@@ -231,6 +231,92 @@ TEST(Result, other_flow_and_esteps_no_z_line) {
   ASSERT_FALSE(cal_result_view(CalFlow::ESTEPS, {{"last_result", nullptr}}).present);
 }
 
+static CalView base(CalFlow f, const json &s) { return cal_view(f, s, false); }
+
+TEST(Feedback, running_step_list_replaces_the_stage_text) {
+  json s = prog("auto_calibrate", 7, 10, "localized_z_offset", "Measuring the Z offset", "touch 2 of 3");
+  s["auto_calibrate_state"] = "running";
+  s["auto_calibrate_stage"] = "localized_z_offset";
+  CalView v = base(CalFlow::AUTO_CALIBRATE, s);
+  auto f = cal_feedback(CalFlow::AUTO_CALIBRATE, s, true, v);
+  ASSERT_TRUE(f.progress.active);
+  ASSERT_FALSE(f.result.present);
+  ASSERT_EQ(v.text, std::string(""));
+  ASSERT_TRUE(v.can_cancel);
+}
+
+TEST(Feedback, restart_and_reconnect_notice) {
+  json s = prog("auto_calibrate", 9, 10, "commit", "Saving (Klipper restarts)", "");
+  s["auto_calibrate_state"] = "running";
+  CalView v = base(CalFlow::AUTO_CALIBRATE, s);
+  cal_feedback(CalFlow::AUTO_CALIBRATE, s, true, v);
+  ASSERT_EQ(v.text, std::string(CAL_RESTART_NOTICE));
+  v = base(CalFlow::AUTO_CALIBRATE, s);
+  cal_feedback(CalFlow::AUTO_CALIBRATE, s, false, v);
+  ASSERT_EQ(v.text, std::string(CAL_RECONNECT_NOTICE));
+  // no progress (older extensions), restart_pending
+  json o = {{"auto_calibrate_state", "restart_pending"}};
+  v = base(CalFlow::AUTO_CALIBRATE, o);
+  cal_feedback(CalFlow::AUTO_CALIBRATE, o, true, v);
+  ASSERT_EQ(v.text, std::string(CAL_RESTART_NOTICE));
+}
+
+TEST(Feedback, awaiting_step_keeps_its_prompt) {
+  json s = prog("esteps", 3, 5, "measure", "Measure and enter the length", "");
+  s["esteps_state"] = "awaiting_measurement";
+  CalView v = base(CalFlow::ESTEPS, s);
+  std::string before = v.text;
+  auto f = cal_feedback(CalFlow::ESTEPS, s, true, v);
+  ASSERT_TRUE(f.progress.active);
+  ASSERT_EQ(v.text, before);
+  ASSERT_TRUE(v.needs_measurement);
+}
+
+TEST(Feedback, end_screen_after_complete) {
+  utc();
+  json s = {{"auto_calibrate_state", "complete"}, {"progress", nullptr},
+            {"last_result", {{"flow", "auto_calibrate"}, {"ok", true}, {"finished_at", OCT24},
+                             {"summary", {"Z offset 1.669 mm (was 1.795)", "Bed mesh 9x9, range 0.16 mm"}}}}};
+  CalView v = base(CalFlow::AUTO_CALIBRATE, s);
+  auto f = cal_feedback(CalFlow::AUTO_CALIBRATE, s, true, v);
+  ASSERT_TRUE(f.result.present);
+  ASSERT_EQ(f.result.headline, std::string("Done 24 Oct"));
+  ASSERT_EQ(v.text, std::string("Z offset 1.669 mm (was 1.795)\nBed mesh 9x9, range 0.16 mm\n"
+                                "Your Z adjustment was reset to 0."));
+  ASSERT_TRUE(v.can_start);
+}
+
+TEST(Feedback, failure_screen) {
+  json s = {{"auto_calibrate_state", "error"}, {"auto_calibrate_error", "x"},
+            {"last_result", {{"flow", "auto_calibrate"}, {"ok", false}, {"error_step", "Bed mesh"},
+                             {"error", "probe did not trigger"}, {"advice", "Check the probe."}}}};
+  CalView v = cal_view(CalFlow::AUTO_CALIBRATE, s, false);
+  auto f = cal_feedback(CalFlow::AUTO_CALIBRATE, s, true, v);
+  ASSERT_EQ(f.result.headline, std::string("Failed: Bed mesh"));
+  ASSERT_TRUE(v.can_start);
+  ASSERT_EQ(v.text, std::string("Why: probe did not trigger\nWhat to do: Check the probe.\n"
+                                "Nothing was saved."));
+  // idle while printing: the note stays under the result
+  s["auto_calibrate_state"] = "idle";
+  v = cal_view(CalFlow::AUTO_CALIBRATE, s, true);
+  cal_feedback(CalFlow::AUTO_CALIBRATE, s, true, v);
+  ASSERT_EQ(v.text.substr(v.text.size() - 29), std::string("Not available while printing."));
+}
+
+TEST(Feedback, cancelled_and_other_pages_unchanged) {
+  json s = {{"auto_calibrate_state", "cancelled"},
+            {"last_result", {{"flow", "auto_calibrate"}, {"ok", false}}}};
+  CalView v = base(CalFlow::AUTO_CALIBRATE, s);
+  std::string before = v.text;
+  ASSERT_FALSE(cal_feedback(CalFlow::AUTO_CALIBRATE, s, true, v).result.present);
+  ASSERT_EQ(v.text, before);
+  json lc = {{"state", "idle"}};
+  v = base(CalFlow::LOAD_CELL, lc);
+  before = v.text;
+  cal_feedback(CalFlow::LOAD_CELL, lc, true, v);
+  ASSERT_EQ(v.text, before);
+}
+
 static json profile(json points) {
   return {{"points", points}, {"mesh_params", {{"x_count", 3}, {"y_count", 2}}}};
 }

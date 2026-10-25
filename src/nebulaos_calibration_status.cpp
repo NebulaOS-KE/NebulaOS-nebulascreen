@@ -280,6 +280,39 @@ CalResultView cal_result_view(CalFlow flow, const json &status) {
   return r;
 }
 
+CalFeedback cal_feedback(CalFlow flow, const json &status, bool klippy_ready, CalView &v) {
+  CalFeedback f;
+  if (flow == CalFlow::LOAD_CELL || flow == CalFlow::BED_TRAM || !status.is_object()) return f;
+  const std::string state = str(status, (std::string(cal_flow_key(flow)) + "_state").c_str());
+  static const std::string printing_note = "\n\nNot available while printing.";
+  bool printing_suffix = v.text.size() >= printing_note.size()
+    && v.text.compare(v.text.size() - printing_note.size(), printing_note.size(), printing_note) == 0;
+  bool saving = state == "commit_requested" || state == "restart_pending"
+                || state == "verification_pending";
+  f.progress = cal_progress_view(flow, status);
+  if (f.progress.active) {
+    if (f.progress.restarting || saving) {
+      v.text = klippy_ready ? CAL_RESTART_NOTICE : CAL_RECONNECT_NOTICE;
+    } else if (state == "running") {
+      v.text = "";   // the step list says it
+    }
+    return f;
+  }
+  if (saving) {
+    v.text = klippy_ready ? CAL_RESTART_NOTICE : CAL_RECONNECT_NOTICE;
+    return f;
+  }
+  if (state == "running" || state == "cancelled" || state.rfind("awaiting_", 0) == 0) return f;
+  CalResultView r = cal_result_view(flow, status);
+  if (!r.present) return f;
+  f.result = r;
+  std::string t;
+  for (auto &l : r.lines) t += (t.empty() ? "" : "\n") + l;
+  if (printing_suffix) t += printing_note;
+  v.text = t;
+  return f;
+}
+
 // ---- G106: saved mesh --------------------------------------------------------
 
 const char *const BEDMESH_NONE_TEXT =

@@ -130,10 +130,11 @@ static const char *const DESCRIPTION_ESTEPS =
   "The hotend heats; you mark the filament at the extruder entry, the printer "
   "extrudes a fixed length, and you enter how far the mark moved.";
 static const char *const DESCRIPTION_AUTO =
-  "Cleans the nozzle, measures the Z offset with the load cell and probes a "
-  "bed mesh, then saves everything with one Klipper restart. With the load "
-  "cell in Automatic mode it checks the load cell first (no bottle needed).\n"
-  "Takes several minutes. The bed must be empty.";
+  "Load cell check, nozzle clean, Z offset, bed mesh - about 7 min, no tools "
+  "needed. With the load cell in Automatic mode it checks the load cell "
+  "first (no bottle needed). Saves everything with one Klipper restart and "
+  "resets the Z adjustment to 0.\n"
+  "The bed must be empty.";
 static const char *const DESCRIPTION_SHAPER =
   "Measures resonances with the accelerometer: first mounted on the toolhead "
   "(X), then on the bed (Y). Saves the result with one Klipper restart.\n"
@@ -280,7 +281,7 @@ std::string cal_mode_command(bool automatic) {
 
 static const char *const AUTO_INTRO =
   "Automatic (default): the printer checks the load cell by itself on an "
-  "empty bed - no bottle, nothing moves or heats. Z-Offset & Bed Mesh runs "
+  "empty bed - no bottle, nothing moves or heats. Auto Calibration runs "
   "this check too.";
 
 static void load_cell_modes(CalView &v, const json &status, bool printing) {
@@ -318,7 +319,7 @@ static void load_cell_modes(CalView &v, const json &status, bool printing) {
     t += "\nRemove everything from the bed and tap Run again, or use Manual "
          "(bottle calibration).";
   } else if (check == "ok" && ready) {
-    t += "\n\nLast check: passed - ready.";
+    t += "\n\nReady - Automatic needs no weight calibration; Auto Calibration uses it.";
   } else if (check == "ok") {
     t += "\n\nLast check passed, but automatic contact is not available "
          "right now. Tap Run to check again.";
@@ -348,9 +349,9 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
   CalView v;
   switch (flow) {
     case CalFlow::ESTEPS: v.title = "E-Steps Calibration"; break;
-    case CalFlow::AUTO_CALIBRATE: v.title = "Z-Offset & Bed Mesh"; break;
+    case CalFlow::AUTO_CALIBRATE: v.title = "Auto Calibration"; break;
     case CalFlow::INPUT_SHAPER: v.title = "Input Shaper"; break;
-    case CalFlow::LOAD_CELL: v.title = "Load Cell"; break;
+    case CalFlow::LOAD_CELL: v.title = "Load Cell Calibration"; break;
     case CalFlow::BED_TRAM: v.title = "Bed Tramming"; break;
   }
   if (!status.is_object()) {

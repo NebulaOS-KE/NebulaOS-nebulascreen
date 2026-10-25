@@ -79,6 +79,51 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
     }, LV_EVENT_VALUE_CHANGED, this);
   }
 
+  if (!cal_flow_steps(flow).empty()) {
+    prog_box = lv_obj_create(body);
+    lv_obj_move_to_index(prog_box, 0);
+    lv_obj_set_size(prog_box, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(prog_box, 0, 0);
+    lv_obj_set_style_pad_column(prog_box, 6, 0);
+    lv_obj_set_style_border_width(prog_box, 0, 0);
+    lv_obj_set_style_bg_opa(prog_box, LV_OPA_TRANSP, 0);
+    lv_obj_clear_flag(prog_box, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(prog_box, LV_FLEX_FLOW_ROW);
+    lv_obj_t *left = lv_obj_create(prog_box);
+    lv_obj_t *right = lv_obj_create(prog_box);
+    for (lv_obj_t *c : {left, right}) {
+      lv_obj_set_height(c, LV_SIZE_CONTENT);
+      lv_obj_set_style_pad_all(c, 0, 0);
+      lv_obj_set_style_pad_row(c, c == left ? 4 : 1, 0);
+      lv_obj_set_style_border_width(c, 0, 0);
+      lv_obj_set_style_bg_opa(c, LV_OPA_TRANSP, 0);
+      lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
+      lv_obj_set_flex_flow(c, LV_FLEX_FLOW_COLUMN);
+    }
+    lv_obj_set_width(left, LV_PCT(48));
+    lv_obj_set_flex_grow(right, 1);
+    steps_col = right;
+    prog_counter = lv_label_create(left);
+    lv_obj_set_style_text_font(prog_counter, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(prog_counter, lv_palette_main(LV_PALETTE_GREY), 0);
+    prog_head = lv_label_create(left);
+    lv_obj_set_width(prog_head, LV_PCT(100));
+    lv_label_set_long_mode(prog_head, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(prog_head, &lv_font_montserrat_20, 0);
+    prog_detail = lv_label_create(left);
+    lv_obj_set_width(prog_detail, LV_PCT(100));
+    lv_label_set_long_mode(prog_detail, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(prog_detail, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(prog_detail, lv_palette_lighten(LV_PALETTE_BLUE, 2), 0);
+    for (int i = 0; i < kMaxSteps; i++) {
+      step_lbls[i] = lv_label_create(right);
+      lv_obj_set_width(step_lbls[i], LV_PCT(100));
+      lv_label_set_long_mode(step_lbls[i], LV_LABEL_LONG_DOT);
+      lv_obj_set_style_text_font(step_lbls[i], &lv_font_montserrat_12, 0);
+    }
+    lv_obj_add_flag(prog_box, LV_OBJ_FLAG_HIDDEN);
+  }
+
   lv_obj_set_width(text, LV_PCT(100));
   lv_label_set_long_mode(text, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_font(text, &lv_font_montserrat_14, 0);
@@ -147,6 +192,10 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
 
 GuidedCalibrationPanel::~GuidedCalibrationPanel() {
   ws.unregister_notify_update(this);
+  if (restart_timer != nullptr) {
+    lv_timer_del(restart_timer);
+    restart_timer = nullptr;
+  }
   if (cont != NULL) {
     lv_obj_del(cont);
     cont = NULL;
@@ -162,6 +211,20 @@ void GuidedCalibrationPanel::refresh() {
   auto status = State::get_instance()->get_data(
     json::json_pointer(std::string("/printer_state/") + cal_status_object(flow)));
   CalView v = cal_view(flow, status, KUtils::is_printing());
+  // G104: step list, restart notice, end / failure screen
+  auto wh = State::get_instance()->get_data("/printer_state/webhooks/state"_json_pointer);
+  bool klippy_ready = !wh.is_string() || wh.template get<std::string>() == "ready";
+  CalFeedback fb = cal_feedback(flow, status, klippy_ready, v);
+  render_feedback(fb);
+  bool restarting = v.text == CAL_RESTART_NOTICE || v.text == CAL_RECONNECT_NOTICE;
+  if (restarting && restart_timer == nullptr) {
+    restart_timer = lv_timer_create([](lv_timer_t *t) {
+      ((GuidedCalibrationPanel *)t->user_data)->refresh();
+    }, 1000, this);
+  } else if (!restarting && restart_timer != nullptr) {
+    lv_timer_del(restart_timer);
+    restart_timer = nullptr;
+  }
   if (mode_sel != nullptr) {
     // G99: the tapped mode shows at once; the status confirms it
     bool want_auto = v.mode_auto;
@@ -190,6 +253,7 @@ void GuidedCalibrationPanel::refresh() {
     if (on) lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
   };
+  show(text, !v.text.empty());
   show(start_btn, v.can_start);
   show(cancel_btn, v.can_cancel);
   for (int i = 0; i < kMaxActions; i++) {
@@ -212,6 +276,50 @@ void GuidedCalibrationPanel::refresh() {
     lv_obj_update_layout(cont);
     lv_obj_scroll_to_view(measure_row, LV_ANIM_OFF);
   }
+}
+
+void GuidedCalibrationPanel::render_feedback(const CalFeedback &f) {
+  if (prog_box == nullptr) return;
+  bool on = f.progress.active || f.result.present;
+  if (!on) {
+    lv_obj_add_flag(prog_box, LV_OBJ_FLAG_HIDDEN);
+    return;
+  }
+  lv_obj_clear_flag(prog_box, LV_OBJ_FLAG_HIDDEN);
+  if (f.progress.active) {
+    lv_label_set_text(prog_counter, f.progress.counter.c_str());
+    lv_label_set_text(prog_head, f.progress.label.c_str());
+    lv_obj_set_style_text_color(prog_head, lv_color_white(), 0);
+    lv_label_set_text(prog_detail, f.progress.detail.c_str());
+    lv_obj_clear_flag(prog_counter, LV_OBJ_FLAG_HIDDEN);
+    if (f.progress.detail.empty()) lv_obj_add_flag(prog_detail, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_clear_flag(prog_detail, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_label_set_text(prog_head, f.result.headline.c_str());
+    lv_obj_set_style_text_color(prog_head, f.result.ok ? lv_palette_main(LV_PALETTE_GREEN)
+                                                     : lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_add_flag(prog_counter, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(prog_detail, LV_OBJ_FLAG_HIDDEN);
+  }
+  for (int i = 0; i < kMaxSteps; i++) {
+    bool show = f.progress.active && i < (int)f.progress.steps.size();
+    if (!show) {
+      lv_obj_add_flag(step_lbls[i], LV_OBJ_FLAG_HIDDEN);
+      continue;
+    }
+    const CalStepRow &r = f.progress.steps[i];
+    std::string t = (r.state == CalStepState::DONE ? std::string(LV_SYMBOL_OK " ")
+                     : r.state == CalStepState::CURRENT ? std::string(LV_SYMBOL_RIGHT " ")
+                     : std::string("    ")) + r.label;
+    lv_label_set_text(step_lbls[i], t.c_str());
+    lv_obj_set_style_text_color(step_lbls[i],
+      r.state == CalStepState::DONE ? lv_palette_main(LV_PALETTE_GREEN)
+      : r.state == CalStepState::CURRENT ? lv_color_white()
+      : lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_clear_flag(step_lbls[i], LV_OBJ_FLAG_HIDDEN);
+  }
+  if (f.progress.active) lv_obj_clear_flag(steps_col, LV_OBJ_FLAG_HIDDEN);
+  else lv_obj_add_flag(steps_col, LV_OBJ_FLAG_HIDDEN);
 }
 
 void GuidedCalibrationPanel::show_keypad(bool on) {
@@ -240,7 +348,8 @@ void GuidedCalibrationPanel::consume(json &j) {
   // Read-only lookups: operator[] would insert nulls into the shared notification.
   const json &n = j;
   if (!n.contains(json::json_pointer(std::string("/params/0/") + cal_status_object(flow)))
-      && !n.contains("/params/0/print_stats/state"_json_pointer)) {
+      && !n.contains("/params/0/print_stats/state"_json_pointer)
+      && !n.contains("/params/0/webhooks/state"_json_pointer)) {
     return;
   }
   std::lock_guard<std::mutex> lock(lv_lock);

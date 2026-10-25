@@ -4,6 +4,7 @@
 #include "button_container.h"
 #include "lvgl/lvgl.h"
 #include "nebulaos_calibration_flow.h"
+#include "nebulaos_calibration_status.h"
 #include "websocket_client.h"
 
 #include <mutex>
@@ -65,6 +66,19 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   lv_obj_t *mode_sel = nullptr;
   std::string pending_mode;    // tapped, not yet reported back ("auto"/"manual")
   bool auto_checking = false;  // NEBULAOS_LOAD_CELL_AUTO_CHECK sent, no answer yet
+  // G104 (Run 19): step list / end screen. Left: "Step 7 of 10", the step
+  // in large type, its live detail; right: every step with check marks.
+  lv_obj_t *prog_box = nullptr;
+  lv_obj_t *prog_counter = nullptr;
+  lv_obj_t *prog_head = nullptr;
+  lv_obj_t *prog_detail = nullptr;
+  lv_obj_t *steps_col = nullptr;
+  static constexpr int kMaxSteps = 12;
+  lv_obj_t *step_lbls[kMaxSteps] = {};
+  // refreshes the page while Klipper restarts (the reconnect is not always
+  // announced by a status notification for this object)
+  lv_timer_t *restart_timer = nullptr;
+  void render_feedback(const CalFeedback &f);
   lv_obj_t *text;
   std::string shown_text;      // to scroll back to the top on a new step
   lv_obj_t *measure_row;

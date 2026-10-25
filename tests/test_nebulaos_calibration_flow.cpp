@@ -150,7 +150,7 @@ TEST(LoadCell, steps) {
   json s = json::object();
   s["state"] = "idle";
   auto v = cal_view(CalFlow::LOAD_CELL, s, false);
-  ASSERT_EQ(v.title, std::string("Load Cell"));
+  ASSERT_EQ(v.title, std::string("Load Cell Calibration"));
   ASSERT_TRUE(v.can_start);
   ASSERT_TRUE(v.text.find("1.5 L bottle") != std::string::npos);
   const char *steps[][2] = {{"awaiting_empty", "Step 1 of 5"},
@@ -421,7 +421,7 @@ TEST(LoadCellMode, automatic_offers_run_not_start) {
 
 TEST(LoadCellMode, automatic_check_result) {
   auto v = cal_view(CalFlow::LOAD_CELL, lc_status("idle", "auto", "ok", true), false);
-  ASSERT_TRUE(v.text.find("passed - ready") != std::string::npos);
+  ASSERT_TRUE(v.text.find("Ready - Automatic needs no weight calibration; Auto Calibration uses it.") != std::string::npos);
   ASSERT_EQ(v.actions.size(), (size_t)1);
   v = cal_view(CalFlow::LOAD_CELL,
                lc_status("idle", "auto", "failed", false, "the load cell reading is too close to its limit"),

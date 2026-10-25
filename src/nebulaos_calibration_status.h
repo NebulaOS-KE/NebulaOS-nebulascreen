@@ -104,6 +104,18 @@ struct CalResultView {
 // From nebulaos_calibration.last_result, only when it belongs to this flow.
 CalResultView cal_result_view(CalFlow flow, const json &calibration_status);
 
+// What the guided page shows for a NebulaOS flow (E-steps, Auto Calibration,
+// Input Shaper): the step list while it runs, the end / failure screen after
+// it. Adjusts v.text: empty while a plain "running" step is shown by the
+// step list, the restart notice during the save (the reconnect notice while
+// Klipper is away), the result lines once it is over. Load cell and bed
+// tramming have their own pages: nothing changes.
+struct CalFeedback {
+  CalProgressView progress;
+  CalResultView result;   // present only when it is shown
+};
+CalFeedback cal_feedback(CalFlow flow, const json &status, bool klippy_ready, CalView &v);
+
 // ---- G106: Bed Mesh page -------------------------------------------------
 // The saved profile to show when no mesh is active: "default" if it has
 // points, otherwise the first (by name) with points; "" when none.
