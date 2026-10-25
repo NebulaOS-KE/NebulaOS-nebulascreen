@@ -4,8 +4,8 @@ The full run, in the order that actually matters. Do it **top to bottom** and st
 the way you want — you don't need every step.
 
 > **Just want the first layer right?** The [Calibration guide](Calibration-Guide) is the short
-> version: Bed Tramming, Load Cell, Z-Offset & Bed Mesh, then fine-tune the Z offset on the first
-> print - and when to redo which step.
+> version: the Calibration menu's 1-7 (Bed Tramming, Heaters (PID), Axis Twist, Auto Calibration,
+> ...), then fine-tune the Z offset on the first print - and when to redo which step.
 
 > **Golden rule: change one thing, then print a test.** If you tweak five settings and the next print is
 > worse, you won't know which one did it.
@@ -33,9 +33,10 @@ then slicer. Doing it out of order means redoing work.
 | 9. TMC Autotune | Loud or hot motors (optional) |
 
 The screen's **Tune → Calibration** menu lists the steps that have their own guided screen, in
-this order: 1 Bed Tramming, 2 Axis Twist, 3 Load Cell, 4 Z-Offset & Bed Mesh, 5 Input Shaper,
-6 E-Steps, 7 Skew Correction, 8 TMC Autotune. Mechanics, PID and pressure advance/flow are done
-elsewhere, so they don't get a row.
+this order (Run 19): 1 Bed Tramming, 2 Heaters (PID), 3 Axis Twist, 4 Auto Calibration (formerly
+Z-Offset & Bed Mesh), 5 Input Shaper, 6 E-Steps, 7 Skew Correction; under OTHER: Load Cell
+Calibration, TMC Autotune, Bed Mesh. Mechanics and pressure advance/flow are done elsewhere, so
+they don't get a row. (The step numbers on this page are the walkthrough's own.)
 
 **"Which one fixes my problem?"**
 

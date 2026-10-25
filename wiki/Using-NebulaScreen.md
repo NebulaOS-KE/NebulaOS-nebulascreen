@@ -467,6 +467,10 @@ actually works.
   turns it back on.
 - **Saved profiles list** — each saved profile is a row with its name; tap the row to **load** it as
   active, or tap the ✕ on that row to **delete** it permanently.
+- **No active mesh** — Klipper does not load a saved mesh after a restart, so after Auto Calibration
+  usually none is active. The page then shows the saved one (`default` first) with *Saved mesh
+  'default' - each print measures its own mesh at the start*; it is not loaded. Without any saved
+  mesh: *No bed mesh yet - run Calibration > Auto Calibration.*
 
 #### 3D View screen
 
@@ -514,46 +518,59 @@ needed for normal printing or normal troubleshooting. If you suspect a driver is
 ### Calibration
 
 One menu for every calibration routine, reached from the **Calibration** tile. It is a scrollable
-list: the numbered **IN ORDER** steps follow the order of the
-[Calibration walkthrough](Calibration-Explained), then an **OTHER** section. **Up / ✓ / Down** on the
-right move through the list; **Back** is the tile in the bottom-right corner, like on every page.
+list: the numbered **IN ORDER** steps are the order a new printer needs them (just do 1, 2, 3, ...;
+short version: [Calibration guide](Calibration-Guide)), then an **OTHER** section. **Up / ✓ / Down**
+on the right move through the list; **Back** is the tile in the bottom-right corner, like on every
+page.
 
 | # | Row | Opens |
 |---|---|---|
 | 1 | **Bed Tramming** | Guided four-corner tramming ([Bed tramming](Bed-Tramming)) |
-| 2 | **Axis Twist** | Axis Twist Compensation wizard |
-| 3 | **Load Cell** | Guided load cell calibration ([Load cell calibration](Load-Cell-Calibration)) |
-| 4 | **Z-Offset & Bed Mesh** | Guided nozzle clean, Z offset and bed mesh, saved with one Klipper restart |
+| 2 | **Heaters (PID)** | PID tuning: **Bed 65 C** and **Hotend 230 C**, each saved with one Klipper restart |
+| 3 | **Axis Twist** | Axis Twist Compensation wizard; its Save also removes the saved bed mesh |
+| 4 | **Auto Calibration** | Load cell check, nozzle clean, Z offset, bed mesh - about 7 min, no tools needed |
 | 5 | **Input Shaper** | Guided resonance measurement |
-| 6 | **E-Steps Calibration** | Guided mark-extrude-measure calibration |
-| 7 | **Skew Correction** | Skew Correction |
-| 8 | **TMC Autotune** *(optional)* | TMC Autotune |
-| — | **Bed Mesh** *(Other)* | The same Bed Mesh panel as the Tune-tab tile — view or re-mesh on its own |
+| 6 | **E-Steps** | Guided mark-extrude-measure calibration |
+| 7 | **Skew Correction** | Skew Correction (needs a printed test part) |
+| — | **Load Cell Calibration** *(Other)* | Automatic re-check or manual with a bottle ([Load cell calibration](Load-Cell-Calibration)) |
+| — | **TMC Autotune** *(Other, optional)* | TMC Autotune - quieter motors |
+| — | **Bed Mesh** *(Other)* | The same Bed Mesh panel as the Tune-tab tile — view or measure |
+
+Under every row a status line: **Done 24 Oct - <result>** (green) when it has run, a one-line
+description with the time it takes when not, or **Redo: <reason>** (orange, with a bar on the left)
+when something changed since - for example *Redo: Axis Twist changed* on Auto Calibration after
+Axis Twist was saved, or *Redo: a shim was added at front left* after tramming the load-cell corner.
+Older NebulaOS versions without a calibration history show the descriptions only.
 
 Every row except Bed Mesh is locked while a print is running. **Axis Twist** and **Skew Correction**
 show a message instead of opening when their Klipper section (`[axis_twist_compensation]`,
 `[skew_correction]`) is missing; NebulaOS ships both. **TMC Autotune** is greyed out when Klipper has
 no `motor_database.cfg`.
 
-#### The guided screens (Bed Tramming, Load Cell, Z-Offset & Bed Mesh, Input Shaper, E-Steps)
+#### The guided screens (Bed Tramming, Auto Calibration, Input Shaper, E-Steps, Load Cell Calibration)
 
 These run NebulaOS calibration workflows in Klipper (`NEBULAOS_*` macros). Each screen shows a short
 description, a **Start** button (asks to confirm) and, while the workflow runs, its live state, the
-buttons for the current step and **Cancel**. What each one does:
+buttons for the current step and **Cancel**. Auto Calibration, Input Shaper and E-Steps show every
+step with check marks (*Step 7 of 10*, the current step in large type with its live detail:
+temperatures, *touch 2 of 3*, *point 41 of 81*), a notice while Klipper restarts to save (the
+screen reconnects by itself), and at the end either **Done <date>** with the new values or
+**Failed: <step>** with why and what to do. What each one does:
 
 - **Bed Tramming** — measures the four bed corners and tells you which one to correct, one at a
   time: a printed shim on rigid spacers, or a screw turn on rubber or spring mounts. The printer homes
   and probes; the bed must be empty.
-- **Load Cell** — teaches the load cell how much force it measures, with a 1.5 L water bottle and a
-  kitchen scale. About 2 minutes; nothing moves or heats.
-- **Z-Offset & Bed Mesh** — cleans the nozzle, measures the Z offset with the load cell and probes a
-  bed mesh, then saves everything with one Klipper restart. Takes several minutes; the bed must be
-  empty. Full walkthrough: [Calibration walkthrough](Calibration-Explained).
+- **Auto Calibration** (formerly *Z-Offset & Bed Mesh*) — load cell check, nozzle clean, Z offset
+  and bed mesh, saved with one Klipper restart; resets the Z adjustment to 0. About 7 minutes; the
+  bed must be empty. Full walkthrough: [Calibration walkthrough](Calibration-Explained).
 - **Input Shaper** — measures resonances with the accelerometer, first mounted on the toolhead (X),
   then on the bed (Y), and saves the result with one Klipper restart.
-- **E-Steps Calibration** — the hotend heats; you mark the filament at the extruder entry, the printer
+- **E-Steps** — the hotend heats; you mark the filament at the extruder entry, the printer
   extrudes a fixed length, and you type in how far the mark moved. The corrected value is applied
   for you.
+- **Load Cell Calibration** — **Automatic** (default: a sensor check, no bottle; after a pass
+  *Ready - Automatic needs no weight calibration; Auto Calibration uses it.*) or **Manual** (a
+  1.5 L water bottle and a kitchen scale, about 2 minutes; nothing moves or heats).
 
 #### Axis Twist
 

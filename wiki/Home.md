@@ -33,8 +33,9 @@ repository. See [Installation](Installation).
 - Print status and control: temperatures, fans, LED, homing and jogging, file browser (including USB
   sticks), Exclude Object, Spoolman
 - Interactive 3D bed mesh (rotate, zoom) plus a table view
-- A **Calibration** menu with guided screens, in order: Bed Tramming, Axis Twist, Load Cell,
-  Z-Offset & Bed Mesh, Input Shaper, E-Steps, Skew Correction, TMC Autotune
+- A **Calibration** menu with guided screens, in order: Bed Tramming, Heaters (PID), Axis Twist,
+  Auto Calibration, Input Shaper, E-Steps, Skew Correction (then Load Cell Calibration, TMC Autotune
+  and Bed Mesh), each with a status line (done / not done / redo)
 - Live tuning during a print: speed, flow, Z offset, pressure advance; firmware retraction and machine
   limits on their own panels
 - Power-loss recovery through NebulaOS

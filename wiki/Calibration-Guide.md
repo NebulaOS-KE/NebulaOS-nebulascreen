@@ -1,15 +1,36 @@
 # Calibration guide (the short version)
 
-Four steps on the screen, in this order. All of them are in **Tune → Calibration**.
-For background, every other calibration and troubleshooting, see the
-[full calibration walkthrough](Calibration-Explained).
+All calibrations are in **Tune → Calibration**, numbered in the order a new printer needs them:
+do 1, 2, 3, ... from the top. For background, every other calibration and troubleshooting, see
+the [full calibration walkthrough](Calibration-Explained).
 
-| # | Screen | You need | Time |
+| # | Menu row | You need | Time |
 |---|---|---|---|
 | 1 | **Bed Tramming** | an empty bed (and maybe a printed shim) | 5-15 min |
-| 2 | **Load Cell** | nothing (Automatic) or a 1.5 L bottle + kitchen scale (Manual) | 1-2 min |
-| 3 | **Z-Offset & Bed Mesh** | an empty bed | several minutes |
-| 4 | Fine-tune on the first print: **Tune → Z Offset** or **Fine Tune** | a test print | while printing |
+| 2 | **Heaters (PID)** | an empty, cool printer | about 5 min per heater |
+| 3 | **Axis Twist** | a sheet of paper | about 5 min |
+| 4 | **Auto Calibration** | an empty bed - no tools | about 7 min |
+| 5 | **Input Shaper** | the accelerometer | about 5 min |
+| 6 | **E-Steps** | a ruler or caliper, a marker | about 5 min |
+| 7 | **Skew Correction** | a printed test part, a caliper | about 30 min |
+| - | then the first print: **Tune → Z Offset** or **Fine Tune** | a test print | while printing |
+
+Below them, **OTHER**: **Load Cell Calibration** (automatic re-check or manual with a bottle),
+**TMC Autotune** (optional, quieter motors) and **Bed Mesh** (view or measure).
+
+### The status line under every row
+
+Each row says where you stand:
+
+- **Done 24 Oct - Z offset 1.752 mm, mesh range 0.16 mm** (green): when it last ran and its result.
+- a one-line description and the time it takes (grey): not done yet.
+- **Redo: Axis Twist changed** (orange, with a bar on the left): something changed since, run it
+  again. Examples: saving **Axis Twist** marks Auto Calibration *Redo: Axis Twist changed*; a
+  shim at the front-left corner (Bed Tramming) marks Load Cell Calibration and Auto Calibration
+  *Redo: a shim was added at front left*. Running the calibration clears it.
+
+On a printer whose NebulaOS does not keep a calibration history yet, the rows show the
+descriptions only.
 
 ---
 
@@ -33,32 +54,81 @@ With rubber or spring mounts the screen tells you which screw to turn and how fa
 Correct the corner, tap **Done - measure again**, repeat until every corner says OK.
 Details: [Bed tramming](Bed-Tramming).
 
-## 2. Load Cell
+## 2. Heaters (PID)
+
+Teaches the bed and the hotend heaters to hold their temperature steadily. Two buttons:
+**Bed 65 C** and **Hotend 230 C** - start with the bed. Each heats and cools a few times (about
+5 minutes; the temperature going up and down is normal), then saves with one Klipper restart.
+Redo it after changing a heater, a thermistor or the hotend.
+
+It comes before Auto Calibration on purpose: the hotend oozes during the long hot phase, and Auto
+Calibration's nozzle clean removes that before the Z offset is measured.
+
+## 3. Axis Twist
+
+A 5-point paper test across X that corrects a slightly twisted gantry for every probe. Its
+**Save** also removes the saved bed mesh (it was measured without the correction) and marks Auto
+Calibration *Redo: Axis Twist changed* - run step 4 next.
+
+## 4. Auto Calibration
+
+One button does everything (it used to be called *Z-Offset & Bed Mesh*): load cell check (cold
+and hot, no bottle, when the load cell is in Automatic mode), nozzle clean, Z offset, bed mesh,
+all saved with **one** Klipper restart. Remove everything from the bed and tap **Start**.
+
+While it runs the page shows every step with check marks, the current one in large type with its
+live detail, for example:
+
+```
+Step 7 of 10                  ✓ Load cell check
+Measuring the Z offset        ✓ Homing
+touch 2 of 3                  ...
+                              > Measuring the Z offset
+                                Bed mesh
+                                Saving (Klipper restarts)
+                                Verifying
+```
+
+Heating shows the temperatures (*bed 61/65 C, nozzle 148/150 C*), the mesh the probe point
+(*point 41 of 81*). During **Saving** the page says that Klipper restarts and the screen
+reconnects by itself - do not switch the printer off. At the end:
+
+- **Done 24 Oct** with the new values, for example *Z offset 1.669 mm (was 1.795)*, *Bed mesh 9x9,
+  range 0.16 mm* and *Your Z adjustment was reset to 0.* - the adjustment from the first-print
+  step was made for the old Z offset.
+- or **Failed: <step>** with *Why*, *What to do* and *Nothing was saved.*
+
+Input Shaper and E-Steps show the same step list.
+
+## 5.-7. Input Shaper, E-Steps, Skew Correction
+
+Guided pages; see the [full calibration walkthrough](Calibration-Explained). Skew Correction is
+last because it needs a printed test part from a calibrated printer.
+
+## Load Cell Calibration (OTHER)
 
 The load cell under the front-left bed screw is the sensor that feels the nozzle touch the bed.
-The Load Cell page has two choices at the top:
+The page has two choices at the top:
 
 - **Automatic** (the default). The printer checks the sensor by itself on an empty bed: no
-  bottle, nothing moves or heats. Tap **Run**. The page then says *Last check: passed - ready*.
-  You do not have to run it by hand: Z-Offset & Bed Mesh (step 3) runs the same check first.
-  If the check fails, the page says why and offers **Run** again or **Use Manual**.
+  bottle, nothing moves or heats. Tap **Run**. After a passed check the page says *Ready -
+  Automatic needs no weight calibration; Auto Calibration uses it.* You do not have to run it by
+  hand: Auto Calibration runs the same check first. If the check fails, the page says why and
+  offers **Run** again or **Use Manual**.
 - **Manual**. The calibration with a 1.5 L bottle of water and a kitchen scale (about 2 minutes,
   nothing moves or heats): [Load cell calibration (water bottle)](Load-Cell-Calibration).
   The value you measure is used **until you choose Automatic again**.
 
 The choice is saved at once and survives restarts.
 
-## 3. Z-Offset & Bed Mesh
+## Bed Mesh (OTHER)
 
-One button does everything: with the load cell in Automatic mode it checks the load cell (cold
-and hot, no bottle), cleans the nozzle, measures the Z offset with the load cell, probes a bed
-mesh and saves it all with **one** Klipper restart. Remove everything from the bed and tap
-**Start**.
+Shows the active mesh. Klipper does not load a saved mesh by itself after a restart, so after
+Auto Calibration the page shows the saved one instead, with *Saved mesh 'default' - each print
+measures its own mesh at the start* - nothing is loaded. Only when no mesh was ever saved it says
+*No bed mesh yet - run Calibration > Auto Calibration.*
 
-It also sets the Z offset adjustment from step 4 back to **0**, because that adjustment was made
-for the old Z offset.
-
-## 4. Fine-tune on the first print
+## Then: fine-tune on the first print
 
 Print something with a large first layer and watch it. On the screen, **Tune → Z Offset** (or
 the Z buttons in **Fine Tune**, or tap the Z value on the print screen):
@@ -79,14 +149,18 @@ NebulaOS). Its **Save** button folds the current offset into the probe `z_offset
 
 ## When to redo what
 
+The menu's *Redo* lines cover the common cases; in general:
+
 | What changed | Redo |
 |---|---|
-| New nozzle, new build plate | 3 (then 4 on the next print) |
-| Shim at the front-left corner, or bed hardware (spacers, springs, the bed itself) | 2 and 3 |
-| Corners uneven (first layer thick on one side) | 1, then 2, then 3 |
+| New nozzle, new build plate | 4 Auto Calibration (then fine-tune on the next print) |
+| New heater, thermistor or hotend | 2 Heaters (PID), then 4 |
+| Shim at the front-left corner, or bed hardware (spacers, springs, the bed itself) | Load Cell Calibration (Automatic: just Run) and 4 |
+| Corners uneven (first layer thick on one side) | 1, then 4 |
+| Axis Twist saved | 4 (its saved mesh was removed) |
 
 The front-left corner is special: the load cell sits under it, so changing that corner changes
-how the load cell is mounted. That is why step 2 follows step 1.
+how the load cell is mounted.
 
 ## "Not now"
 
