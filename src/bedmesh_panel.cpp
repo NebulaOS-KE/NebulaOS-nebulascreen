@@ -1,4 +1,5 @@
 #include "bedmesh_panel.h"
+#include "nebulaos_calibration_status.h"
 #include "settings_ui.h"
 #include "state.h"
 #include "utils.h"
@@ -696,7 +697,9 @@ void BedMeshPanel::handle_prompt_save(lv_event_t *e) {
       return;
     }
 
-    ws.gcode_script(fmt::format("BED_MESH_PROFILE SAVE=\"{}\"\nSAVE_CONFIG", profile_name));
+    ws.gcode_script(fmt::format("BED_MESH_PROFILE SAVE=\"{}\"\n{}SAVE_CONFIG", profile_name,
+      cal_record_prefix(State::get_instance()->get_data("/printer_state/nebulaos_calibration"_json_pointer), "bed_mesh",
+                        fmt::format("Saved as {}", profile_name))));
 
     lv_textarea_set_text(input, "");
     lv_obj_add_flag(prompt, LV_OBJ_FLAG_HIDDEN);
@@ -722,7 +725,9 @@ void BedMeshPanel::handle_kb_input(lv_event_t *e)
       return;
     }
 
-    ws.gcode_script(fmt::format("BED_MESH_PROFILE SAVE=\"{}\"\nSAVE_CONFIG", profile_name));
+    ws.gcode_script(fmt::format("BED_MESH_PROFILE SAVE=\"{}\"\n{}SAVE_CONFIG", profile_name,
+      cal_record_prefix(State::get_instance()->get_data("/printer_state/nebulaos_calibration"_json_pointer), "bed_mesh",
+                        fmt::format("Saved as {}", profile_name))));
 
     lv_textarea_set_text(input, "");
     lv_obj_add_flag(prompt, LV_OBJ_FLAG_HIDDEN);

@@ -1,4 +1,5 @@
 #include "axis_twist_panel.h"
+#include "nebulaos_calibration_status.h"
 #include "settings_ui.h"
 #include "state.h"
 #include "utils.h"
@@ -370,7 +371,11 @@ void AxisTwistPanel::handle_callback(lv_event_t *e) {
   }
 
   if (btn == save_btn) {
-    ws.gcode_script("SAVE_CONFIG");
+    // G105 (Run 19): the saved bed mesh was probed without this twist
+    // correction - remove it in the same restart (a stale mesh loaded by a
+    // slicer profile could drive the nozzle into the bed); the extensions
+    // then mark Auto Calibration "Redo: Axis Twist changed".
+    ws.gcode_script(cal_axis_twist_save_script(State::get_instance()->get_data("/printer_state/nebulaos_calibration"_json_pointer)));
     KUtils::notify_toast("Saving... Klipper will restart.", 3000);
     lv_obj_move_background(panel_cont);
     return;

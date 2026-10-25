@@ -2,6 +2,7 @@
 #include "settings_ui.h"
 #include "state.h"
 #include "utils.h"
+#include "nebulaos_calibration_status.h"
 #include "spdlog/spdlog.h"
 
 #include <string>
@@ -151,8 +152,11 @@ void SkewCorrectionPanel::apply_and_save() {
     }
   }
   // SET_SKEW XY=<ac>,<bd>,<ad> then persist (restarts Klipper).
-  ws.gcode_script(fmt::format("SET_SKEW XY={},{},{}\nSAVE_CONFIG",
-                              s[0], s[1], s[2]));
+  // G105 (Run 19): the Calibration menu's status line (newer extensions)
+  std::string record = cal_record_prefix(State::get_instance()->get_data("/printer_state/nebulaos_calibration"_json_pointer), "skew",
+    fmt::format("A-C {}, B-D {}, A-D {} mm", s[0], s[1], s[2]));
+  ws.gcode_script(fmt::format("SET_SKEW XY={},{},{}\n{}SAVE_CONFIG",
+                              s[0], s[1], s[2], record));
   KUtils::notify_toast("Skew applied. Saving and restarting Klipper.", 4000);
   lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
   lv_obj_move_background(panel_cont);

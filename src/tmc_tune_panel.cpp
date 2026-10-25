@@ -1,5 +1,6 @@
 #include "settings_ui.h"
 #include "tmc_tune_panel.h"
+#include "nebulaos_calibration_status.h"
 #include "state.h"
 #include "spdlog/spdlog.h"
 
@@ -350,5 +351,8 @@ void TmcTunePanel::save_config() {
     save_configs.push_back(s->get_config_macro());
   }
 
-  ws.gcode_script(fmt::format("{}\nSAVE_CONFIG", fmt::join(save_configs, "\n")));
+  // G105 (Run 19): the Calibration menu's status line (newer extensions)
+  std::string record = cal_record_prefix(State::get_instance()->get_data("/printer_state/nebulaos_calibration"_json_pointer), "tmc_autotune",
+    fmt::format("{} motors tuned", steppers.size()));
+  ws.gcode_script(fmt::format("{}\n{}SAVE_CONFIG", fmt::join(save_configs, "\n"), record));
 }

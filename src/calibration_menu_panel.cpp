@@ -20,6 +20,7 @@ LV_IMG_DECLARE(skew_img);
 LV_IMG_DECLARE(motor_img);
 LV_IMG_DECLARE(bedmesh_img);
 LV_IMG_DECLARE(load_cell_img);
+LV_IMG_DECLARE(heater);
 
 // Icons are shown at native size (46x46, same material_46 assets the Tune-tab
 // tiles use) - no lv_img_set_zoom/LV_IMG_SIZE_MODE_REAL this time. That
@@ -37,7 +38,7 @@ LV_IMG_DECLARE(load_cell_img);
 // is nullptr for the unordered utility section.
 static lv_obj_t *make_row(lv_obj_t *parent, const void *icon, const char *label,
                            lv_event_cb_t cb, void *user_data, const char *number = nullptr,
-                           const char *sub = nullptr) {
+                           const char *sub = nullptr, lv_obj_t **sub_label = nullptr) {
   lv_obj_t *row = lv_obj_create(parent);
   lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_style_radius(row, 0, 0);
@@ -107,6 +108,7 @@ static lv_obj_t *make_row(lv_obj_t *parent, const void *icon, const char *label,
     lv_label_set_long_mode(sl, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_font(sl, &lv_font_montserrat_10, 0);
     lv_obj_set_style_text_color(sl, lv_palette_main(LV_PALETTE_GREY), 0);
+    if (sub_label != nullptr) *sub_label = sl;
   } else {
     lv_obj_set_flex_grow(lbl, 1);
   }
@@ -141,7 +143,8 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
                                             BedMeshPanel &bedmesh,
                                             AxisTwistPanel &axis_twist, SkewCorrectionPanel &skew,
                                             TmcTunePanel &tmc_tune)
-  : ws(websocket_client)
+  : NotifyConsumer(l)
+  , ws(websocket_client)
   , panel_cont(lv_obj_create(lv_scr_act()))
   , highlight_index(-1)
   , auto_calibrate_panel(websocket_client, l, CalFlow::AUTO_CALIBRATE)
@@ -149,6 +152,7 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   , load_cell_panel(websocket_client, l, CalFlow::LOAD_CELL)
   , bed_tram_panel(websocket_client, l, CalFlow::BED_TRAM)
   , input_shaper_panel(websocket_client, l, CalFlow::INPUT_SHAPER)
+  , pid_panel(websocket_client, l)
   , bedmesh_panel(bedmesh)
   , axis_twist_panel(axis_twist)
   , skew_correction_panel(skew)
@@ -186,24 +190,31 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   lv_obj_add_flag(list_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_scrollbar_mode(list_cont, LV_SCROLLBAR_MODE_AUTO);
 
+  // G105 (Run 19): Tim's order and the status line under every row
+  auto add = [this](const CalMenuEntry &e, const void *icon, const char *number) {
+    lv_obj_t *sub = nullptr;
+    lv_obj_t *row = make_row(list_cont, icon, e.title, &CalibrationMenuPanel::_handle_callback,
+                             this, number, e.description, &sub);
+    rows.push_back(row);
+    status_labels.push_back(sub);
+    entries.push_back(&e);
+    return row;
+  };
+  const auto &order = cal_menu_in_order();
+  const auto &other = cal_menu_other();
   make_section_label(list_cont, "IN ORDER");
-  // G87: tramming first - shimming the front-left corner changes the load
-  // cell mounting, so the load cell and Z offset come after it.
-  bed_tram_row    = make_row(list_cont, &bedmesh_img,     "Bed Tramming",            &CalibrationMenuPanel::_handle_callback, this, "1");
-  axis_twist_row  = make_row(list_cont, &layers_img,      "Axis Twist",              &CalibrationMenuPanel::_handle_callback, this, "2");
-  load_cell_row   = make_row(list_cont, &load_cell_img,         "Load Cell",               &CalibrationMenuPanel::_handle_callback, this, "3",
-                             "Automatic (default) or Manual with a bottle");
-  wizard_row      = make_row(list_cont, &home_z,          "Z-Offset & Bed Mesh",     &CalibrationMenuPanel::_handle_callback, this, "4",
-                             "Includes the load cell check in Automatic mode");
-  inputshaper_row = make_row(list_cont, &inputshaper_img, "Input Shaper",            &CalibrationMenuPanel::_handle_callback, this, "5");
-  esteps_row      = make_row(list_cont, &extrude_img,     "E-Steps Calibration",     &CalibrationMenuPanel::_handle_callback, this, "6");
-  skew_row        = make_row(list_cont, &skew_img,        "Skew Correction",         &CalibrationMenuPanel::_handle_callback, this, "7");
-  tmc_tune_row    = make_row(list_cont, &motor_img,       "TMC Autotune (optional)", &CalibrationMenuPanel::_handle_callback, this, "8");
+  bed_tram_row    = add(order[0], &bedmesh_img,     "1");
+  pid_row         = add(order[1], &heater,          "2");
+  axis_twist_row  = add(order[2], &layers_img,      "3");
+  wizard_row      = add(order[3], &home_z,          "4");
+  inputshaper_row = add(order[4], &inputshaper_img, "5");
+  esteps_row      = add(order[5], &extrude_img,     "6");
+  skew_row        = add(order[6], &skew_img,        "7");
 
   make_section_label(list_cont, "OTHER");
-  bedmesh_row = make_row(list_cont, &bedmesh_img, "Bed Mesh", &CalibrationMenuPanel::_handle_callback, this);
-
-  rows = {bed_tram_row, axis_twist_row, load_cell_row, wizard_row, inputshaper_row, esteps_row, skew_row, tmc_tune_row, bedmesh_row};
+  load_cell_row   = add(other[0], &load_cell_img,   nullptr);
+  tmc_tune_row    = add(other[1], &motor_img,       nullptr);
+  bedmesh_row     = add(other[2], &bedmesh_img,     nullptr);
 
   // Right-side nav column - same construction as macros_panel.cpp's nav_cont
   // (Up/OK/Down), above the Back tile (66 px + a gap).
@@ -250,9 +261,12 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   lv_obj_center(down_img);
   lv_obj_add_event_cb(down_btn, &CalibrationMenuPanel::_handle_nav, LV_EVENT_CLICKED, this);
   lv_obj_move_foreground(back_btn);   // above the nav column's background
+
+  ws.register_notify_update(this);
 }
 
 CalibrationMenuPanel::~CalibrationMenuPanel() {
+  ws.unregister_notify_update(this);
   if (panel_cont != NULL) {
     lv_obj_del(panel_cont);
     panel_cont = NULL;
@@ -278,7 +292,35 @@ void CalibrationMenuPanel::init(json &j) {
 
 }
 
+void CalibrationMenuPanel::refresh_status() {
+  auto status = State::get_instance()->get_data("/printer_state/nebulaos_calibration"_json_pointer);
+  const json &history = status.is_object() && status.contains("history") ? status["history"] : json();
+  for (size_t i = 0; i < rows.size() && i < status_labels.size(); i++) {
+    if (status_labels[i] == nullptr) continue;
+    CalRowStatus st = cal_row_status(history, *entries[i]);
+    lv_label_set_text(status_labels[i], st.text.c_str());
+    lv_color_t c = st.state == CalRowState::DONE ? lv_palette_lighten(LV_PALETTE_GREEN, 1)
+      : st.state == CalRowState::REDO ? lv_palette_main(LV_PALETTE_ORANGE)
+      : lv_palette_main(LV_PALETTE_GREY);
+    lv_obj_set_style_text_color(status_labels[i], c, 0);
+    // "Redo" stands out: a left accent bar on the row
+    lv_obj_set_style_border_side(rows[i], st.state == CalRowState::REDO
+      ? (lv_border_side_t)(LV_BORDER_SIDE_BOTTOM | LV_BORDER_SIDE_LEFT) : LV_BORDER_SIDE_BOTTOM, 0);
+    lv_obj_set_style_border_color(rows[i], st.state == CalRowState::REDO
+      ? lv_palette_main(LV_PALETTE_ORANGE) : lv_palette_darken(LV_PALETTE_GREY, 3), 0);
+    lv_obj_set_style_border_width(rows[i], st.state == CalRowState::REDO ? 3 : 1, 0);
+  }
+}
+
+void CalibrationMenuPanel::consume(json &j) {
+  const json &n = j;
+  if (!n.contains("/params/0/nebulaos_calibration/history"_json_pointer)) return;
+  std::lock_guard<std::mutex> lock(lv_lock);
+  refresh_status();
+}
+
 void CalibrationMenuPanel::foreground() {
+  refresh_status();
   lv_obj_move_foreground(panel_cont);
   set_highlight(0);
 }
@@ -349,6 +391,13 @@ void CalibrationMenuPanel::activate_row(lv_obj_t *row) {
     // Calibration probes the bed; never mid-print.
     if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
     axis_twist_panel.foreground();
+    return;
+  }
+
+  if (row == pid_row) {
+    // Heats; never mid-print (the page checks again on Start).
+    if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
+    pid_panel.foreground();
     return;
   }
 

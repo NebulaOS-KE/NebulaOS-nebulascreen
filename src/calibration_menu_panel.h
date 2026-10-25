@@ -8,30 +8,29 @@
 #include "axis_twist_panel.h"
 #include "skew_correction_panel.h"
 #include "tmc_tune_panel.h"
+#include "pid_calibration_panel.h"
+#include "nebulaos_calibration_status.h"
+#include "notify_consumer.h"
 
 #include <mutex>
 #include <vector>
 
 // Entry point for every calibration flow, reached from the Tune tab's single
-// "Calibration" button. Mirrors wiki/Calibration-Explained.md's own
-// recommended order as a numbered, scrollable list - Bed Tramming through TMC
-// Autotune - so the on-screen menu and the docs never drift apart. Axis Twist
-// comes before Auto Calibration deliberately, not just cosmetically: Klipper
-// applies its correction to every probe call from then on (patched into
-// probe.py), so a bed mesh captured before it is twist-biased and has to be
-// redone - see the wiki page and axis_twist_compensation.py's probe.py patch.
-//
-// Below the numbered list, an unordered "Other tools" section holds routines
-// that don't fit a fixed sequence - today just Bed Mesh, which Auto
-// Calibration already runs internally but is also useful standalone (e.g.
-// re-mesh only, after a small change, without redoing the whole wizard).
+// "Calibration" button. G105 (Run 19, Tim): "an idiot just does 1-2-3" -
+// IN ORDER 1 Bed Tramming (mechanical first), 2 Heaters (PID) (before Auto
+// Calibration: its nozzle clean removes the ooze of the PID dwell), 3 Axis
+// Twist (before the mesh: Klipper applies its correction to every probe),
+// 4 Auto Calibration, 5 Input Shaper, 6 E-Steps, 7 Skew Correction (needs a
+// printed part). OTHER: Load Cell Calibration, TMC Autotune, Bed Mesh.
+// Every row has a status line from nebulaos_calibration.history (done /
+// description / "Redo: <reason>"), see nebulaos_calibration_status.
 //
 // Bed Mesh / Input Shaper / Axis Twist / Skew / TMC Autotune panels are owned
 // by PrinterTunePanel (Bed Mesh doubles as a Tune-tab top-level tile too,
 // since viewing it is routine even though calibrating it isn't) and passed in
 // by reference here, the same pattern PrinterTunePanel itself already uses
 // for FineTunePanel/ZOffsetPanel.
-class CalibrationMenuPanel {
+class CalibrationMenuPanel : public NotifyConsumer {
  public:
   CalibrationMenuPanel(KWebSocketClient &, std::mutex &,
                         BedMeshPanel &,
@@ -44,6 +43,7 @@ class CalibrationMenuPanel {
   void init(json &j);
 
   void foreground();
+  void consume(json &j);
   void handle_callback(lv_event_t *event);
   static void _handle_callback(lv_event_t *e) { ((CalibrationMenuPanel*)e->user_data)->handle_callback(e); }
 
@@ -54,6 +54,7 @@ class CalibrationMenuPanel {
 #ifdef SIMULATOR
   // Screenshot tour: open a row (on-screen order) / reach a guided page.
   void sim_tap_row(size_t i) { if (i < rows.size()) activate_row(rows[i]); }
+  PidCalibrationPanel &sim_pid() { return pid_panel; }
   GuidedCalibrationPanel &sim_guided(CalFlow f) {
     return f == CalFlow::ESTEPS ? esteps_panel : f == CalFlow::LOAD_CELL ? load_cell_panel
       : f == CalFlow::BED_TRAM ? bed_tram_panel : f == CalFlow::INPUT_SHAPER ? input_shaper_panel
@@ -66,6 +67,7 @@ class CalibrationMenuPanel {
   void move_highlight(int delta);
   void set_highlight(int idx);
   void activate_row(lv_obj_t *row);
+  void refresh_status();
 
   KWebSocketClient &ws;
 
@@ -79,18 +81,22 @@ class CalibrationMenuPanel {
 
   // numbered, in recommended order
   lv_obj_t *bed_tram_row;
+  lv_obj_t *pid_row;
   lv_obj_t *axis_twist_row;
   lv_obj_t *wizard_row;
   lv_obj_t *inputshaper_row;
   lv_obj_t *esteps_row;
-  lv_obj_t *load_cell_row;
   lv_obj_t *skew_row;
+  // OTHER
+  lv_obj_t *load_cell_row;
   lv_obj_t *tmc_tune_row;
-  // unordered utility section
   lv_obj_t *bedmesh_row;
 
   // every row above, in on-screen order, for Up/Down to walk through
   std::vector<lv_obj_t*> rows;
+  // G105: each row's status line and its history key (same order as rows)
+  std::vector<lv_obj_t*> status_labels;
+  std::vector<const CalMenuEntry*> entries;
   int highlight_index;
 
   // NebulaOS guided flows (D3-D5): the workflows run in Klipper
@@ -101,6 +107,7 @@ class CalibrationMenuPanel {
   GuidedCalibrationPanel load_cell_panel;
   GuidedCalibrationPanel bed_tram_panel;
   GuidedCalibrationPanel input_shaper_panel;
+  PidCalibrationPanel pid_panel;
   BedMeshPanel &bedmesh_panel;
   AxisTwistPanel &axis_twist_panel;
   SkewCorrectionPanel &skew_correction_panel;

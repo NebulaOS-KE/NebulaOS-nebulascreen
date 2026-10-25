@@ -721,7 +721,7 @@ void MainPanel::sim_tour(const char *dir) {
     {"m18-zoffset-older-extensions", [objs, this]() {
       objs(false); print_status_panel.get_zoffset_panel().foreground(); objs(true); }},
     {"m19-calibration", [this]() { printertune_panel.sim_tap(7); }},
-    {"m20-axis-twist", [cal]() { cal().sim_tap_row(1); }},
+    {"m20-axis-twist", [cal]() { cal().sim_tap_row(2); }},
     {"m21-skew", [cal]() { cal().sim_tap_row(6); }},
     // Load cell G99 (Run 18): Automatic (default) / Manual
     {"m29a-loadcell-auto-never", [lc]() { lc({{"state", "idle"}, {"mode", "auto"}, {"mode_choice", "auto"},
