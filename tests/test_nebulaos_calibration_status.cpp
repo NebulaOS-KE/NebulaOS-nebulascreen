@@ -251,6 +251,7 @@ TEST(Feedback, restart_and_reconnect_notice) {
   CalView v = base(CalFlow::AUTO_CALIBRATE, s);
   cal_feedback(CalFlow::AUTO_CALIBRATE, s, true, v);
   ASSERT_EQ(v.text, std::string(CAL_RESTART_NOTICE));
+  ASSERT_FALSE(v.can_cancel);
   v = base(CalFlow::AUTO_CALIBRATE, s);
   cal_feedback(CalFlow::AUTO_CALIBRATE, s, false, v);
   ASSERT_EQ(v.text, std::string(CAL_RECONNECT_NOTICE));

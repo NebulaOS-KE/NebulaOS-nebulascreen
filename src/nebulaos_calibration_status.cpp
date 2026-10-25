@@ -293,6 +293,7 @@ CalFeedback cal_feedback(CalFlow flow, const json &status, bool klippy_ready, Ca
   if (f.progress.active) {
     if (f.progress.restarting || saving) {
       v.text = klippy_ready ? CAL_RESTART_NOTICE : CAL_RECONNECT_NOTICE;
+      v.can_cancel = false;   // the save cannot be cancelled
     } else if (state == "running") {
       v.text = "";   // the step list says it
     }

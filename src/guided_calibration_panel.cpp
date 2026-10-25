@@ -280,6 +280,14 @@ void GuidedCalibrationPanel::refresh() {
 
 void GuidedCalibrationPanel::render_feedback(const CalFeedback &f) {
   if (prog_box == nullptr) return;
+  // While a flow runs, its prompt / the restart notice comes first (the step
+  // list is long); after it, the headline first and the result lines below.
+  lv_obj_move_to_index(text, f.progress.active ? 0 : 1);
+  if (f.progress.restarting) {
+    lv_obj_set_style_text_color(text, lv_palette_main(LV_PALETTE_AMBER), 0);
+  } else {
+    lv_obj_remove_local_style_prop(text, LV_STYLE_TEXT_COLOR, 0);
+  }
   bool on = f.progress.active || f.result.present;
   if (!on) {
     lv_obj_add_flag(prog_box, LV_OBJ_FLAG_HIDDEN);

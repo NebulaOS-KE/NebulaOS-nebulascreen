@@ -689,6 +689,17 @@ void MainPanel::sim_tour(const char *dir) {
     st({{cal_status_object(f), status}});
     cal().sim_guided(f).foreground();
   };
+  // G104: a running flow at step n (progress + its state)
+  auto prog = [](const char *flow, int n, const char *key, const char *label, const char *detail) {
+    std::string f = flow;
+    int total = (int)cal_flow_steps(f == "esteps" ? CalFlow::ESTEPS
+      : f == "input_shaper" ? CalFlow::INPUT_SHAPER : CalFlow::AUTO_CALIBRATE).size();
+    json s = {{"progress", {{"flow", flow}, {"step", n}, {"total", total}, {"key", key},
+                            {"label", label}, {"detail", detail}}}, {"last_result", nullptr}};
+    s[f + "_state"] = "running";
+    s[f + "_stage"] = key;
+    return s;
+  };
   const json null_lc = {{"grams", nullptr}, {"replace_grams", nullptr}, {"finger_grams", nullptr},
                         {"problem", nullptr}, {"counts_per_gram", nullptr},
                         {"old_counts_per_gram", nullptr}, {"change_percent", nullptr},
@@ -709,6 +720,19 @@ void MainPanel::sim_tour(const char *dir) {
     {"m08-leds", [this]() { led_panel.foreground(); }},
     {"m09-files", [this]() { print_panel.foreground(); }},
     {"m10-bedmesh", [this]() { printertune_panel.sim_tap(0); }},
+    // G106 (Run 19): no active mesh, 'default' saved -> shown with the notice
+    {"m10b-bedmesh-saved", [st, this]() {
+      json pts = json::array();
+      for (int y = 0; y < 9; y++) {
+        json row = json::array();
+        for (int x = 0; x < 9; x++) row.push_back(0.02 * (x - 4) - 0.015 * (y - 4) + 0.01 * ((x * y) % 3));
+        pts.push_back(row);
+      }
+      st({{"bed_mesh", {{"profile_name", ""}, {"probed_matrix", json::array()},
+        {"profiles", {{"default", {{"points", pts}, {"mesh_params", {{"algo", "bicubic"},
+          {"tension", 0.2}, {"min_x", 5.0}, {"max_x", 215.0}, {"min_y", 5.0}, {"max_y", 215.0},
+          {"x_count", 9}, {"y_count", 9}, {"mesh_x_pps", 2}, {"mesh_y_pps", 2}}}}}}}}}});
+      printertune_panel.sim_tap(0); }},
     {"m11-finetune", [this]() { printertune_panel.sim_tap(1); }},
     {"m12-limits", [this]() { printertune_panel.sim_tap(2); }},
     {"m13-tmc-metrics", [this]() { printertune_panel.sim_tap(3); }},
@@ -721,6 +745,32 @@ void MainPanel::sim_tour(const char *dir) {
     {"m18-zoffset-older-extensions", [objs, this]() {
       objs(false); print_status_panel.get_zoffset_panel().foreground(); objs(true); }},
     {"m19-calibration", [this]() { printertune_panel.sim_tap(7); }},
+    // G105 (Run 19): status lines - done / not done / redo
+    {"m19b-calibration-status", [st, cal]() {
+      double oct24 = 1792843200.0, oct23 = oct24 - 86400.0;
+      st({{"nebulaos_calibration", {{"history", {
+        {"bed_tram", {{"done_at", oct23}, {"summary", "4 corners within 0.05 mm"}, {"redo", nullptr}}},
+        {"pid", {{"done_at", oct23}, {"summary", "Hotend tuned at 230 C"}, {"redo", nullptr}}},
+        {"axis_twist", {{"done_at", oct24}, {"summary", "Axis twist compensation saved"}, {"redo", nullptr}}},
+        {"auto_calibrate", {{"done_at", oct23}, {"summary", "Z offset 1.752 mm, mesh range 0.16 mm"},
+                            {"redo", "Axis Twist changed"}}},
+        {"input_shaper", {{"done_at", nullptr}, {"summary", ""}, {"redo", nullptr}}},
+        {"esteps", {{"done_at", nullptr}, {"summary", ""}, {"redo", nullptr}}},
+        {"skew", {{"done_at", nullptr}, {"summary", ""}, {"redo", nullptr}}},
+        {"load_cell", {{"done_at", nullptr}, {"summary", ""}, {"redo", "a shim was added at front left"}}},
+        {"tmc_autotune", {{"done_at", nullptr}, {"summary", ""}, {"redo", nullptr}}},
+        {"bed_mesh", {{"done_at", nullptr}, {"summary", ""}, {"redo", nullptr}}}}}}}});
+      cal().foreground(); }},
+    {"m19c-calibration-status-middle", [cal]() { cal().sim_show_row(5); }},
+    {"m19d-calibration-status-other", [cal]() { cal().sim_show_row(9); }},
+    // Heaters (PID), new in Run 19
+    {"m22a-pid", [cal]() { cal().sim_tap_row(1); }},
+    {"m22b-pid-running", [st, cal]() {
+      st({{"heater_bed", {{"temperature", 61.4}, {"target", 65.0}}}});
+      cal().sim_pid().sim_running(PidHeater::BED); }},
+    {"m22c-pid-done", [cal]() {
+      cal().sim_pid().sim_result(pid_summary(PidHeater::BED)
+        + " - saving, Klipper restarts now. The screen reconnects by itself."); }},
     {"m20-axis-twist", [cal]() { cal().sim_tap_row(2); }},
     {"m21-skew", [cal]() { cal().sim_tap_row(6); }},
     // Load cell G99 (Run 18): Automatic (default) / Manual
@@ -795,6 +845,40 @@ void MainPanel::sim_tour(const char *dir) {
     {"m50-auto-calibrate", [guided]() { guided(CalFlow::AUTO_CALIBRATE, {{"auto_calibrate_state", "idle"}}); }},
     {"m51-auto-calibrate-running", [guided]() { guided(CalFlow::AUTO_CALIBRATE, {
       {"auto_calibrate_state", "running"}, {"auto_calibrate_stage", "measuring the Z offset"}}); }},
+    // G104 (Run 19): progress, restart, end and failure screens
+    {"m51a-auto-step1-load-cell", [guided, prog]() { guided(CalFlow::AUTO_CALIBRATE,
+      prog("auto_calibrate", 1, "preflight", "Load cell check", "")); }},
+    {"m51b-auto-step4-heating", [guided, prog]() { guided(CalFlow::AUTO_CALIBRATE,
+      prog("auto_calibrate", 4, "establish_thermal_state", "Heating up", "bed 61/65 C, nozzle 148/150 C")); }},
+    {"m51c-auto-step7-touch", [guided, prog]() { guided(CalFlow::AUTO_CALIBRATE,
+      prog("auto_calibrate", 7, "localized_z_offset", "Measuring the Z offset", "touch 2 of 3")); }},
+    {"m51d-auto-step8-mesh", [guided, prog]() { guided(CalFlow::AUTO_CALIBRATE,
+      prog("auto_calibrate", 8, "bed_mesh", "Bed mesh", "point 41 of 81")); }},
+    {"m51e-auto-step9-restart", [guided, prog]() { guided(CalFlow::AUTO_CALIBRATE,
+      prog("auto_calibrate", 9, "commit", "Saving (Klipper restarts)", "")); }},
+    {"m51f-auto-reconnecting", [st, guided, prog]() {
+      st({{"webhooks", {{"state", "startup"}}}});
+      guided(CalFlow::AUTO_CALIBRATE, prog("auto_calibrate", 9, "commit", "Saving (Klipper restarts)", "")); }},
+    {"m51g-auto-done", [st, guided]() {
+      st({{"webhooks", {{"state", "ready"}}}});
+      guided(CalFlow::AUTO_CALIBRATE, {{"auto_calibrate_state", "complete"}, {"progress", nullptr},
+        {"last_result", {{"flow", "auto_calibrate"}, {"ok", true}, {"finished_at", 1792843200.0},
+          {"summary", {"Z offset 1.669 mm (was 1.795)", "Bed mesh 9x9, range 0.16 mm"}},
+          {"error_step", ""}, {"error", ""}, {"advice", ""}}}}); }},
+    {"m51h-auto-failed", [guided]() {
+      guided(CalFlow::AUTO_CALIBRATE, {{"auto_calibrate_state", "error"},
+        {"auto_calibrate_error", "the three touches disagree by 0.08 mm"}, {"progress", nullptr},
+        {"last_result", {{"flow", "auto_calibrate"}, {"ok", false}, {"finished_at", 1792843200.0},
+          {"summary", json::array()}, {"error_step", "Measuring the Z offset"},
+          {"error", "the three touches disagree by 0.08 mm"},
+          {"advice", "Clean the nozzle and the bed at the front-left corner, then try again."}}}}); }},
+    {"m51i-auto-idle-older-extensions", [guided]() {
+      guided(CalFlow::AUTO_CALIBRATE, {{"auto_calibrate_state", "idle"}, {"last_result", nullptr}}); }},
+    {"m52a-esteps-step1-heating", [guided, prog]() { guided(CalFlow::ESTEPS,
+      prog("esteps", 1, "heating", "Heating up", "nozzle 148/210 C")); }},
+    {"m54a-input-shaper-step2", [guided]() { guided(CalFlow::INPUT_SHAPER, {
+      {"input_shaper_state", "awaiting_x_mount"}, {"progress", {{"flow", "input_shaper"}, {"step", 2},
+      {"total", 7}, {"key", "mount_x"}, {"label", "Mount the sensor on the toolhead"}, {"detail", ""}}}}); }},
     {"m52-esteps", [guided]() { guided(CalFlow::ESTEPS, {{"esteps_state", "idle"}}); }},
     {"m53-esteps-measure-keypad", [guided, cal]() {
       guided(CalFlow::ESTEPS, {{"esteps_state", "awaiting_measurement"}});
