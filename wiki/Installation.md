@@ -17,7 +17,7 @@ installing NebulaOS itself.
 | Path | What |
 |---|---|
 | `/opt/nebulascreen/nebulascreen` | The app (static MIPS executable, read-only image) |
-| `/opt/nebulascreen/nebulabeep` | Buzzer player used by `M300` / `PLAY_TUNE` ([Beeps & songs](Buzzer-and-Sounds)) |
+| `/opt/nebulascreen/nebulabeep` | Compatibility client: forwards buzzer requests to Klipper's `nebulaos_beeper` ([Beeps & songs](Buzzer-and-Sounds)) |
 | `/opt/nebulascreen/themes/` | Colour themes |
 | `/opt/nebulascreen/nebulascreen.json` | Settings. Bind-mounted from the persistent file `/usr/data/nebulaos/nebulascreen/nebulascreen.json` |
 | `config/nebulascreen/nebulascreen.json` | The same settings file, visible and editable in Mainsail's config browser |

@@ -31,7 +31,9 @@ example the `GuppyScreen` class in `src/guppyscreen.cpp`).
 - **Logging** — `spdlog`, rotating file (10 MB × 3).
 - **Print-state safety** — `src/utils.cpp`: `is_printing()`, `notify_locked()`,
   `confirm_if_printing()`.
-- **Buzzer** — `k1/k1_mods/buzzer/guppybeep.c`, built as the separate static program `nebulabeep`.
+- **Buzzer** — owned by Klipper's `nebulaos_beeper` extra (kernel PWM channel); the touch click is a
+  request to it over the Klippy API socket (`src/touch_beep_client.*`). `k1/k1_mods/buzzer/guppybeep.c`
+  builds `nebulabeep`, now only a compatibility client that forwards to Klipper.
 - **Packaging** — both programs are **statically linked** (musl on MIPS), so there are no shared-library
   dependencies on the printer.
 

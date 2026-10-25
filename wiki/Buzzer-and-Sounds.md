@@ -12,9 +12,13 @@ There are three things this gives you:
 3. **`PLAY_TUNE` songs** — built-in tunes, plus your own, kept in an editable file.
 
 The `M300`, `BEEP` and `PLAY_TUNE` macros are part of the NebulaOS Klipper config
-(`/etc/nebulaos/klipper/beeper.cfg`). They run `nebulabeep`, the buzzer player built from this
-repository (`k1/k1_mods/buzzer/guppybeep.c`) and installed as `/opt/nebulascreen/nebulabeep`. The old
-shell-command name `guppybeep` still works for your own macros.
+(`/etc/nebulaos/klipper/beeper.cfg`). Klipper itself owns the buzzer: the `nebulaos_beeper` extra drives
+the kernel's PWM channel for it (`/sys/class/pwm/pwmchip0/pwm3`) and plays every sound in the
+background, so **a beep or a song never pauses the print**. The screen's touch click goes through the
+same owner. `/opt/nebulascreen/nebulabeep` still exists for old scripts, but it only forwards to
+Klipper now; the old `RUN_SHELL_COMMAND CMD=guppybeep` / `CMD=nebulabeep` names are gone - call
+`M300`, `PLAY_TUNE` or `NEBULAOS_BEEP FREQ=<Hz> DURATION=<ms>` instead. `NEBULAOS_BEEPER_STOP` silences
+the buzzer.
 
 ---
 
@@ -117,15 +121,15 @@ PLAY_TUNE SONG=mario
 
 It's a normal Klipper command, so the slicer passes it straight through. A few tips:
 
-- Put it at the **very end** of your end-gcode. A song blocks the command queue while it plays — which
-  is fine once the print is finished, and that's why end-of-print is the right spot.
+- Put it at the **very end** of your end-gcode. The song starts when the moves before it have
+  finished and plays in the background - the printer does not wait for it.
 - For a quick "done" chirp instead of a whole song, use `M300 S1500 P300` or `BEEP`.
 - The slicer's end-gcode only runs on a **successful** finish. To get a sound on *failure*, trigger
   `PLAY_TUNE SONG=error` from a cancel/error macro instead.
 
-> **Don't play long songs mid-print.** `M300` blips are instant and fine anytime, but a full `PLAY_TUNE`
-> takes several seconds and the printer waits for it to end. Save songs for idle moments — print done,
-> error, startup.
+> **Songs mid-print are cut short.** Nothing waits for a song, but while a print runs a tune is cut to
+> 20 seconds so a long song can't buzz through half the job. Save long songs for idle moments — print
+> done, error, startup.
 
 ---
 
@@ -136,5 +140,5 @@ It's a normal Klipper command, so the slicer passes it straight through. A few t
   changes. That's the physical hardware, not a bug.
 - **It's a 1-bit beeper** — think classic 8-bit chiptune, not hi-fi. There's no speaker or audio chip on
   the KE.
-- **Safe during prints.** Because it's true hardware PWM, making sound uses essentially no CPU and won't
-  disturb a running job.
+- **Safe during prints.** The tone itself is hardware PWM (no CPU); Klipper only switches notes, and
+  it never holds the G-code queue to do so.

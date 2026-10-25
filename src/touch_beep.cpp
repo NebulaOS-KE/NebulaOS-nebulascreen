@@ -5,24 +5,28 @@
 #include <atomic>
 
 #ifndef SIMULATOR
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
+#include "touch_beep_client.h"
+#include <memory>
+#include <mutex>
 #endif
 
 namespace {
   std::atomic<bool> s_enabled{false};
 
   // Suppress a follow-up beep that lands within this window of the last one.
-  // The buzzer pulse is short and the panel reports at ~50Hz, so back-to-back
-  // CLICKED events from a single jittery tap shouldn't double-fire, and a burst
-  // of rapid taps shouldn't queue overlapping beep processes on the GPIO.
+  // The panel reports at ~50Hz, so back-to-back CLICKED events from a single
+  // jittery tap shouldn't double-fire.
   constexpr uint32_t DEBOUNCE_MS = 120;
   uint32_t s_last_tick = 0;
 
-  // Hardware-PWM soft "tick" (see k1/k1_mods/buzzer/guppybeep.c). Far quieter
-  // and lower than /usr/bin/beep's fixed loud pulse - a phone-like touch tick.
-  const char *BEEP_PATH = nebulascreen::kBeepPath;
+#ifndef SIMULATOR
+  // G108: Klipper's nebulaos_beeper owns the buzzer; the click (a soft,
+  // phone-like 260 Hz / 4 ms / 2% duty tick, configured in that extra) is
+  // requested over the Klippy API socket (S55klipper's APISOCK). The screen
+  // never touches the PWM hardware itself (formerly nebulabeep + /dev/mem).
+  std::once_flag s_client_once;
+  std::unique_ptr<TouchBeep::KlippyClickClient> s_client;
+#endif
 }
 
 namespace TouchBeep {
@@ -37,22 +41,11 @@ bool is_enabled() {
 
 void beep() {
 #ifndef SIMULATOR
-  // Double-fork: the grandchild execs guppybeep and is reparented to init
-  // (which reaps it), so we leave no zombie and never block the UI thread on
-  // the buzzer pulse. The parent only waits on the short-lived middle child,
-  // which exits immediately.
-  pid_t pid = fork();
-  if (pid == 0) {
-    pid_t grandchild = fork();
-    if (grandchild == 0) {
-      execl(BEEP_PATH, nebulascreen::kBeepName, "click", (char *)NULL);
-      _exit(127); // exec failed (nebulabeep missing) - nothing we can do here
-    }
-    _exit(0);
-  } else if (pid > 0) {
-    int status;
-    waitpid(pid, &status, 0);
-  }
+  // Non-blocking: the client's worker thread does the socket I/O.
+  std::call_once(s_client_once, [] {
+    s_client.reset(new KlippyClickClient(nebulascreen::kKlippyApiSocket));
+  });
+  s_client->request();
 #else
   spdlog::debug("TouchBeep::beep() (no-op in simulator)");
 #endif

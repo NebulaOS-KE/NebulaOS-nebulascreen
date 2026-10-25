@@ -29,8 +29,7 @@ constexpr const char *kDefaultConfig =
 constexpr const char *kInitScript = "/etc/init.d/S58nebulascreen";
 constexpr const char *kLogPath = "/opt/printer_data/logs/nebulascreen.log";
 constexpr const char *kThumbnailPath = "/opt/nebulascreen/thumbnails";
-constexpr const char *kBeepPath = "/opt/nebulascreen/nebulabeep";
-constexpr const char *kBeepName = "nebulabeep";
+constexpr const char *kKlippyApiSocket = "/opt/printer_data/comms/klippy.sock"; // S55klipper APISOCK
 
 // Moonraker database namespace holding the user's macro and console
 // favorites. It stays "guppyscreen" on purpose: the database is shared by

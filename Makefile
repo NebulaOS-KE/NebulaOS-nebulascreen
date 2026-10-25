@@ -114,9 +114,17 @@ wpaclient:
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## the matching tests/test_*.cpp.
-.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb
+.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb test-touch-beep-client
 
-test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb
+test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb test-touch-beep-client
+
+# G108: the touch click goes to Klipper's nebulaos_beeper (no hardware access).
+test-touch-beep-client:
+	@mkdir -p build
+	g++ -std=c++17 -Wall -Wextra -pthread -I. \
+		src/touch_beep_client.cpp tests/test_touch_beep_client.cpp \
+		-o build/test_touch_beep_client
+	./build/test_touch_beep_client
 
 # NebulaScreen rename (Run 15): device names and the legacy-config mapping.
 test-nebulascreen-paths: libhv.a
