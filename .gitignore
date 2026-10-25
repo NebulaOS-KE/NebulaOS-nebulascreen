@@ -17,3 +17,5 @@ build-mips/
 /.idea
 /.vscode
 dist/
+# Python bytecode from running the release tests (scripts/, tests/)
+__pycache__/
