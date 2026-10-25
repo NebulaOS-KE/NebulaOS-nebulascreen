@@ -282,6 +282,9 @@ class BedMeshPanel : public NotifyConsumer {
   lv_obj_t *kb;
   lv_obj_t *empty_label;   // G94: "No bed mesh yet" cover instead of empty boxes
   std::string active_profile;
+  std::string shown_profile;       // G106: active, or else the saved one shown
+  bool saved_view = false;         // showing a saved (not loaded) profile
+  lv_obj_t *saved_label = nullptr; // "Saved mesh 'default' - each print ..."
   std::vector<std::vector<double>> mesh;
   int current_view_angle;
   void *canvas_draw_buf;

@@ -286,8 +286,17 @@ BedMeshPanel::BedMeshPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_set_style_text_align(empty_text, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(empty_text, &lv_font_montserrat_14, 0);
   lv_label_set_text(empty_text,
-    "No bed mesh loaded yet.\n\nTap Calibrate, or run Calibration > Z-Offset & Bed Mesh.");
+    BEDMESH_NONE_TEXT);
   lv_obj_center(empty_text);
+  // G106: which saved mesh is shown (only when none is active)
+  saved_label = lv_label_create(cont);
+  lv_obj_add_flag(saved_label, LV_OBJ_FLAG_FLOATING);
+  lv_obj_set_width(saved_label, LV_PCT(78));
+  lv_label_set_long_mode(saved_label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_font(saved_label, &lv_font_montserrat_10, 0);
+  lv_obj_set_style_text_color(saved_label, lv_palette_lighten(LV_PALETTE_AMBER, 1), 0);
+  lv_obj_align(saved_label, LV_ALIGN_TOP_LEFT, 84, -22);  // on the title line
+  lv_obj_add_flag(saved_label, LV_OBJ_FLAG_HIDDEN);
 
   // button controls
   lv_obj_set_size(controls_cont, LV_PCT(100), LV_SIZE_CONTENT);
@@ -388,12 +397,20 @@ void BedMeshPanel::refresh_views_with_lock(json &bm) {
 
 void BedMeshPanel::refresh_views(json &bm) {
   refresh_mesh(bm);
-  // only when this update says which profile is loaded (notifications carry
-  // just the changed fields)
-  if (empty_label != nullptr && bm.is_object() && bm.contains("profile_name")) {
-    auto name = bm["/profile_name"_json_pointer];
-    bool has_mesh = name.is_string() && !name.template get<std::string>().empty()
-                    && !mesh.empty();
+  // only when this update says which profile is loaded or saved
+  // (notifications carry just the changed fields)
+  if (empty_label != nullptr && bm.is_object()
+      && (bm.contains("profile_name") || bm.contains("profiles"))) {
+    // G106 (Run 19): the active mesh, or else the saved one
+    bool has_mesh = !shown_profile.empty() && !mesh.empty();
+    if (saved_label != nullptr) {
+      if (has_mesh && saved_view) {
+        lv_label_set_text(saved_label, bedmesh_saved_notice(shown_profile).c_str());
+        lv_obj_clear_flag(saved_label, LV_OBJ_FLAG_HIDDEN);
+      } else {
+        lv_obj_add_flag(saved_label, LV_OBJ_FLAG_HIDDEN);
+      }
+    }
     if (has_mesh) {
       lv_obj_add_flag(empty_label, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -413,17 +430,36 @@ void BedMeshPanel::refresh_mesh(json &bm) {
     }
 
     active_profile = active_profile_j.template get<std::string>();
-    if (active_profile.length() > 0) {
-      save_btn.enable();
-
-      refresh_profile_info(active_profile);
-
-      auto mesh_json = bm["/probed_matrix"_json_pointer];
-      if (mesh_json.is_null()) {
-        mesh_json = State::get_instance()->get_data("/printer_state/bed_mesh/probed_matrix"_json_pointer);
+    // G106 (Run 19): Klipper never loads a saved profile at startup and Auto
+    // Calibration ends with a restart, so usually no mesh is ACTIVE while
+    // 'default' IS saved. Show the saved one (never load it: a stale mesh
+    // must not drive the nozzle - each print measures its own).
+    shown_profile = active_profile;
+    saved_view = false;
+    std::vector<std::vector<double>> saved_points;
+    if (active_profile.empty()) {
+      auto all = State::get_instance()->get_data("/printer_state/bed_mesh/profiles"_json_pointer);
+      shown_profile = bedmesh_saved_profile(all);
+      if (!shown_profile.empty()) {
+        saved_view = true;
+        saved_points = bedmesh_profile_points(all, shown_profile);
       }
+    }
+    if (shown_profile.length() > 0) {
+      if (saved_view) save_btn.disable(); else save_btn.enable();
+      lv_obj_clear_flag(mesh_table, LV_OBJ_FLAG_HIDDEN);
 
-      mesh = mesh_json.template get<std::vector<std::vector<double>>>();
+      refresh_profile_info(shown_profile);
+
+      if (saved_view) {
+        mesh = saved_points;
+      } else {
+        auto mesh_json = bm["/probed_matrix"_json_pointer];
+        if (mesh_json.is_null()) {
+          mesh_json = State::get_instance()->get_data("/printer_state/bed_mesh/probed_matrix"_json_pointer);
+        }
+        mesh = mesh_json.template get<std::vector<std::vector<double>>>();
+      }
       spdlog::debug("Loaded mesh data: {}x{} points", mesh.size(), mesh.empty() ? 0 : mesh[0].size());
 
       // Draw the 3D mesh
@@ -503,7 +539,8 @@ void BedMeshPanel::refresh_mesh(json &bm) {
       }
       lv_table_set_row_cnt(mesh_table, row_idx);
     } else {
-      // no active profile, hide mesh matrix
+      // no active and no saved profile, hide mesh matrix
+      mesh.clear();
       lv_obj_add_flag(mesh_table, LV_OBJ_FLAG_HIDDEN);
       save_btn.disable();
     }
