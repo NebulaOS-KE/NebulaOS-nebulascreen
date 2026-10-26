@@ -160,9 +160,25 @@ fusing/gaps = too high, lines translucent/flat = too low, squished and fused wit
 Those faint echoes trailing sharp corners are vibration. Input shaping cancels them.
 
 **On the screen:** Tune → Calibration → **5 Input Shaper** (the NebulaOS workflow
-`NEBULAOS_INPUT_SHAPER_CALIBRATE`). Have the accelerometer ready: the run measures X with it mounted on
-the toolhead, then asks you to move it to the bed for Y, and saves the result with one Klipper restart.
-**Cancel** stops the run.
+`NEBULAOS_INPUT_SHAPER_CALIBRATE`). Have the accelerometer ready. Everything happens on this page, with
+no popups:
+
+1. **Show graphs** (on by default, remembered): draws a graph of each axis. Off saves a little time.
+   It can only be changed between runs.
+2. Tap **Start**. The printer homes. Mount the accelerometer firmly on the toolhead and tap **Continue**.
+3. The page shows what is happening: *Shaking X: 45 Hz (5-135 Hz)*, then *Calculating the best shaper
+   for X...*, then *Drawing the X graph...*.
+4. The X result (shaper type and frequency, remaining vibrations, smoothing, the highest acceleration
+   that shaper allows) with its graph. Tap the graph to see it full screen, tap again to close.
+   Move the accelerometer firmly onto the bed and tap **Continue**.
+5. The same for Y, then the result is saved with one Klipper restart.
+6. The end page shows both results and both graphs.
+
+The graph shows the measured vibration (blue), what is left after the chosen shaper (orange) and the
+shaper itself (dashed). The latest graphs are also in Mainsail: **Machine** → config folder
+`input_shaper/` (`shaper_x.png`, `shaper_y.png`). If a graph cannot be drawn, the page says why;
+the calibration itself still finishes. **Cancel** stops the run. From the console:
+`NEBULAOS_INPUT_SHAPER_CALIBRATE GRAPHS=0` skips the graphs.
 
 **Done when:** a fast corner-test print shows no echoes. If it does, try a different shaper type.
 
@@ -177,9 +193,12 @@ look thicker or thinner than sliced, single-wall prints too fat or too thin).
 **On the screen:** Tune → Calibration → **6 E-Steps Calibration** (the NebulaOS workflow
 `NEBULAOS_ESTEPS_CALIBRATE`):
 
-1. The hotend heats. Mark the filament at the extruder entry.
+1. The hotend heats. Mark the filament at the extruder entry and tap **Start Extrusion**.
 2. The printer extrudes a fixed length.
-3. Measure how far the mark moved and type it in. The corrected `rotation_distance` is applied for you.
+3. Measure how far the mark moved and type it in.
+4. The page shows the old and the new `rotation_distance`; **Apply & Save** saves it (Klipper restarts).
+
+Every step's button is on the page itself, no popups.
 
 Repeat once to check. If the result keeps varying between runs rather than converging, that's an
 extruder hardware issue (skipping steps, loose grub screw, worn gears), not something calibration can

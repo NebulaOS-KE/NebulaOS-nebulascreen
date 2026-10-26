@@ -43,7 +43,21 @@ struct CalView {
   bool has_modes = false;
   bool show_modes = false;   // the choice is shown (the bottle flow is not running)
   bool mode_auto = false;    // the selected mode: automatic
+  // G109 (Run 20): Input Shaper only - the "Show graphs" switch (shown on the
+  // idle / end page, never while a run is active) and the graphs to show.
+  bool graph_switch = false;
+  std::vector<std::pair<std::string, std::string>> graphs;   // (label "X", png path)
 };
+
+// G109: the Input Shaper start command with the remembered graph choice.
+std::string cal_shaper_start_command(bool graphs);   // ... GRAPHS=1|0
+// One measured axis from input_shaper_axes, in short lines:
+// "X: mzv 52.4 Hz\n  vibrations 2.1 %\n  smoothing 0.061\n  max accel 7000"
+// ("" when the axis has no result).
+std::string cal_shaper_axis_line(const json &status, const char *axis);
+// Why a graph is missing: "X graph not drawn: <reason>", one line per axis
+// ("" when every graph is there or graphs were off). only_x: X only.
+std::string cal_shaper_graph_problems(const json &status, bool only_x);
 
 // G99: the load-cell mode commands and the automatic check.
 std::string cal_mode_command(bool automatic);   // NEBULAOS_LOAD_CELL_MODE MODE=auto|manual
@@ -61,6 +75,7 @@ const char *cal_status_object(CalFlow flow);
 
 // G89/G90: action prompts with this title are shown by the flow's own page
 // on the screen, not as a popup (Mainsail still shows them as prompts).
+// G109 (Run 20): also Input Shaper and E-Steps.
 bool cal_prompt_hidden_on_screen(const std::string &title);
 
 // The label of the measurement row's button ("Weigh" for the load cell).

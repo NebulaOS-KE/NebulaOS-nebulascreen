@@ -102,8 +102,10 @@ Input Shaper and E-Steps show the same step list.
 
 ## 5.-7. Input Shaper, E-Steps, Skew Correction
 
-Guided pages; see the [full calibration walkthrough](Calibration-Explained). Skew Correction is
-last because it needs a printed test part from a calibrated printer.
+Guided pages, every step's button on the page (no popups); see the
+[full calibration walkthrough](Calibration-Explained). Input Shaper shows what it is doing
+(shaking, calculating, drawing) and a graph of each axis next to its result (switch **Show graphs**).
+Skew Correction is last because it needs a printed test part from a calibrated printer.
 
 ## Load Cell Calibration (OTHER)
 

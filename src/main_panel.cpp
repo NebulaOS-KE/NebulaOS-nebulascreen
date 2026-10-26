@@ -709,6 +709,13 @@ void MainPanel::sim_tour(const char *dir) {
     s.merge_patch(extra);
     guided(CalFlow::LOAD_CELL, s);
   };
+  // G109: the tour's graphs are PNGs the caller put next to the shots
+  const std::string shot_dir = dir;
+  const json sim_axes = {
+    {"x", {{"type", "mzv"}, {"freq", 52.4}, {"vibrations", 2.1}, {"smoothing", 0.061},
+           {"max_accel", 7000.0}, {"graph", shot_dir + "/input_shaper_x.png"}, {"graph_error", ""}}},
+    {"y", {{"type", "ei"}, {"freq", 38.7}, {"vibrations", 1.0}, {"smoothing", 0.09},
+           {"max_accel", 4400.0}, {"graph", shot_dir + "/input_shaper_y.png"}, {"graph_error", ""}}}};
   SimSteps steps = {
     {"m01-home", [tab, this]() { tab(main_tab); }},
     {"m02-macros", [tab, this]() { tab(macros_tab); }},
@@ -883,7 +890,43 @@ void MainPanel::sim_tour(const char *dir) {
     {"m53-esteps-measure-keypad", [guided, cal]() {
       guided(CalFlow::ESTEPS, {{"esteps_state", "awaiting_measurement"}});
       cal().sim_guided(CalFlow::ESTEPS).sim_keypad(); }},
-    {"m54-input-shaper", [guided]() { guided(CalFlow::INPUT_SHAPER, {{"input_shaper_state", "idle"}}); }},
+    {"m54-input-shaper", [guided]() { guided(CalFlow::INPUT_SHAPER, {{"input_shaper_state", "idle"},
+                                                                  {"progress", nullptr}}); }},
+    // G109 (Run 20): live phase, result + graph, end page, full screen, E-Steps buttons
+    {"m54b-input-shaper-measuring-x", [guided, prog]() { json s = prog("input_shaper", 3, "measure_x",
+      "Measuring X", "Shaking X: 45 Hz (5-135 Hz)"); s["input_shaper_phase"] = "measuring";
+      guided(CalFlow::INPUT_SHAPER, s); }},
+    {"m54c-input-shaper-calculating-x", [guided, prog]() { json s = prog("input_shaper", 3, "measure_x",
+      "Measuring X", "Calculating the best shaper for X..."); s["input_shaper_phase"] = "calculating";
+      guided(CalFlow::INPUT_SHAPER, s); }},
+    {"m54d-input-shaper-x-result-graph", [guided, sim_axes]() { guided(CalFlow::INPUT_SHAPER, {
+      {"input_shaper_state", "awaiting_y_mount"}, {"input_shaper_phase", ""}, {"last_result", nullptr},
+      {"input_shaper_axes", {{"x", sim_axes["x"]}}},
+      {"progress", {{"flow", "input_shaper"}, {"step", 4}, {"total", 7}, {"key", "mount_y"},
+                    {"label", "Move the sensor to the bed"}, {"detail", ""}}}}); }},
+    {"m54e-input-shaper-done-graphs", [guided, sim_axes]() { guided(CalFlow::INPUT_SHAPER, {
+      {"input_shaper_state", "complete"}, {"progress", nullptr}, {"input_shaper_axes", sim_axes},
+      {"last_result", {{"flow", "input_shaper"}, {"ok", true}, {"finished_at", 1792843200.0},
+                       {"summary", {"X: mzv 52.4 Hz", "Y: ei 38.7 Hz"}}}}}); }},
+    {"m54f-input-shaper-graph-full-screen", [cal]() {
+      cal().sim_guided(CalFlow::INPUT_SHAPER).sim_open_graph(0); }},
+    {"m54g-input-shaper-graphs-off", [guided, cal]() {
+      cal().sim_guided(CalFlow::INPUT_SHAPER).sim_close_graph();
+      Config::get_instance()->set<bool>("/input_shaper_graphs", false);
+      guided(CalFlow::INPUT_SHAPER, {{"input_shaper_state", "idle"}, {"last_result", nullptr},
+                                     {"input_shaper_axes", nullptr}});
+      cal().sim_guided(CalFlow::INPUT_SHAPER).sim_sync_switch();
+      Config::get_instance()->set<bool>("/input_shaper_graphs", true); }},
+    {"m52b-esteps-start-extrusion", [guided]() { guided(CalFlow::ESTEPS, {
+      {"esteps_state", "awaiting_continue"}, {"last_result", nullptr},
+      {"progress", {{"flow", "esteps"}, {"step", 2}, {"total", 5}, {"key", "mark_filament"},
+                    {"label", "Mark the filament"}, {"detail", ""}}}}); }},
+    {"m52c-esteps-confirm", [guided]() { guided(CalFlow::ESTEPS, {
+      {"esteps_state", "awaiting_confirmation"}, {"last_result", nullptr},
+      {"esteps_old_rotation_distance", 7.53}, {"esteps_new_rotation_distance", 7.3794},
+      {"esteps_measured_length", 98.0}, {"esteps_commanded_length", 100.0},
+      {"progress", {{"flow", "esteps"}, {"step", 4}, {"total", 5}, {"key", "confirm"},
+                    {"label", "Confirm the new value"}, {"detail", ""}}}}); }},
     // printing
     {"m60-print-status", [st, this]() {
       json mock = {{"params", {{

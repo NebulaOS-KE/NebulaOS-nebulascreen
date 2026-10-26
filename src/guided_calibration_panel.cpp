@@ -1,8 +1,11 @@
 #include "settings_ui.h"
 #include "guided_calibration_panel.h"
+#include "config.h"
 #include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
+
+#include <sys/stat.h>
 
 LV_IMG_DECLARE(back);
 LV_IMG_DECLARE(load_cell_img);
@@ -175,6 +178,72 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_event_cb(kb, &GuidedCalibrationPanel::_handle_kb, LV_EVENT_ALL, this);
 
+  if (flow == CalFlow::INPUT_SHAPER) {
+    // G109 (Run 20): "Show graphs" switch + thumbnails below the step text
+    graph_sw_row = lv_obj_create(body);
+    lv_obj_set_size(graph_sw_row, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(graph_sw_row, 0, 0);
+    lv_obj_set_style_border_width(graph_sw_row, 0, 0);
+    lv_obj_set_style_bg_opa(graph_sw_row, LV_OPA_TRANSP, 0);
+    lv_obj_clear_flag(graph_sw_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(graph_sw_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(graph_sw_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(graph_sw_row, 10, 0);
+    lv_obj_t *l = lv_label_create(graph_sw_row);
+    lv_label_set_text(l, "Show graphs");
+    lv_obj_set_style_text_font(l, &lv_font_montserrat_14, 0);
+    graph_sw = lv_switch_create(graph_sw_row);
+    if (graphs_wanted()) lv_obj_add_state(graph_sw, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(graph_sw, [](lv_event_t *e) {
+      auto *self = (GuidedCalibrationPanel *)lv_event_get_user_data(e);
+      Config *conf = Config::get_instance();
+      conf->set<bool>("/input_shaper_graphs", lv_obj_has_state(self->graph_sw, LV_STATE_CHECKED));
+      conf->save();
+    }, LV_EVENT_VALUE_CHANGED, this);
+    lv_obj_add_flag(graph_sw_row, LV_OBJ_FLAG_HIDDEN);
+
+    // The graphs stand right of the text (which narrows), above the Back
+    // button, so they are seen with the result without scrolling: `body` and
+    // the graph column share one row between the title and the buttons.
+    lv_obj_t *mid = lv_obj_create(cont);
+    lv_obj_move_to_index(mid, lv_obj_get_index(body));
+    lv_obj_set_width(mid, LV_PCT(100));
+    lv_obj_set_flex_grow(mid, 1);
+    lv_obj_set_style_pad_all(mid, 0, 0);
+    lv_obj_set_style_pad_column(mid, 8, 0);
+    lv_obj_set_style_border_width(mid, 0, 0);
+    lv_obj_set_style_bg_opa(mid, LV_OPA_TRANSP, 0);
+    lv_obj_clear_flag(mid, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(mid, LV_FLEX_FLOW_ROW);
+    lv_obj_set_parent(body, mid);
+    lv_obj_set_flex_grow(body, 0);
+    lv_obj_set_height(body, LV_PCT(100));
+    graph_row = lv_obj_create(mid);
+    lv_obj_set_size(graph_row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(graph_row, 0, 0);
+    lv_obj_set_style_pad_row(graph_row, 4, 0);
+    lv_obj_set_style_border_width(graph_row, 0, 0);
+    lv_obj_set_style_bg_opa(graph_row, LV_OPA_TRANSP, 0);
+    lv_obj_clear_flag(graph_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(graph_row, LV_FLEX_FLOW_COLUMN);
+    for (int i = 0; i < kMaxGraphs; i++) {
+      graph_imgs[i] = lv_img_create(graph_row);
+      // the object takes the zoomed size (LVGL 8.3: in the default mode it
+      // keeps the PNG's size and clips the zoomed picture to a zoomed area)
+      lv_img_set_size_mode(graph_imgs[i], LV_IMG_SIZE_MODE_REAL);
+      lv_obj_add_flag(graph_imgs[i], LV_OBJ_FLAG_CLICKABLE);
+      lv_obj_add_event_cb(graph_imgs[i], [](lv_event_t *e) {
+        auto *self = (GuidedCalibrationPanel *)lv_event_get_user_data(e);
+        lv_obj_t *t = lv_event_get_current_target(e);
+        for (int k = 0; k < kMaxGraphs; k++) {
+          if (self->graph_imgs[k] == t) self->open_graph(k);
+        }
+      }, LV_EVENT_CLICKED, this);
+      lv_obj_add_flag(graph_imgs[i], LV_OBJ_FLAG_HIDDEN);
+    }
+    lv_obj_add_flag(graph_row, LV_OBJ_FLAG_HIDDEN);
+  }
+
   if (flow == CalFlow::LOAD_CELL) {
     // Run 19: Tim's load-cell icon in the free top-right corner (46 px on
     // the small screen, 64 px otherwise - the Makefile's ASSET_DIR)
@@ -192,6 +261,7 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
 
 GuidedCalibrationPanel::~GuidedCalibrationPanel() {
   ws.unregister_notify_update(this);
+  close_graph();
   if (restart_timer != nullptr) {
     lv_timer_del(restart_timer);
     restart_timer = nullptr;
@@ -264,6 +334,7 @@ void GuidedCalibrationPanel::refresh() {
     }
     show(action_btns[i], on);
   }
+  show_graphs(v);
   show(measure_row, v.needs_measurement);
   if (!cal_input_keep(v) && *lv_textarea_get_text(measure_ta) != '\0') {
     lv_textarea_set_text(measure_ta, "");   // the flow is over: a new run starts empty
@@ -275,6 +346,93 @@ void GuidedCalibrationPanel::refresh() {
     // in view next to the keypad
     lv_obj_update_layout(cont);
     lv_obj_scroll_to_view(measure_row, LV_ANIM_OFF);
+  }
+}
+
+// ---- G109 (Run 20): Input Shaper graphs ----------------------------------------
+bool GuidedCalibrationPanel::graphs_wanted() const {
+  json &v = Config::get_instance()->get_json("/input_shaper_graphs");
+  return !v.is_boolean() || v.template get<bool>();   // default: on
+}
+
+// A new run writes the PNG under the same name: the stamp (mtime + size)
+// tells the screen to drop LVGL's cached decode and load it again.
+static long long file_stamp(const std::string &path) {
+  struct stat st;
+  if (stat(path.c_str(), &st) != 0) return -1;
+  return (long long)st.st_mtime * 1000003LL + (long long)st.st_size;
+}
+
+void GuidedCalibrationPanel::show_graphs(const CalView &v) {
+  if (graph_row == nullptr) return;
+  if (v.graph_switch) lv_obj_clear_flag(graph_sw_row, LV_OBJ_FLAG_HIDDEN);
+  else lv_obj_add_flag(graph_sw_row, LV_OBJ_FLAG_HIDDEN);
+  int shown = 0;
+  for (int i = 0; i < kMaxGraphs; i++) {
+    long long stamp = i < (int)v.graphs.size() ? file_stamp(v.graphs[i].second) : -1;
+    if (stamp < 0) {
+      lv_obj_add_flag(graph_imgs[i], LV_OBJ_FLAG_HIDDEN);
+      continue;
+    }
+    std::string src = "A:" + v.graphs[i].second;
+    if (src != graph_src[i] || stamp != graph_stamp[i]) {
+      lv_img_cache_invalidate_src(src.c_str());
+      graph_src[i] = src;
+      graph_stamp[i] = stamp;
+      lv_img_set_src(graph_imgs[i], graph_src[i].c_str());
+    }
+    lv_obj_clear_flag(graph_imgs[i], LV_OBJ_FLAG_HIDDEN);
+    shown++;
+  }
+  // One graph: 46 % (220x125); two stacked: 27 % (131x74) of the 480x272
+  // PNGs - both end above the Back button. The size is refreshed after a
+  // zoom change: a stale, larger object would repeat (tile) the image.
+  const uint16_t zoom = shown > 1 ? 70 : 117;
+  const lv_coord_t w = (lv_coord_t)(kGraphW * zoom / 256);
+  for (int i = 0; i < kMaxGraphs; i++) {
+    if (lv_img_get_zoom(graph_imgs[i]) != zoom) {
+      lv_img_set_zoom(graph_imgs[i], zoom);
+      lv_obj_refresh_self_size(graph_imgs[i]);
+    }
+  }
+  if (shown > 0) {
+    lv_obj_clear_flag(graph_row, LV_OBJ_FLAG_HIDDEN);
+    // the text takes what is left of the width; during a run the result and
+    // its graph replace the step list (the result says what to do next)
+    lv_obj_update_layout(cont);
+    lv_coord_t room = lv_obj_get_content_width(lv_obj_get_parent(body)) - w - 8;
+    lv_obj_set_width(body, room);
+    if (prog_box != nullptr && v.can_cancel) lv_obj_add_flag(prog_box, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_obj_add_flag(graph_row, LV_OBJ_FLAG_HIDDEN);
+    if (lv_obj_has_flag(kb, LV_OBJ_FLAG_HIDDEN)) lv_obj_set_width(body, LV_PCT(75));
+  }
+}
+
+void GuidedCalibrationPanel::open_graph(int i) {
+  if (i < 0 || i >= kMaxGraphs || graph_src[i].empty()) return;
+  close_graph();
+  graph_full = lv_obj_create(lv_layer_top());
+  lv_obj_set_size(graph_full, LV_PCT(100), LV_PCT(100));
+  lv_obj_set_style_pad_all(graph_full, 0, 0);
+  lv_obj_set_style_border_width(graph_full, 0, 0);
+  lv_obj_set_style_radius(graph_full, 0, 0);
+  lv_obj_set_style_bg_color(graph_full, lv_color_black(), 0);
+  lv_obj_set_style_bg_opa(graph_full, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(graph_full, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(graph_full, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_t *img = lv_img_create(graph_full);
+  lv_img_set_src(img, graph_src[i].c_str());
+  lv_obj_center(img);
+  lv_obj_add_event_cb(graph_full, [](lv_event_t *e) {
+    ((GuidedCalibrationPanel *)lv_event_get_user_data(e))->close_graph();
+  }, LV_EVENT_CLICKED, this);
+}
+
+void GuidedCalibrationPanel::close_graph() {
+  if (graph_full != nullptr) {
+    lv_obj_del_async(graph_full);
+    graph_full = nullptr;
   }
 }
 
@@ -411,7 +569,10 @@ void GuidedCalibrationPanel::confirm_start() {
     bool start = lv_msgbox_get_active_btn(obj) == 1;
     lv_msgbox_close(obj);
     if (start) {
-      panel->send(cal_start_command(panel->flow), "Start failed");
+      // G109: Input Shaper starts with the remembered graph choice
+      panel->send(panel->flow == CalFlow::INPUT_SHAPER
+                    ? cal_shaper_start_command(panel->graphs_wanted())
+                    : cal_start_command(panel->flow), "Start failed");
     }
   }, LV_EVENT_VALUE_CHANGED, this);
   KUtils::style_lock_mbox(mbox, 90);
@@ -497,12 +658,14 @@ void GuidedCalibrationPanel::handle_callback(lv_event_t *e) {
   lv_obj_t *btn = lv_event_get_current_target(e);
   if (btn == back_btn.get_container()) {
     show_keypad(false);
+    close_graph();
     lv_obj_move_background(cont);
   } else if (btn == start_btn) {
     if (KUtils::is_printing()) {
       KUtils::notify_locked();
       return;
     }
+    close_graph();
     confirm_start();
   } else if (btn == cancel_btn) {
     send(cal_cancel_command(flow), "Cancel failed");

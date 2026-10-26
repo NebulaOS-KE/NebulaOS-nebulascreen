@@ -38,7 +38,79 @@ const char *cal_status_object(CalFlow flow) {
 }
 
 bool cal_prompt_hidden_on_screen(const std::string &title) {
-  return title == "Load Cell Calibration" || title == "Bed Tramming";
+  // G109: "E-Steps Calibration" and "E-Steps Calibration — Confirm"
+  return title == "Load Cell Calibration" || title == "Bed Tramming"
+         || title == "Input Shaper Calibration"
+         || title.rfind("E-Steps Calibration", 0) == 0;
+}
+
+std::string cal_shaper_start_command(bool graphs) {
+  return std::string("NEBULAOS_INPUT_SHAPER_CALIBRATE GRAPHS=") + (graphs ? "1" : "0");
+}
+
+std::string cal_shaper_axis_line(const json &status, const char *axis) {
+  if (!status.is_object() || !status.contains("input_shaper_axes")) return "";
+  const json &axes = status["input_shaper_axes"];
+  if (!axes.is_object() || !axes.contains(axis) || !axes[axis].is_object()) return "";
+  const json &a = axes[axis];
+  std::string type = str(a, "type");
+  double freq = 0;
+  if (type.empty() || !num(a, "freq", freq)) return "";
+  std::string up(axis);
+  for (auto &c : up) c = (char)std::toupper((unsigned char)c);
+  char buf[160];
+  std::snprintf(buf, sizeof(buf), "%s: %s %.1f Hz", up.c_str(), type.c_str(), freq);
+  std::string line = buf;
+  // short lines on purpose: LVGL wraps at '.', which would split 0.061
+  double vib = 0, smooth = 0, accel = 0;
+  if (num(a, "vibrations", vib)) {
+    std::snprintf(buf, sizeof(buf), "\n  vibrations %.1f %%", vib);
+    line += buf;
+  }
+  if (num(a, "smoothing", smooth)) {
+    std::snprintf(buf, sizeof(buf), "\n  smoothing %.3f", smooth);
+    line += buf;
+  }
+  if (num(a, "max_accel", accel)) {
+    std::snprintf(buf, sizeof(buf), "\n  max accel %.0f", accel);
+    line += buf;
+  }
+  return line;
+}
+
+// G109: the graphs of the measured axes that have one (X after X, both at the end)
+static std::vector<std::pair<std::string, std::string>> shaper_graphs(const json &status,
+                                                                      bool only_x) {
+  std::vector<std::pair<std::string, std::string>> out;
+  if (!status.is_object() || !status.contains("input_shaper_axes")) return out;
+  const json &axes = status["input_shaper_axes"];
+  if (!axes.is_object()) return out;
+  for (const char *axis : {"x", "y"}) {
+    if (only_x && std::string(axis) != "x") break;
+    if (!axes.contains(axis) || !axes[axis].is_object()) continue;
+    std::string png = str(axes[axis], "graph");
+    if (!png.empty()) out.push_back({std::string(1, (char)std::toupper((unsigned char)axis[0])), png});
+  }
+  return out;
+}
+
+// G109: why a graph is missing, one line per axis ("" when all are there or
+// graphs were off)
+std::string cal_shaper_graph_problems(const json &status, bool only_x) {
+  std::string t;
+  if (!status.is_object() || !status.contains("input_shaper_axes")) return t;
+  const json &axes = status["input_shaper_axes"];
+  if (!axes.is_object()) return t;
+  for (const char *axis : {"x", "y"}) {
+    if (only_x && std::string(axis) != "x") break;
+    if (!axes.contains(axis) || !axes[axis].is_object()) continue;
+    std::string err = str(axes[axis], "graph_error");
+    if (!err.empty()) {
+      t += std::string(t.empty() ? "" : "\n") + (char)std::toupper((unsigned char)axis[0])
+           + " graph not drawn: " + err;
+    }
+  }
+  return t;
 }
 
 const char *cal_input_button(CalFlow flow) {
@@ -402,23 +474,49 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
              "a finger and tap Measure, or tap Continue.";
     v.can_cancel = true;
   } else if (state == "awaiting_continue") {
-    v.text = "Mark the filament where it enters the extruder, then tap "
-             "Start Extrusion in the prompt.";
+    // G109: the step's button is on this page (no popup on the screen)
+    v.text = "The hotend is hot. Mark the filament where it enters the "
+             "extruder, then tap Start Extrusion.";
+    v.actions = {{"Start Extrusion", "_NEBULAOS_ESTEPS_CALIBRATE CONTINUE=1"}};
     v.can_cancel = true;
   } else if (state == "awaiting_measurement") {
     v.text = "Measure how far the mark moved and enter it in mm.";
     v.can_cancel = true;
     v.needs_measurement = true;
   } else if (state == "awaiting_confirmation") {
-    v.text = "Check the new value in the prompt and tap Apply & Save.";
+    double before = 0, after = 0, measured = 0, commanded = 0;
+    if (flow == CalFlow::ESTEPS && num(status, "esteps_old_rotation_distance", before)
+        && num(status, "esteps_new_rotation_distance", after)) {
+      char buf[200];
+      if (num(status, "esteps_measured_length", measured)
+          && num(status, "esteps_commanded_length", commanded)) {
+        std::snprintf(buf, sizeof(buf), "Measured %.1f mm of %.0f mm.\n", measured, commanded);
+        v.text = buf;
+      }
+      std::snprintf(buf, sizeof(buf), "rotation_distance %.4f -> %.4f\n\n", before, after);
+      v.text += buf;
+      v.text += "Apply & Save restarts Klipper.";
+    } else {
+      v.text = "Check the new value and tap Apply & Save.";
+    }
+    if (flow == CalFlow::ESTEPS) {
+      v.actions = {{"Apply & Save", "_NEBULAOS_ESTEPS_CONFIRM"}};
+    }
     v.can_cancel = true;
   } else if (state == "awaiting_x_mount") {
     v.text = "Mount the accelerometer firmly on the toolhead, then tap "
-             "Continue in the prompt.";
+             "Continue.";
+    v.actions = {{"Continue", "_NEBULAOS_INPUT_SHAPER_CALIBRATE CONTINUE=1"}};
     v.can_cancel = true;
   } else if (state == "awaiting_y_mount") {
-    v.text = "Move the accelerometer firmly onto the bed, then tap "
-             "Continue in the prompt.";
+    std::string x = cal_shaper_axis_line(status, "x");
+    std::string problem = cal_shaper_graph_problems(status, true);
+    v.text = (x.empty() ? std::string() : x + "\n")
+             + (problem.empty() ? std::string() : problem + "\n")
+             + (x.empty() && problem.empty() ? "" : "\n")
+             + "Move the accelerometer firmly onto the bed, then tap Continue.";
+    v.actions = {{"Continue", "_NEBULAOS_INPUT_SHAPER_CALIBRATE CONTINUE=1"}};
+    v.graphs = shaper_graphs(status, true);
     v.can_cancel = true;
   } else if (state == "commit_requested" || state == "restart_pending"
              || state == "verification_pending") {
@@ -491,6 +589,13 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
   std::string problem = str(status, p + "problem");
   if (flow == CalFlow::LOAD_CELL && v.can_cancel && !problem.empty()) {
     v.text = "Problem: " + problem + "\n\n" + v.text;
+  }
+  if (flow == CalFlow::INPUT_SHAPER) {
+    // G109: the switch only between runs; the last run's graphs on its end page
+    v.graph_switch = v.can_start;
+    if (state == "complete") {
+      v.graphs = shaper_graphs(status, false);
+    }
   }
   if (printing && (v.can_start || state.empty() || state == "idle"
                    || (v.show_modes && v.mode_auto))) {

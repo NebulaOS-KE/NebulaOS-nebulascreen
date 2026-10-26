@@ -24,6 +24,8 @@ class PromptPanel : public NotifyConsumer {
 
     private:
         static void on_button_click(lv_event_t *e);
+        // prompt_end, and G109: Klippy disconnected (caller holds lv_lock)
+        void close_prompt();
 
         KWebSocketClient &ws;
         lv_obj_t *prompt_cont;

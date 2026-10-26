@@ -226,7 +226,12 @@ TEST(Prompts, hidden_on_screen_for_page_flows) {
   ASSERT_TRUE(cal_prompt_hidden_on_screen("Load Cell Calibration"));
   ASSERT_TRUE(cal_prompt_hidden_on_screen("Bed Tramming"));
   ASSERT_FALSE(cal_prompt_hidden_on_screen("Load cell not calibrated"));   // the guard popup stays
-  ASSERT_FALSE(cal_prompt_hidden_on_screen("E-Steps Calibration"));
+  // G109 (Run 20): Input Shaper and E-Steps are page flows now too
+  ASSERT_TRUE(cal_prompt_hidden_on_screen("Input Shaper Calibration"));
+  ASSERT_TRUE(cal_prompt_hidden_on_screen("E-Steps Calibration"));
+  ASSERT_TRUE(cal_prompt_hidden_on_screen("E-Steps Calibration \u2014 Confirm"));
+  ASSERT_FALSE(cal_prompt_hidden_on_screen("M600 - Filament Change - UNLOAD Filament"));
+  ASSERT_FALSE(cal_prompt_hidden_on_screen("RESUME aborted !!!"));
 }
 
 TEST(BedTram, page) {
@@ -475,6 +480,105 @@ TEST(LoadCellMode, auto_calibrate_text_mentions_the_check) {
   json s = {{"auto_calibrate_state", "idle"}};
   auto v = cal_view(CalFlow::AUTO_CALIBRATE, s, false);
   ASSERT_TRUE(v.text.find("Automatic mode it checks the load cell") != std::string::npos);
+}
+
+// ---- G109 (Run 20): Input Shaper / E-Steps on the page, graphs ---------------
+static json shaper_axes() {
+  return {{"x", {{"type", "mzv"}, {"freq", 52.4}, {"vibrations", 2.1}, {"smoothing", 0.061},
+                 {"max_accel", 7000.0}, {"graph", "/cal/input_shaper_x.png"}, {"graph_error", ""}}},
+          {"y", {{"type", "ei"}, {"freq", 38.7}, {"vibrations", 1.0}, {"smoothing", 0.09},
+                 {"max_accel", 4400.0}, {"graph", ""}, {"graph_error", "took longer than 240 s"}}}};
+}
+
+TEST(G109, start_command_carries_the_graph_choice) {
+  ASSERT_EQ(cal_shaper_start_command(true), std::string("NEBULAOS_INPUT_SHAPER_CALIBRATE GRAPHS=1"));
+  ASSERT_EQ(cal_shaper_start_command(false), std::string("NEBULAOS_INPUT_SHAPER_CALIBRATE GRAPHS=0"));
+}
+
+TEST(G109, axis_line) {
+  json s = idle();
+  s["input_shaper_axes"] = shaper_axes();
+  ASSERT_EQ(cal_shaper_axis_line(s, "x"),
+            std::string("X: mzv 52.4 Hz\n  vibrations 2.1 %\n  smoothing 0.061\n  max accel 7000"));
+  ASSERT_EQ(cal_shaper_axis_line(s, "z"), std::string(""));
+  ASSERT_EQ(cal_shaper_axis_line(idle(), "x"), std::string(""));
+  json old = idle();   // only type + freq
+  old["input_shaper_axes"] = {{"x", {{"type", "zv"}, {"freq", 60.0}}}};
+  ASSERT_EQ(cal_shaper_axis_line(old, "x"), std::string("X: zv 60.0 Hz"));
+}
+
+TEST(G109, mount_steps_have_continue_on_the_page) {
+  json s = idle();
+  s["input_shaper_state"] = "awaiting_x_mount";
+  auto v = cal_view(CalFlow::INPUT_SHAPER, s, false);
+  ASSERT_EQ(v.actions.size(), (size_t)1);
+  ASSERT_EQ(v.actions[0].second, std::string("_NEBULAOS_INPUT_SHAPER_CALIBRATE CONTINUE=1"));
+  ASSERT_TRUE(v.text.find("in the prompt") == std::string::npos);
+  ASSERT_FALSE(v.graph_switch);   // locked during a run
+  ASSERT_TRUE(v.graphs.empty());
+}
+
+TEST(G109, after_x_the_result_and_its_graph) {
+  json s = idle();
+  s["input_shaper_state"] = "awaiting_y_mount";
+  s["input_shaper_axes"] = shaper_axes();
+  auto v = cal_view(CalFlow::INPUT_SHAPER, s, false);
+  ASSERT_TRUE(v.text.find("X: mzv 52.4 Hz") == 0);
+  ASSERT_TRUE(v.text.find("onto the bed") != std::string::npos);
+  ASSERT_EQ(v.graphs.size(), (size_t)1);
+  ASSERT_EQ(v.graphs[0].first, std::string("X"));
+  ASSERT_EQ(v.graphs[0].second, std::string("/cal/input_shaper_x.png"));
+  ASSERT_EQ(v.actions[0].first, std::string("Continue"));
+}
+
+TEST(G109, x_graph_problem_is_said) {
+  json s = idle();
+  s["input_shaper_state"] = "awaiting_y_mount";
+  json axes = shaper_axes();
+  axes["x"]["graph"] = "";
+  axes["x"]["graph_error"] = "ImportError: no matplotlib";
+  s["input_shaper_axes"] = axes;
+  auto v = cal_view(CalFlow::INPUT_SHAPER, s, false);
+  ASSERT_TRUE(v.graphs.empty());
+  ASSERT_TRUE(v.text.find("X graph not drawn: ImportError: no matplotlib") != std::string::npos);
+}
+
+TEST(G109, end_page_shows_both_graphs_and_the_switch) {
+  json s = idle();
+  s["input_shaper_state"] = "complete";
+  json axes = shaper_axes();
+  axes["y"]["graph"] = "/cal/input_shaper_y.png";
+  s["input_shaper_axes"] = axes;
+  auto v = cal_view(CalFlow::INPUT_SHAPER, s, false);
+  ASSERT_EQ(v.graphs.size(), (size_t)2);
+  ASSERT_EQ(v.graphs[1].first, std::string("Y"));
+  ASSERT_TRUE(v.graph_switch);
+  ASSERT_TRUE(v.can_start);
+}
+
+TEST(G109, idle_page_has_the_switch_not_while_printing) {
+  ASSERT_TRUE(cal_view(CalFlow::INPUT_SHAPER, idle(), false).graph_switch);
+  ASSERT_FALSE(cal_view(CalFlow::INPUT_SHAPER, idle(), true).graph_switch);
+  ASSERT_FALSE(cal_view(CalFlow::ESTEPS, idle(), false).graph_switch);
+}
+
+TEST(G109, esteps_steps_have_their_buttons_on_the_page) {
+  json s = idle();
+  s["esteps_state"] = "awaiting_continue";
+  auto v = cal_view(CalFlow::ESTEPS, s, false);
+  ASSERT_EQ(v.actions.size(), (size_t)1);
+  ASSERT_EQ(v.actions[0].first, std::string("Start Extrusion"));
+  ASSERT_EQ(v.actions[0].second, std::string("_NEBULAOS_ESTEPS_CALIBRATE CONTINUE=1"));
+  s["esteps_state"] = "awaiting_confirmation";
+  s["esteps_old_rotation_distance"] = 7.53;
+  s["esteps_new_rotation_distance"] = 7.38;
+  s["esteps_measured_length"] = 98.0;
+  s["esteps_commanded_length"] = 100.0;
+  v = cal_view(CalFlow::ESTEPS, s, false);
+  ASSERT_EQ(v.actions[0].second, std::string("_NEBULAOS_ESTEPS_CONFIRM"));
+  ASSERT_TRUE(v.text.find("7.5300 -> 7.3800") != std::string::npos);
+  ASSERT_TRUE(v.text.find("Measured 98.0 mm of 100 mm") != std::string::npos);
+  ASSERT_TRUE(v.can_cancel);
 }
 
 int main() {

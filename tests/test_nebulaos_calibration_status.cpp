@@ -287,6 +287,30 @@ TEST(Feedback, end_screen_after_complete) {
   ASSERT_TRUE(v.can_start);
 }
 
+TEST(Feedback, input_shaper_end_screen_details_each_axis) {
+  // G109 (Run 20): the detailed per-axis result replaces the short summary
+  utc();
+  json s = {{"input_shaper_state", "complete"}, {"progress", nullptr},
+            {"input_shaper_axes",
+             {{"x", {{"type", "mzv"}, {"freq", 52.4}, {"vibrations", 2.1}, {"smoothing", 0.061},
+                     {"max_accel", 7000.0}, {"graph", "/c/x.png"}, {"graph_error", ""}}},
+              {"y", {{"type", "ei"}, {"freq", 38.7}, {"graph", ""},
+                     {"graph_error", "took longer than 240 s"}}}}},
+            {"last_result", {{"flow", "input_shaper"}, {"ok", true}, {"finished_at", OCT24},
+                             {"summary", {"X: mzv 52.4 Hz", "Y: ei 38.7 Hz"}}}}};
+  CalView v = base(CalFlow::INPUT_SHAPER, s);
+  auto f = cal_feedback(CalFlow::INPUT_SHAPER, s, true, v);
+  ASSERT_TRUE(f.result.present);
+  ASSERT_EQ(v.text, std::string("X: mzv 52.4 Hz\n  vibrations 2.1 %\n  smoothing 0.061\n  max accel 7000\n"
+                                "Y: ei 38.7 Hz\n"
+                                "Y graph not drawn: took longer than 240 s"));
+  // older extensions (no input_shaper_axes): the summary as before
+  s.erase("input_shaper_axes");
+  v = base(CalFlow::INPUT_SHAPER, s);
+  cal_feedback(CalFlow::INPUT_SHAPER, s, true, v);
+  ASSERT_EQ(v.text, std::string("X: mzv 52.4 Hz\nY: ei 38.7 Hz"));
+}
+
 TEST(Feedback, failure_screen) {
   json s = {{"auto_calibrate_state", "error"}, {"auto_calibrate_error", "x"},
             {"last_result", {{"flow", "auto_calibrate"}, {"ok", false}, {"error_step", "Bed mesh"},

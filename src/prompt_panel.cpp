@@ -183,6 +183,26 @@ PromptPanel::PromptPanel(KWebSocketClient &websocket_client,
     "PromptPanel",
     [this](json &d) { consume(d); }
   );
+  // G109 (Run 20): a Klipper restart ends every Klipper prompt - one left
+  // open (e.g. from before a SAVE_CONFIG) would stay on the screen forever.
+  ws.register_method_callback(
+    "notify_klippy_disconnected",
+    "PromptPanel",
+    [this](json &) {
+      std::lock_guard<std::mutex> guard(lv_lock);
+      close_prompt();
+    }
+  );
+}
+
+void PromptPanel::close_prompt() {
+  hidden_prompt = false;
+  lv_label_set_text(header, "");
+  lv_label_set_text(body, "");
+  lv_obj_clean(button_cont);
+  lv_obj_clean(footer_cont);
+  lv_obj_scroll_to_y(body_cont, 0, LV_ANIM_OFF);
+  background();
 }
 
 PromptPanel::~PromptPanel() {
@@ -329,12 +349,6 @@ void PromptPanel::consume(json &j) {
     foreground();
 
   } else if (cmd == "prompt_end") {
-    hidden_prompt = false;
-    lv_label_set_text(header, "");
-    lv_label_set_text(body, "");
-    lv_obj_clean(button_cont);
-    lv_obj_clean(footer_cont);
-    lv_obj_scroll_to_y(body_cont, 0, LV_ANIM_OFF);
-    background();
+    close_prompt();
   }
 }

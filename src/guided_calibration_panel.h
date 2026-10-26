@@ -31,6 +31,13 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   void sim_weigh() { lv_event_send(measure_btn, LV_EVENT_CLICKED, NULL); }
   void sim_auto_checking(bool on) { auto_checking = on; refresh(); }
   std::string sim_input() const { return lv_textarea_get_text(measure_ta); }
+  void sim_open_graph(int i) { open_graph(i); }
+  void sim_close_graph() { close_graph(); }
+  void sim_sync_switch() {
+    if (graph_sw == nullptr) return;
+    if (graphs_wanted()) lv_obj_add_state(graph_sw, LV_STATE_CHECKED);
+    else lv_obj_clear_state(graph_sw, LV_STATE_CHECKED);
+  }
 #endif
 
   static void _handle_callback(lv_event_t *e) {
@@ -51,6 +58,11 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   void select_mode(bool automatic);
   void run_auto_check();
   void show_keypad(bool on);
+  // G109 (Run 20): Input Shaper graphs
+  bool graphs_wanted() const;
+  void show_graphs(const CalView &v);
+  void open_graph(int i);
+  void close_graph();
 
   KWebSocketClient &ws;
   CalFlow flow;
@@ -96,6 +108,18 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   bool was_active = false;
   lv_obj_t *kb;
   ButtonContainer back_btn;
+  // G109 (Run 20), Input Shaper only: the "Show graphs" switch (remembered in
+  // the screen config, /input_shaper_graphs, default on; hidden during a run),
+  // a thumbnail per measured axis (tap = full screen, tap again = close).
+  lv_obj_t *graph_sw_row = nullptr;
+  lv_obj_t *graph_sw = nullptr;
+  lv_obj_t *graph_row = nullptr;
+  static constexpr int kMaxGraphs = 2;
+  static constexpr lv_coord_t kGraphW = 480, kGraphH = 272;   // the extension's screen PNG
+  lv_obj_t *graph_imgs[kMaxGraphs] = {};
+  std::string graph_src[kMaxGraphs];     // "A:<path>" shown in each slot
+  long long graph_stamp[kMaxGraphs] = {}; // mtime+size of the shown file
+  lv_obj_t *graph_full = nullptr;        // full-screen view on the top layer
 };
 
 #endif // __GUIDED_CALIBRATION_PANEL_H__

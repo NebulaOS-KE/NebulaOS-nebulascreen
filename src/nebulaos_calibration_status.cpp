@@ -306,6 +306,19 @@ CalFeedback cal_feedback(CalFlow flow, const json &status, bool klippy_ready, Ca
   if (state == "running" || state == "cancelled" || state.rfind("awaiting_", 0) == 0) return f;
   CalResultView r = cal_result_view(flow, status);
   if (!r.present) return f;
+  if (flow == CalFlow::INPUT_SHAPER && r.ok) {
+    // G109: the detailed result of each axis (+ why a graph is missing)
+    std::vector<std::string> lines;
+    for (const char *axis : {"x", "y"}) {
+      std::string l = cal_shaper_axis_line(status, axis);
+      if (!l.empty()) lines.push_back(l);
+    }
+    if (!lines.empty()) {
+      std::string problems = cal_shaper_graph_problems(status, false);
+      if (!problems.empty()) lines.push_back(problems);
+      r.lines = lines;
+    }
+  }
   f.result = r;
   std::string t;
   for (auto &l : r.lines) t += (t.empty() ? "" : "\n") + l;
