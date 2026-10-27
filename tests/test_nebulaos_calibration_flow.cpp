@@ -531,6 +531,49 @@ TEST(G109, after_x_the_result_and_its_graph) {
   ASSERT_EQ(v.actions[0].first, std::string("Continue"));
 }
 
+TEST(G118, measuring_shows_the_live_view_not_the_mount_step) {
+  // the state stays awaiting_*_mount while the axis is measured
+  struct { const char *state, *stage, *phase; } cases[] = {
+    {"awaiting_x_mount", "measure_x", "measuring"},
+    {"awaiting_x_mount", "measure_x", "calculating"},
+    {"awaiting_x_mount", "measure_x", "graph"},
+    {"awaiting_x_mount", "measure_x", ""},
+    {"awaiting_y_mount", "measure_y", "measuring"},
+    {"awaiting_y_mount", "measure_y", ""},
+    {"awaiting_y_mount", "final_validation", ""},
+    {"awaiting_y_mount", "commit", ""},
+  };
+  for (auto &c : cases) {
+    json s = idle();
+    s["input_shaper_state"] = c.state;
+    s["input_shaper_stage"] = c.stage;
+    s["input_shaper_phase"] = c.phase;
+    s["input_shaper_axes"] = shaper_axes();
+    auto v = cal_view(CalFlow::INPUT_SHAPER, s, false);
+    ASSERT_EQ(v.text, std::string(""));
+    ASSERT_TRUE(v.actions.empty());
+    ASSERT_TRUE(v.graphs.empty());
+    ASSERT_FALSE(v.can_cancel);
+    ASSERT_FALSE(v.can_start);
+  }
+}
+
+TEST(G118, waiting_for_the_mount_keeps_continue) {
+  json s = idle();
+  s["input_shaper_state"] = "awaiting_x_mount";
+  s["input_shaper_stage"] = "home";
+  s["input_shaper_phase"] = "";
+  ASSERT_EQ(cal_view(CalFlow::INPUT_SHAPER, s, false).actions.size(), (size_t)1);
+  // X is done (its stage stays measure_x) and Y waits for the sensor
+  s["input_shaper_state"] = "awaiting_y_mount";
+  s["input_shaper_stage"] = "measure_x";
+  s["input_shaper_axes"] = shaper_axes();
+  auto v = cal_view(CalFlow::INPUT_SHAPER, s, false);
+  ASSERT_EQ(v.actions.size(), (size_t)1);
+  ASSERT_TRUE(v.can_cancel);
+  ASSERT_EQ(v.graphs.size(), (size_t)1);
+}
+
 TEST(G109, x_graph_problem_is_said) {
   json s = idle();
   s["input_shaper_state"] = "awaiting_y_mount";

@@ -895,15 +895,22 @@ void MainPanel::sim_tour(const char *dir) {
     // G109 (Run 20): live phase, result + graph, end page, full screen, E-Steps buttons
     {"m54b-input-shaper-measuring-x", [guided, prog]() { json s = prog("input_shaper", 3, "measure_x",
       "Measuring X", "Shaking X: 45 Hz (5-135 Hz)"); s["input_shaper_phase"] = "measuring";
+      s["input_shaper_state"] = "awaiting_x_mount";   // G118: the real state
       guided(CalFlow::INPUT_SHAPER, s); }},
     {"m54c-input-shaper-calculating-x", [guided, prog]() { json s = prog("input_shaper", 3, "measure_x",
       "Measuring X", "Calculating the best shaper for X..."); s["input_shaper_phase"] = "calculating";
+      s["input_shaper_state"] = "awaiting_x_mount";   // G118: the real state
       guided(CalFlow::INPUT_SHAPER, s); }},
     {"m54d-input-shaper-x-result-graph", [guided, sim_axes]() { guided(CalFlow::INPUT_SHAPER, {
       {"input_shaper_state", "awaiting_y_mount"}, {"input_shaper_phase", ""}, {"last_result", nullptr},
       {"input_shaper_axes", {{"x", sim_axes["x"]}}},
       {"progress", {{"flow", "input_shaper"}, {"step", 4}, {"total", 7}, {"key", "mount_y"},
                     {"label", "Move the sensor to the bed"}, {"detail", ""}}}}); }},
+    // G118: Y is measured while the state is still awaiting_y_mount
+    {"m54h-input-shaper-measuring-y", [guided, prog, sim_axes]() { json s = prog("input_shaper", 5,
+      "measure_y", "Measuring Y", "Shaking Y: 80 Hz (5-135 Hz)"); s["input_shaper_phase"] = "measuring";
+      s["input_shaper_state"] = "awaiting_y_mount"; s["input_shaper_axes"] = {{"x", sim_axes["x"]}};
+      guided(CalFlow::INPUT_SHAPER, s); }},
     {"m54e-input-shaper-done-graphs", [guided, sim_axes]() { guided(CalFlow::INPUT_SHAPER, {
       {"input_shaper_state", "complete"}, {"progress", nullptr}, {"input_shaper_axes", sim_axes},
       {"last_result", {{"flow", "input_shaper"}, {"ok", true}, {"finished_at", 1792843200.0},

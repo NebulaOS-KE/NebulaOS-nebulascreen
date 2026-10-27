@@ -417,6 +417,21 @@ void cal_auto_check_running(CalView &v) {
   v.can_start = false;
 }
 
+// G118: the extensions keep input_shaper_state at awaiting_x_mount /
+// awaiting_y_mount while that axis is measured (only stage / phase move on),
+// so the mount step's text and Continue must not show then.
+static bool shaper_measuring(const json &status, const std::string &state,
+                             const std::string &stage) {
+  std::string phase = str(status, "input_shaper_phase");
+  if (phase == "measuring" || phase == "calculating" || phase == "graph") return true;
+  if (state == "awaiting_x_mount") return stage == "measure_x";
+  if (state == "awaiting_y_mount") {
+    return stage == "measure_y" || stage == "final_validation" || stage == "commit"
+           || stage == "restart";
+  }
+  return false;
+}
+
 CalView cal_view(CalFlow flow, const json &status, bool printing) {
   CalView v;
   switch (flow) {
@@ -503,6 +518,10 @@ CalView cal_view(CalFlow flow, const json &status, bool printing) {
       v.actions = {{"Apply & Save", "_NEBULAOS_ESTEPS_CONFIRM"}};
     }
     v.can_cancel = true;
+  } else if (flow == CalFlow::INPUT_SHAPER && shaper_measuring(status, state, stage)) {
+    // the step list shows the live phase; a running SHAPER_CALIBRATE cannot
+    // be interrupted, so no Cancel either
+    v.text = "";
   } else if (state == "awaiting_x_mount") {
     v.text = "Mount the accelerometer firmly on the toolhead, then tap "
              "Continue.";
