@@ -177,8 +177,8 @@ no popups:
 The graph shows the measured vibration (blue), what is left after the chosen shaper (orange) and the
 shaper itself (dashed). The latest graphs are also in Mainsail: **Machine** → config folder
 `input_shaper/` (`shaper_x.png`, `shaper_y.png`). If a graph cannot be drawn, the page says why;
-the calibration itself still finishes. **Cancel** stops the run. From the console:
-`NEBULAOS_INPUT_SHAPER_CALIBRATE GRAPHS=0` skips the graphs.
+the calibration itself still finishes. **Cancel** stops the run. From Mainsail or the console
+the run draws no graphs; `NEBULAOS_INPUT_SHAPER_CALIBRATE GRAPHS=1` draws them.
 
 **Done when:** a fast corner-test print shows no echoes. If it does, try a different shaper type.
 
