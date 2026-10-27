@@ -81,6 +81,7 @@ struct UsbImage {
 };
 struct BootLogoList {
   std::vector<std::string> names;   // uploads, in dropdown order after "NebulaOS"
+  std::vector<bool> shipped;        // G116: per name - comes with NebulaOS, no Delete
   std::string options;              // "NebulaOS\nlogo.png\n..."
   int active = 0;                   // dropdown index of what is set now
   std::vector<UsbImage> usb;

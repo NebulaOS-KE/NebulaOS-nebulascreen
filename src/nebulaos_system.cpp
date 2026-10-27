@@ -292,6 +292,8 @@ BootLogoList boot_logo_list(const json &images_reply) {
       std::string n = str_at(i, "/name"_json_pointer);
       if (n.empty()) continue;
       l.names.push_back(n);
+      l.shipped.push_back(i.contains("shipped") && i["shipped"].is_boolean()
+                          && i["shipped"].get<bool>());
       l.options += "\n" + n;
     }
   }

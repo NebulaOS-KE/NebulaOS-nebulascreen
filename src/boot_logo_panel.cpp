@@ -98,7 +98,9 @@ void BootLogoPanel::show_preview() {
   uint16_t idx = lv_dropdown_get_selected(logo_dd);
   bool active = (int)idx == list.active;
   lv_label_set_text(preview_note, active ? "Active now." : "Not applied yet - tap Apply.");
-  if (name.empty()) lv_obj_add_state(delete_btn, LV_STATE_DISABLED);
+  // G116: the logos that come with NebulaOS cannot be deleted
+  if (name.empty() || (idx >= 1 && idx <= list.shipped.size() && list.shipped[idx - 1]))
+    lv_obj_add_state(delete_btn, LV_STATE_DISABLED);
   else lv_obj_clear_state(delete_btn, LV_STATE_DISABLED);
   json params = {{"filename", name}};
   ws.send_jsonrpc(BOOT_DISPLAY_PREVIEW_METHOD, params, [this, name](json &reply) {

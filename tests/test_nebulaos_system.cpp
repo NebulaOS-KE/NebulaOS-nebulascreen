@@ -167,6 +167,17 @@ TEST(BootLogo, page_list) {
   ASSERT_EQ(boot_logo_preview_src(json()), std::string(""));
 }
 
+TEST(BootLogo, shipped_logos_have_no_delete) {
+  // G116: osconfig marks the logos that come with NebulaOS
+  json r = json::parse(R"({"result":{"images":[{"name":"NebulaOS Deep Space.jpg","size":1,"shipped":true},
+    {"name":"mine.png","size":2}],"selected":""}})");
+  auto l = boot_logo_list(r);
+  ASSERT_EQ(l.options, std::string("NebulaOS\nNebulaOS Deep Space.jpg\nmine.png"));
+  ASSERT_EQ(l.shipped.size(), (size_t)2);
+  ASSERT_TRUE(l.shipped[0]);
+  ASSERT_FALSE(l.shipped[1]);
+}
+
 TEST(Logs, level_and_save) {
   ASSERT_EQ(std::string(LOG_LEVEL_OPTIONS), std::string("Info\nWarning\nDebug"));
   ASSERT_EQ(log_level_at(1), std::string("warning"));
