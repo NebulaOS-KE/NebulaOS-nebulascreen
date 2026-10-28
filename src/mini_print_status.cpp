@@ -1,24 +1,11 @@
 #include "mini_print_status.h"
 #include "utils.h"
+#include "print_estimate.h"
 #include "spdlog/spdlog.h"
 
 #ifdef SIMULATOR
 LV_IMG_DECLARE(print);  // stand-in preview for the sim (no gcode thumbnail there)
 #endif
-
-// remaining seconds -> hh:mm:ss, dropping the hours field when it's zero
-static std::string fmt_hms(int64_t s) {
-  if (s < 0) {
-    s = 0;
-  }
-  int h = (int)(s / 3600);
-  int m = (int)((s % 3600) / 60);
-  int sec = (int)(s % 60);
-  if (h > 0) {
-    return fmt::format("{}:{:02d}:{:02d}", h, m, sec);
-  }
-  return fmt::format("{:02d}:{:02d}", m, sec);
-}
 
 MiniPrintStatus::MiniPrintStatus(lv_obj_t *parent,
 				 lv_event_cb_t cb,
@@ -169,7 +156,7 @@ lv_obj_t *MiniPrintStatus::get_chip() {
 }
 
 void MiniPrintStatus::update_eta(int64_t eta_secs) {
-  eta = fmt_hms(eta_secs);
+  eta = format_duration(static_cast<double>(eta_secs < 0 ? 0 : eta_secs));  // like Mainsail
   render();
 }
 

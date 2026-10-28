@@ -9,6 +9,7 @@
 #include "zoffset_panel.h"
 #include "exclude_object_panel.h"
 #include "mini_print_status.h"
+#include "print_estimate.h"
 #include "lvgl/lvgl.h"
 
 #include <mutex>
@@ -37,7 +38,7 @@ class PrintStatusPanel : public NotifyConsumer {
 
   void consume(json &j);
   void show_completion(const std::string &state);  // print finished -> result + stats + Done
-  void update_time_progress(uint32_t time_passed);
+  void update_time_progress();
   void update_flow_rate(double filament_used);
   void update_layers(json &info);
   int max_layer(json &info);
@@ -101,15 +102,15 @@ class PrintStatusPanel : public NotifyConsumer {
   ImageLabel time_left;
   /* ImageLabel fan2; */
 
-  /* json &metadata; */
-  uint32_t estimated_time_s;
-
-  // Latest virtual_sdcard/progress value (0.0 .. 1.0) and print_stats/filament_used
-  // (mm). update_time_progress averages the file-, filament- and slicer-based
-  // remaining-time estimates the same way Mainsail does, instead of relying on the
-  // slicer's static estimate alone (#126).
-  double current_progress = 0.0;
-  double current_filament_used = 0.0;
+  // Run 21 (Tim): progress and time left exactly like Mainsail - the inputs
+  // Mainsail's getters read (kept from the status deltas: this panel sees a
+  // notification before State does) and Mainsail's own settings (Moonraker
+  // database, namespace "mainsail", key "general"). See print_estimate.h.
+  PrintEstimateInput est_in;
+  PrintEstimateSettings est_settings;
+  void absorb_estimate_fields(const json &status);
+  void fetch_estimate_settings();
+  void update_progress_display();
   // Tracks the previous /printer_state/print_stats/state so we can dismiss the
   // panel only when we transition out of an active print (#94).
   std::string last_print_state;

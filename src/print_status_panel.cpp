@@ -4,6 +4,8 @@
 #include "utils.h"
 #include "spdlog/spdlog.h"
 
+#include <cmath>
+
 
 LV_IMG_DECLARE(extruder);
 LV_IMG_DECLARE(speed_up_img);
@@ -64,9 +66,8 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   , flow_rate(detail_cont, &extrude, 100, "0.0 mm3/s")
   , layers(detail_cont, &layers_img, 100, "...")
   , fan0(detail_cont, &fan, 100, "0%")
-  , elapsed(detail_cont, &clock_img, 100, "0s")
-  , time_left(detail_cont, &hourglass, 100, "...")
-  , estimated_time_s(0)
+  , elapsed(detail_cont, &clock_img, 100, "0:00:00")
+  , time_left(detail_cont, &hourglass, 100, "--")
   , filament_diameter(1.75) // XXX: check config
   , extruder_target(-1)
   , heater_bed_target(-1)
@@ -258,11 +259,11 @@ void PrintStatusPanel::reset() {
   lv_label_set_text(progress_label, "0%");
   print_speed.update_label("0 mm/s");
   flow_rate.update_label("0.0 mm3/s");
-  elapsed.update_label("0s");
-  time_left.update_label("...");
-  estimated_time_s = 0;
-  current_progress = 0.0;
-  current_filament_used = 0.0;
+  elapsed.update_label("0:00:00");
+  time_left.update_label("--");
+  est_in = PrintEstimateInput();
+  current_file = json();
+  fetch_estimate_settings();
   lv_label_set_text(filename_label, "");
 
   auto v = State::get_instance()
@@ -352,17 +353,11 @@ void PrintStatusPanel::populate() {
     lv_obj_clear_flag(pause_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   }
 
-  // progress percentage
-  auto v = s->get_data("/printer_state/virtual_sdcard/progress"_json_pointer);
-  if (!v.is_null()) {
-    current_progress = v.template get<double>();
-    int new_value = static_cast<int>(current_progress * 100);
-    lv_bar_set_value(progress_bar, new_value, LV_ANIM_ON);
-    lv_label_set_text(progress_label, fmt::format("{}%", new_value).c_str());
-    mini_print_status.update_progress(new_value);
-  }
+  // progress percentage (Mainsail's calculation)
+  absorb_estimate_fields(s->get_data("/printer_state"_json_pointer));
+  update_progress_display();
 
-  v = s->get_data(
+  auto v = s->get_data(
       "/printer_state/gcode_move/homing_origin/2"_json_pointer);
   if (!v.is_null()) {
     z_offset.update_label(fmt::format("{:.5} mm", v.template get<double>()).c_str());
@@ -387,22 +382,23 @@ void PrintStatusPanel::populate() {
 }
 
 void PrintStatusPanel::handle_metadata(const std::string &gcode_file, json &j) {
-  auto eta = j["/result/estimated_time"_json_pointer];
-  if (!eta.is_null()) {
-    estimated_time_s = static_cast<uint32_t>(eta.template get<float>());
-    spdlog::trace("updated eta {}", estimated_time_s);
-
-    json v = State::get_instance()->get_data("/printer_state/print_stats/print_duration"_json_pointer);
-    if (!v.is_null()) {
-      uint32_t passed = static_cast<uint32_t>(v.template get<float>());
-      spdlog::trace("updated time progress in handle metadata, passed {}", passed);
-
-      std::lock_guard<std::mutex> lock(lv_lock);
-      update_time_progress(passed);
-    }
-  }
-
   current_file = j["/result"_json_pointer];
+  {
+    // the file's own facts Mainsail's progress/estimates use
+    auto num = [this](const char *key, double &out) {
+      auto v = current_file.is_object() ? current_file.find(key) : current_file.end();
+      bool ok = current_file.is_object() && v != current_file.end() && v->is_number();
+      out = ok ? v->template get<double>() : 0.0;
+      return ok;
+    };
+    est_in.file_filename = gcode_file;
+    num("gcode_start_byte", est_in.gcode_start_byte);
+    num("gcode_end_byte", est_in.gcode_end_byte);
+    est_in.have_filament_total = num("filament_total", est_in.filament_total);
+    std::lock_guard<std::mutex> lock(lv_lock);
+    update_progress_display();
+    update_time_progress();
+  }
 
   auto thumb_detail = KUtils::get_thumbnail(gcode_file, j);
   std::string fullpath = thumb_detail.first;
@@ -491,16 +487,9 @@ void PrintStatusPanel::consume(json &j) {
     lv_label_set_text(filename_label, printfile.template get<std::string>().c_str());
   }
 
-  // Track virtual_sdcard progress and filament usage so update_time_progress
-  // can average the file-, filament- and slicer-based ETAs like Mainsail (#126).
-  auto progress = j["/params/0/virtual_sdcard/progress"_json_pointer];
-  if (!progress.is_null()) {
-    current_progress = progress.template get<double>();
-  }
-
-  auto fil_used = j["/params/0/print_stats/filament_used"_json_pointer];
-  if (!fil_used.is_null()) {
-    current_filament_used = fil_used.template get<double>();
+  // the inputs of Mainsail's progress / time-left calculation
+  if (j.contains("params") && j["params"].is_array() && !j["params"].empty()) {
+    absorb_estimate_fields(j["params"][0]);
   }
 
   auto v = j["/params/0/extruder/target"_json_pointer];
@@ -596,20 +585,12 @@ void PrintStatusPanel::consume(json &j) {
 
   fan0.update_label(fmt::format("{}", fmt::join(values, ", ")).c_str());
 
-  // progress
-  v = j["/params/0/print_stats/print_duration"_json_pointer];
-  if (!v.is_null()) {
-    uint32_t passed = static_cast<uint32_t>(v.template get<float>());
-    update_time_progress(passed);
-  }
-
-  // progress percentage
-  v = j["/params/0/virtual_sdcard/progress"_json_pointer];
-  if (!v.is_null()) {
-    int new_value = static_cast<int>(v.template get<double>() * 100);
-    lv_bar_set_value(progress_bar, new_value, LV_ANIM_ON);
-    lv_label_set_text(progress_label, fmt::format("{}%", new_value).c_str());
-    mini_print_status.update_progress(new_value);
+  // progress percentage and times (Mainsail's calculation)
+  if (!j["/params/0/print_stats"_json_pointer].is_null()
+      || !j["/params/0/virtual_sdcard"_json_pointer].is_null()
+      || !j["/params/0/display_status"_json_pointer].is_null()) {
+    update_progress_display();
+    update_time_progress();
   }
 
   v = j["/params/0/motion_report/live_extruder_velocity"_json_pointer];
@@ -725,49 +706,63 @@ void PrintStatusPanel::handle_callback(lv_event_t *event) {
   }
 }
 
-void PrintStatusPanel::update_time_progress(uint32_t time_passed) {
-    // Average the available remaining-time estimates the way Mainsail does: each
-    // method (file, filament, slicer) contributes only when it yields a positive
-    // value, and the displayed ETA is their unweighted mean (#126). This tracks
-    // Mainsail's ETA, which stays accurate when a print over/under-runs the
-    // slicer's static guess.
-    double total = 0.0;
-    int count = 0;
+void PrintStatusPanel::update_time_progress() {
+  // Mainsail's "Estimate" (time left) and print time, same values, same format.
+  double left = print_time_left(est_in, est_settings);
+  if (left > 0) {
+    time_left.update_label(format_duration(left).c_str());
+    mini_print_status.update_eta(static_cast<int64_t>(left));
+  } else {
+    time_left.update_label("--");
+  }
+  elapsed.update_label(format_duration(est_in.print_duration).c_str());
+}
 
-    // file: extrapolate elapsed time over the virtual_sdcard progress fraction.
-    if (current_progress > 0.0 && time_passed > 0) {
-      double file_remaining = time_passed / current_progress - time_passed;
-      if (file_remaining > 0.0) { total += file_remaining; ++count; }
-    }
+void PrintStatusPanel::update_progress_display() {
+  // Mainsail: Math.floor(getPrintPercent * 100)
+  int pct = static_cast<int>(std::floor(print_percent(est_in, est_settings) * 100));
+  lv_bar_set_value(progress_bar, pct, LV_ANIM_ON);
+  lv_label_set_text(progress_label, fmt::format("{}%", pct).c_str());
+  mini_print_status.update_progress(pct);
+}
 
-    // filament: extrapolate elapsed time over the consumed/total filament ratio.
-    double filament_total = 0.0;
-    if (!current_file.is_null()) {
-      auto ft = current_file["/filament_total"_json_pointer];
-      if (!ft.is_null()) filament_total = ft.template get<double>();
-    }
-    if (current_filament_used > 0.0 && filament_total > current_filament_used
-        && time_passed > 0) {
-      double filament_remaining =
-        time_passed / (current_filament_used / filament_total) - time_passed;
-      if (filament_remaining > 0.0) { total += filament_remaining; ++count; }
-    }
+void PrintStatusPanel::absorb_estimate_fields(const json &st) {
+  if (!st.is_object()) {
+    return;
+  }
+  auto num = [](const json &obj, const char *key, double &out) {
+    auto v = obj.find(key);
+    if (v != obj.end() && v->is_number()) out = v->template get<double>();
+  };
+  auto ps = st.find("print_stats");
+  if (ps != st.end() && ps->is_object()) {
+    num(*ps, "print_duration", est_in.print_duration);
+    num(*ps, "filament_used", est_in.filament_used);
+    auto fn = ps->find("filename");
+    if (fn != ps->end() && fn->is_string()) est_in.print_filename = fn->template get<std::string>();
+  }
+  auto sd = st.find("virtual_sdcard");
+  if (sd != st.end() && sd->is_object()) {
+    num(*sd, "file_position", est_in.file_position);
+    num(*sd, "progress", est_in.sd_progress);
+  }
+  auto ds = st.find("display_status");
+  if (ds != st.end() && ds->is_object()) {
+    num(*ds, "progress", est_in.slicer_progress);
+  }
+}
 
-    // slicer: the static estimate from the gcode metadata.
-    if (estimated_time_s > 0) {
-      double slicer_remaining = static_cast<double>(estimated_time_s) - time_passed;
-      if (slicer_remaining > 0.0) { total += slicer_remaining; ++count; }
-    }
-
-    if (count > 0) {
-      int64_t eta_secs = static_cast<int64_t>(total / count);
-      time_left.update_label(KUtils::eta_string(eta_secs).c_str());
-      mini_print_status.update_eta(eta_secs);
-    } else {
-      time_left.update_label("...");
-    }
-
-    elapsed.update_label(KUtils::eta_string(time_passed).c_str());
+void PrintStatusPanel::fetch_estimate_settings() {
+  // Mainsail keeps its gui.general settings in Moonraker's database; a printer
+  // where they were never changed has none (Mainsail's defaults apply).
+  json q = {{"namespace", "mainsail"}, {"key", "general"}};
+  ws.send_jsonrpc("server.database.get_item", q, [this](json &d) {
+    auto v = d["/result/value"_json_pointer];
+    std::lock_guard<std::mutex> lock(lv_lock);
+    est_settings = print_estimate_settings(v);
+    update_progress_display();
+    update_time_progress();
+  });
 }
 
 void PrintStatusPanel::update_layers(json &info) {
@@ -876,22 +871,20 @@ void PrintStatusPanel::sim_setup_mock_data() {
   }}}};
   State::get_instance()->consume(mock);
   // consume() will reset() + populate() + foreground() because filename is
-  // present, then drive update_time_progress(600) with current_progress=0.20.
+  // present, then drive update_time_progress() with progress 0.20.
   consume(mock);
 
-  // reset() (inside consume) cleared the slicer estimate and metadata, so only
-  // the file method had data above. Inject a slicer estimate + filament total
-  // the way handle_metadata would, then recompute so the displayed ETA shows
-  // the full Mainsail-style average of all three methods (#126):
+  // reset() (inside consume) cleared the metadata; inject a filament total
+  // the way handle_metadata would and recompute (Mainsail's calculation):
   //   file     = 600/0.20            - 600 = 2400 s
-  //   filament = 600/(1234.5/5000.0) - 600 ≈ 1831 s
-  //   slicer   = 3000                - 600 = 2400 s
-  //   mean ≈ 2210 s ≈ 36m50s remaining.
-  estimated_time_s = 3000;
+  //   filament = 600/(1234.5/5000.0) - 600 = 1830 s (rounded)
+  //   mean = 2115 s -> "0:35:15" left.
   current_file = {{"filament_total", 5000.0}};
+  est_in.filament_total = 5000.0;
+  est_in.have_filament_total = true;
   {
     std::lock_guard<std::mutex> lock(lv_lock);
-    update_time_progress(600);
+    update_time_progress();
     mini_print_status.sim_thumb();  // placeholder preview for the home overlay
   }
 

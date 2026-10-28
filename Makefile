@@ -114,9 +114,9 @@ wpaclient:
 ## cross-compile: these always build with the plain host g++ regardless of CROSS_COMPILE,
 ## since they're meant to run right here, not on the printer. See tests/minitest.h and
 ## the matching tests/test_*.cpp.
-.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb test-touch-beep-client
+.PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb test-touch-beep-client test-print-estimate
 
-test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb test-touch-beep-client
+test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb test-touch-beep-client test-print-estimate
 
 # G108: the touch click goes to Klipper's nebulaos_beeper (no hardware access).
 test-touch-beep-client:
@@ -159,6 +159,13 @@ test-nebulaos-display: libhv.a
 		src/nebulaos_display.cpp tests/test_nebulaos_display.cpp \
 		-o build/test_nebulaos_display
 	./build/test_nebulaos_display
+
+# Run 21: print progress and time left exactly like Mainsail (src/print_estimate.cpp).
+test-print-estimate: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		src/print_estimate.cpp tests/test_print_estimate.cpp \
+		-o build/test_print_estimate
+	./build/test_print_estimate
 
 # NebulaOS network contract helpers for the static IP panel (src/nebulaos_network.cpp).
 test-nebulaos-network: libhv.a
