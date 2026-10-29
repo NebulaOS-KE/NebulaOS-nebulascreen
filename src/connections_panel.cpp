@@ -15,6 +15,7 @@ ConnectionsPanel::ConnectionsPanel(KWebSocketClient &c, std::mutex &lock, Spoolm
   , spoolman_panel(sm)
   , wifi_panel(c, lock)
   , hostname_panel(c, lock)
+  , spoolman_server_panel(c, lock)
   , cont(SettingsUi::page("Connections", &body))
   , back_btn(cont, &back, "Back", &ConnectionsPanel::_handle_callback, this)
 {
@@ -45,7 +46,7 @@ ConnectionsPanel::ConnectionsPanel(KWebSocketClient &c, std::mutex &lock, Spoolm
                                          &ConnectionsPanel::_handle_callback, this);
   spoolman_btn = SettingsUi::icon_button(right, &spoolman_img, "Spoolman",
                                          &ConnectionsPanel::_handle_callback, this);
-  lv_obj_add_state(spoolman_btn, LV_STATE_DISABLED);
+  // G125: always on - it is where the server is set, not the spool list
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
   SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
@@ -59,7 +60,7 @@ ConnectionsPanel::~ConnectionsPanel() {
 }
 
 void ConnectionsPanel::enable_spoolman() {
-  lv_obj_clear_state(spoolman_btn, LV_STATE_DISABLED);
+  // G125: the Spoolman button sets the server, so it is never disabled.
 }
 
 void ConnectionsPanel::foreground() {
@@ -122,6 +123,6 @@ void ConnectionsPanel::handle_callback(lv_event_t *e) {
   } else if (obj == printers_btn) {
     printer_select_panel.foreground();
   } else if (obj == spoolman_btn) {
-    spoolman_panel.foreground();
+    spoolman_server_panel.foreground();
   }
 }

@@ -357,6 +357,45 @@ TEST(Mcu, version_shown_and_warned) {
   ASSERT_TRUE(mcu_confirm_text(m.files[1]).find("Built from Klipper v0.13.0-1-gdead.") != std::string::npos);
 }
 
+// -- G125: Spoolman server -------------------------------------------------------
+
+TEST(Spoolman, check_accepts_ip_and_host_name) {
+  auto c = spoolman_check(" 192.168.0.20 ", "7912");
+  ASSERT_TRUE(c.ok);
+  ASSERT_EQ(c.host, std::string("192.168.0.20"));
+  ASSERT_EQ(c.port, 7912);
+  ASSERT_TRUE(spoolman_check("spoolman.local", "80").ok);
+  ASSERT_TRUE(spoolman_check("my-nas", "65535").ok);
+}
+
+TEST(Spoolman, check_refuses_what_the_printer_refuses) {
+  for (auto &h : {"", "a b", "x;reboot", "-x", "a..b", "http://10.0.0.5"}) {
+    ASSERT_FALSE(spoolman_check(h, "7912").ok);
+  }
+  for (auto &p : {"", "0", "65536", "abc", "123456", "-1"}) {
+    ASSERT_FALSE(spoolman_check("10.0.0.5", p).ok);
+  }
+}
+
+TEST(Spoolman, params_view_restart_errors) {
+  json p = spoolman_params("10.0.0.5", 7912);
+  ASSERT_EQ(p["host"].get<std::string>(), std::string("10.0.0.5"));
+  ASSERT_EQ(p["port"].get<int>(), 7912);
+  json st = json::parse(R"({"result":{"configured":true,"server":"http://10.0.0.5:7912","host":"10.0.0.5","port":7912}})");
+  auto v = spoolman_view(st);
+  ASSERT_TRUE(v.configured);
+  ASSERT_EQ(v.port, 7912);
+  ASSERT_EQ(v.server, std::string("http://10.0.0.5:7912"));
+  ASSERT_FALSE(spoolman_view(json::parse(R"({"result":{"configured":false,"server":null,"host":null,"port":null}})")).configured);
+  ASSERT_TRUE(spoolman_restart_needed(json::parse(R"({"result":{"result":"APPLIED","restart":"moonraker"}})")));
+  ASSERT_FALSE(spoolman_restart_needed(json::parse(R"({"result":{"result":"UNCHANGED"}})")));
+  ASSERT_EQ(spoolman_error_text(json::parse(R"({"result":{"result":"APPLIED"}})")), std::string(""));
+  ASSERT_EQ(spoolman_error_text(json::parse(R"({"error":{"code":400,"message":"INVALID_PORT: the port must be 1-65535"}})")),
+            std::string("The printer refused it: the port must be 1-65535"));
+  ASSERT_EQ(spoolman_error_text(json::parse(R"({"error":{"code":409,"message":"PRINTING: A print is running."}})")),
+            std::string("A print is running."));
+}
+
 int main() {
   return minitest::run_all("nebulaos_settings") > 0 ? 1 : 0;
 }

@@ -5,6 +5,7 @@
 #include "hostname_panel.h"
 #include "printer_select_panel.h"
 #include "spoolman_panel.h"
+#include "spoolman_server_panel.h"
 #include "websocket_client.h"
 #include "wifi_panel.h"
 #include "lvgl/lvgl.h"
@@ -14,7 +15,8 @@
 // Settings > Connections (S1, 2026-10-11): how to reach the printer - Wi-Fi
 // network, address (DHCP/static), its .local name (renamed on its own page), and the Mainsail, Moonraker
 // and Spoolman addresses - with the Wi-Fi networks, Printers and Spoolman
-// screens one tap away. Data: machine.nebulaos.network.status, server.config.
+// server (G125: address + port, like Printers) screens one tap away. Data:
+// machine.nebulaos.network.status, server.config.
 class ConnectionsPanel {
  public:
   ConnectionsPanel(KWebSocketClient &ws, std::mutex &lock, SpoolmanPanel &spoolman);
@@ -45,6 +47,7 @@ class ConnectionsPanel {
   WifiPanel wifi_panel;
   PrinterSelectPanel printer_select_panel;
   HostnamePanel hostname_panel;
+  SpoolmanServerPanel spoolman_server_panel;   // G125: the server; the spools stay on Extrude
   std::string hostname;   // from the last network status, "" when unknown
   std::string address;
 

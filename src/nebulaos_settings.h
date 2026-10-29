@@ -28,6 +28,9 @@ extern const char *const UPDATE_REFRESH_METHOD;  // machine.update.refresh
 extern const char *const UPDATE_UPGRADE_METHOD;  // machine.update.upgrade {"name"} (none = all)
 extern const char *const HOSTNAME_METHOD;        // machine.nebulaos.network.hostname {"hostname"}
 extern const char *const SERVICE_RESTART_METHOD; // machine.services.restart {"service"}
+extern const char *const SPOOLMAN_STATUS_METHOD; // machine.nebulaos.spoolman.status
+extern const char *const SPOOLMAN_SERVER_METHOD; // machine.nebulaos.spoolman.server {"host","port"}
+extern const char *const SPOOLMAN_REMOVE_METHOD; // machine.nebulaos.spoolman.remove
 extern const char *const MCU_STATUS_METHOD;      // machine.nebulaos.mcu.status
 extern const char *const MCU_FILES_METHOD;       // machine.nebulaos.mcu.files
 extern const char *const MCU_FLASH_METHOD;       // machine.nebulaos.mcu.flash {"file","sha256"}
@@ -135,6 +138,35 @@ bool hostname_restart_needed(const json &reply);
 json moonraker_restart_params();
 // A message for a failed rename or restart; "" when the call worked.
 std::string hostname_error_text(const json &reply);
+
+// -- Spoolman server (G125, Run 22) ---------------------------------------------------
+// Settings > Connections > Spoolman: the server Moonraker uses ([spoolman] server in
+// moonraker.conf, nebulaos_osconfig/spoolman.py). Mirrors its checks: host = an IPv4
+// address or a host name (letters, digits, '-', '.'), port 1-65535 (default 7912).
+
+extern const int SPOOLMAN_DEFAULT_PORT;           // 7912
+
+struct SpoolmanCheck {
+  bool ok = false;
+  std::string host;       // trimmed
+  int port = 0;
+  std::string message;    // for the screen
+};
+
+struct SpoolmanView {
+  bool configured = false;
+  std::string server;     // "http://10.0.0.5:7912" ("" when not configured)
+  std::string host;
+  int port = 0;
+};
+
+SpoolmanCheck spoolman_check(const std::string &host, const std::string &port);
+json spoolman_params(const std::string &host, int port);
+SpoolmanView spoolman_view(const json &status_reply);
+// After a successful change: Moonraker must restart to read it.
+bool spoolman_restart_needed(const json &reply);
+// A message for a failed call; "" when it worked (refusals: the busy text).
+std::string spoolman_error_text(const json &reply);
 
 // -- MCU firmware (run 4) ----------------------------------------------------------------
 // machine.nebulaos.mcu.* (nebulaos_osconfig/mcu.py).

@@ -14,6 +14,10 @@ const char *const UPDATE_READINESS_METHOD = "machine.nebulaos.updates.readiness"
 const char *const UPDATE_CHECK_READINESS_METHOD = "machine.nebulaos.updates.check_readiness";
 const char *const HOSTNAME_METHOD = "machine.nebulaos.network.hostname";
 const char *const SERVICE_RESTART_METHOD = "machine.services.restart";
+const char *const SPOOLMAN_STATUS_METHOD = "machine.nebulaos.spoolman.status";
+const char *const SPOOLMAN_SERVER_METHOD = "machine.nebulaos.spoolman.server";
+const char *const SPOOLMAN_REMOVE_METHOD = "machine.nebulaos.spoolman.remove";
+const int SPOOLMAN_DEFAULT_PORT = 7912;
 const char *const MCU_STATUS_METHOD = "machine.nebulaos.mcu.status";
 const char *const MCU_FILES_METHOD = "machine.nebulaos.mcu.files";
 const char *const MCU_FLASH_METHOD = "machine.nebulaos.mcu.flash";
@@ -379,6 +383,85 @@ std::string hostname_error_text(const json &reply) {
   if (msg.empty()) return "";
   if (starts_with(msg, "INVALID_HOSTNAME")) return "The printer refused the name: " + after_code(msg);
   if (starts_with(msg, "HOSTNAME_APPLY_FAILED")) return "Could not apply the name. The old name is kept.";
+  return after_code(msg);
+}
+
+// -- Spoolman server (G125) -----------------------------------------------------------
+
+static bool host_label_ok(const std::string &l) {
+  if (l.empty() || l.size() > 63 || l.front() == '-' || l.back() == '-') return false;
+  for (char ch : l) {
+    if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') ||
+          ch == '-')) return false;
+  }
+  return true;
+}
+
+SpoolmanCheck spoolman_check(const std::string &host_in, const std::string &port_in) {
+  SpoolmanCheck c;
+  size_t b = host_in.find_first_not_of(" \t");
+  size_t e = host_in.find_last_not_of(" \t");
+  c.host = b == std::string::npos ? "" : host_in.substr(b, e - b + 1);
+  if (c.host.empty()) {
+    c.message = "Enter the address of the Spoolman server.";
+    return c;
+  }
+  bool labels_ok = c.host.size() <= 253;
+  size_t start = 0;
+  while (labels_ok) {
+    size_t dot = c.host.find('.', start);
+    labels_ok = host_label_ok(c.host.substr(start, dot == std::string::npos ? std::string::npos
+                                                                         : dot - start));
+    if (dot == std::string::npos) break;
+    start = dot + 1;
+  }
+  if (!labels_ok) {
+    c.message = "Use an IP address (e.g. 192.168.0.20) or a host name.";
+    return c;
+  }
+  bool digits = !port_in.empty() && port_in.size() <= 5;
+  for (char ch : port_in) {
+    if (ch < '0' || ch > '9') digits = false;
+  }
+  int port = digits ? std::stoi(port_in) : 0;
+  if (port < 1 || port > 65535) {
+    c.message = "The port is a number from 1 to 65535 (Spoolman: 7912).";
+    return c;
+  }
+  c.port = port;
+  c.ok = true;
+  c.message = "Moonraker restarts to use http://" + c.host + ":" + std::to_string(port) + ".";
+  return c;
+}
+
+json spoolman_params(const std::string &host, int port) {
+  return {{"host", host}, {"port", port}};
+}
+
+SpoolmanView spoolman_view(const json &reply) {
+  SpoolmanView v;
+  const json &r = result_of(reply);
+  v.configured = bool_at(r, "/configured"_json_pointer, false);
+  v.server = str_at(r, "/server"_json_pointer);
+  v.host = str_at(r, "/host"_json_pointer);
+  if (r.is_object() && r.contains("port") && r["port"].is_number_integer()) {
+    v.port = r["port"].template get<int>();
+  }
+  return v;
+}
+
+bool spoolman_restart_needed(const json &reply) {
+  const json &r = result_of(reply);
+  return str_at(r, "/result"_json_pointer) == "APPLIED" &&
+         str_at(r, "/restart"_json_pointer) == "moonraker";
+}
+
+std::string spoolman_error_text(const json &reply) {
+  std::string msg = error_of(reply);
+  if (msg.empty()) return "";
+  if (starts_with(msg, "INVALID_HOST") || starts_with(msg, "INVALID_PORT")) {
+    return "The printer refused it: " + after_code(msg);
+  }
   return after_code(msg);
 }
 
