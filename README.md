@@ -1,5 +1,7 @@
 # NebulaScreen
 
+> Part of [NebulaOS](https://github.com/NebulaOS-KE/NebulaOS): open firmware for the Creality Ender-3 V3 KE. The project map, releases and downloads are there.
+
 NebulaScreen is NebulaOS's touchscreen UI — a KE-focused fork of
 [GuppyScreen](https://github.com/ballaswag/guppyscreen). Full print control, an interactive 3D bed
 mesh, an on-screen calibration suite, running right on the printer's display with no X11, Wayland,
