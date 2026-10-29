@@ -2,6 +2,7 @@
 #define __DISPLAY_PANEL_H__
 
 #include "boot_logo_panel.h"
+#include "camera_panel.h"
 #include "button_container.h"
 #include "websocket_client.h"
 #include "lvgl/lvgl.h"
@@ -44,9 +45,11 @@ class DisplayPanel {
   lv_obj_t *theme_dd;
   lv_obj_t *beep_sw;
   lv_obj_t *boot_logo_btn;
+  lv_obj_t *camera_btn;
   lv_obj_t *power_label;
   ButtonContainer back_btn;
   BootLogoPanel boot_logo_panel;  // G61: its own page
+  CameraPanel camera_panel;       // G121: Nebula Camera controls
 
   std::vector<int> brightness_levels;
   uint32_t theme = 0;

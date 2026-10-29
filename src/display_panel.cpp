@@ -50,6 +50,7 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
   , cont(SettingsUi::page("Display", &body))
   , back_btn(cont, &back, "Back", &DisplayPanel::_handle_callback, this)
   , boot_logo_panel(c, lock)
+  , camera_panel(c, lock)
 {
   SettingsUi::on_shown(cont, [this]() { shown(); });
   Config *conf = Config::get_instance();
@@ -99,6 +100,9 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
   boot_logo_btn = SettingsUi::icon_button(right, &display_img, "Boot logo",
                                           &DisplayPanel::_handle_callback, this);
   power_label = SettingsUi::hint(right, "Power-on logo: ...");
+  // G121 (Run 22): the Nebula Camera controls - the Settings home grid is full
+  camera_btn = SettingsUi::icon_button(right, &display_img, "Camera",
+                                       &DisplayPanel::_handle_callback, this);
 
   for (lv_obj_t *w : {brightness_dd, sleep_dd, theme_dd, beep_sw}) {
     lv_obj_add_event_cb(w, &DisplayPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
@@ -178,6 +182,10 @@ void DisplayPanel::handle_callback(lv_event_t *e) {
 
   if (code == LV_EVENT_CLICKED && obj == back_btn.get_container()) {
     lv_obj_move_background(cont);
+    return;
+  }
+  if (code == LV_EVENT_CLICKED && obj == camera_btn) {
+    camera_panel.foreground();
     return;
   }
   if (code == LV_EVENT_CLICKED && obj == boot_logo_btn) {
