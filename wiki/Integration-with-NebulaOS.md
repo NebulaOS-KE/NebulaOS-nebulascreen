@@ -1,6 +1,6 @@
 # Integration with NebulaOS
 
-[`NebulaOS-firmware`](https://github.com/coreflake1/NebulaOS-firmware) pins an exact commit of this
+[`NebulaOS-firmware`](https://github.com/NebulaOS-KE/NebulaOS-firmware) pins an exact commit of this
 repository in `manifests/dependencies.conf`. Its image build fetches that commit, applies the submodule
 patches, cross-compiles it with this repository's `scripts/build-release.sh` (the same recipe the
 release CI uses) and installs the result read-only under `/opt/nebulascreen`. You do not need to clone

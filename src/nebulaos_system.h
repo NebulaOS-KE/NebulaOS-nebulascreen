@@ -116,7 +116,7 @@ extern const char *const ACK_NOTICE_METHOD;   // machine.nebulaos.system.ack_not
 std::vector<SystemNotice> system_notices(const json &info_reply);
 
 // G69 (2026-10-16): System > Report a problem.
-extern const char *const REPORT_ISSUES_URL;   // github.com/coreflake1/NebulaOS/issues
+extern const char *const REPORT_ISSUES_URL;   // github.com/NebulaOS-KE/NebulaOS/issues
 // "Detailed logging switches back to Info at 14:05 (UTC)." while Debug is
 // on (logs.status "debug_until"), else the standing rule.
 std::string debug_note(const json &status_reply);

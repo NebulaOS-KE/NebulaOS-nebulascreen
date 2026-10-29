@@ -8,7 +8,7 @@ NebulaScreen is based on [GuppyScreen](https://github.com/ballaswag/guppyscreen)
 (GPL-3). See [History and credits](History-and-Credits) for the full lineage.
 
 NebulaScreen is not installed on its own. It is part of every NebulaOS image, built by
-[`NebulaOS-firmware`](https://github.com/coreflake1/NebulaOS-firmware) from a pinned commit of this
+[`NebulaOS-firmware`](https://github.com/NebulaOS-KE/NebulaOS-firmware) from a pinned commit of this
 repository. See [Installation](Installation).
 
 ## Start here

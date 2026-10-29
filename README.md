@@ -28,7 +28,7 @@ NebulaOS component.
 Two different workflows depending on what you're doing.
 
 **If you're just trying to build the whole OS** — use
-[`NebulaOS-firmware`](https://github.com/coreflake1/NebulaOS-firmware) instead. It pins an exact
+[`NebulaOS-firmware`](https://github.com/NebulaOS-KE/NebulaOS-firmware) instead. It pins an exact
 commit of this repo and cross-compiles + installs it automatically as part of the full image. You
 don't need to clone this repo directly for that.
 
@@ -59,14 +59,14 @@ Commit `b15ad7f` fixed a real bug where `Config::init()`/`ThemeConfig::init()` s
 in-memory defaults on every boot on NebulaOS's read-only-squashfs setup, instead of reading your
 actual saved `config.json`/`theme.json`. No crash, just settings that quietly never stuck. We've
 since tested this on real hardware — config and theme survive a real flash now. See
-[`NebulaOS-firmware`'s `manifests/dependencies.conf`](https://github.com/coreflake1/NebulaOS-firmware/blob/main/manifests/dependencies.conf)
+[`NebulaOS-firmware`'s `manifests/dependencies.conf`](https://github.com/NebulaOS-KE/NebulaOS-firmware/blob/main/manifests/dependencies.conf)
 for the pin history.
 
 ## Documentation
 
 Developer and user docs live in [`wiki/`](wiki/) and [`DEVELOPMENT.md`](DEVELOPMENT.md). The wiki
 describes NebulaScreen as it ships inside NebulaOS; for building and installing NebulaOS itself, start
-at [`NebulaOS-firmware`](https://github.com/coreflake1/NebulaOS-firmware).
+at [`NebulaOS-firmware`](https://github.com/NebulaOS-KE/NebulaOS-firmware).
 
 ## License & credits
 

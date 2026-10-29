@@ -244,7 +244,7 @@ TEST(Notices, from_info) {
 TEST(Report, debug_note) {
   ASSERT_TRUE(debug_note(json::parse(R"({"result":{"level":"debug","debug_until":1792186400}})")).find("2026-10-16") != std::string::npos);
   ASSERT_TRUE(debug_note(json::parse(R"({"result":{"level":"info"}})")).find("24 hours") != std::string::npos);
-  ASSERT_EQ(std::string(REPORT_ISSUES_URL), std::string("https://github.com/coreflake1/NebulaOS/issues"));
+  ASSERT_EQ(std::string(REPORT_ISSUES_URL), std::string("https://github.com/NebulaOS-KE/NebulaOS/issues"));
 }
 
 TEST(Storage, text_and_cleanup) {

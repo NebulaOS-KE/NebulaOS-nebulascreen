@@ -2,7 +2,7 @@
 
 Issues and pull requests are welcome. NebulaScreen is part of NebulaOS; bugs seen on a printer are
 best reported from the screen (**Settings → System → Report a problem**), which saves the logs to a
-USB stick and points to [github.com/coreflake1/NebulaOS/issues](https://github.com/coreflake1/NebulaOS/issues).
+USB stick and points to [github.com/NebulaOS-KE/NebulaOS/issues](https://github.com/NebulaOS-KE/NebulaOS/issues).
 
 ## Workflow
 

@@ -9,7 +9,7 @@ because the manual steps are a perfectly fine way to work on the simulator — j
 what CI actually uses anymore. See
 [`wiki/Building-from-Source`](https://github.com/coreflake1/NebulaOS-guppyscreen/wiki/Building-from-Source)
 for the current NebulaOS build picture, and
-[`NebulaOS-firmware`'s Build Environment doc](https://github.com/coreflake1/NebulaOS-firmware/wiki/Build-Environment)
+[`NebulaOS-firmware`'s Build Environment doc](https://github.com/NebulaOS-KE/NebulaOS-firmware/wiki/Build-Environment)
 for what's actually in that image.
 
 This repository contains the Guppy Screen source code and all its external dependencies.

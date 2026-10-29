@@ -8,7 +8,7 @@ Three workflows in `.github/workflows/`:
 | `pull_request.yml` | pull requests to `main` | The same build and tests, without publishing. |
 | `wiki.yml` | push to `main` that touches `wiki/**` | Copies `wiki/` to the GitHub Wiki, see [Wiki publishing](Wiki-Publishing). |
 
-The build jobs run inside the digest-pinned NebulaOS build image (`ghcr.io/coreflake1/nebulaos-build`),
+The build jobs run inside the digest-pinned NebulaOS build image (`ghcr.io/nebulaos-ke/nebulaos-build`),
 the same one NebulaOS-firmware builds with, using the Bootlin `mips32el--musl--stable-2024.02-1`
 toolchain (`CROSS_COMPILE=mipsel-buildroot-linux-musl-`). Two details are set in the workflow:
 

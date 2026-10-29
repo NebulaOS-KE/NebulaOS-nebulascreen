@@ -1,7 +1,7 @@
 # Installation and updates
 
 NebulaScreen is not installed on its own. It is part of the **NebulaOS** image for the Ender-3 V3 KE:
-[`NebulaOS-firmware`](https://github.com/coreflake1/NebulaOS-firmware) pins a commit of this
+[`NebulaOS-firmware`](https://github.com/NebulaOS-KE/NebulaOS-firmware) pins a commit of this
 repository, cross-compiles it with `scripts/build-release.sh` and puts it into the read-only system
 image. Installing NebulaOS installs NebulaScreen. Follow the NebulaOS-firmware documentation for
 installing NebulaOS itself.

@@ -61,7 +61,7 @@ class ReleaseTest(unittest.TestCase):
         with zipfile.ZipFile(self.out) as zf:
             info = json.loads(zf.read("release_info.json"))
             self.assertEqual(info, {"project_name": "NebulaOS-nebulascreen",
-                                    "project_owner": "coreflake1",
+                                    "project_owner": "NebulaOS-KE",
                                     "version": "v0.9.0", "nebulaos_ui_api": 1})
             mode = zf.getinfo("nebulascreen").external_attr >> 16
             self.assertTrue(stat.S_ISREG(mode) and mode & 0o111)

@@ -73,7 +73,7 @@ scripts/build-release.sh v0.9.0
 ```
 
 This is the one build recipe: this repository's CI and NebulaOS-firmware's image build both use it.
-Run it inside the NebulaOS build container (`ghcr.io/coreflake1/nebulaos-build`, pinned by digest in
+Run it inside the NebulaOS build container (`ghcr.io/nebulaos-ke/nebulaos-build`, pinned by digest in
 NebulaOS-firmware's `manifests/dependencies.conf`), with the toolchain on `PATH`. CI uses
 `CROSS_COMPILE=mipsel-buildroot-linux-musl-` from Bootlin `mips32el--musl--stable-2024.02-1`.
 

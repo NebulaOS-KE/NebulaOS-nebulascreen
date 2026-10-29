@@ -43,7 +43,7 @@ ReportPanel::ReportPanel(KWebSocketClient &c, std::mutex &lock)
 
   step(left, "2. Save the logs to a USB stick (button on the right).");
   step(left, "3. Report it on GitHub - scan the code or open\n"
-             "github.com/coreflake1/NebulaOS/issues\n"
+             "github.com/NebulaOS-KE/NebulaOS/issues\n"
              "Attach the zip and say what you did and what happened.");
 
 #if LV_USE_QRCODE

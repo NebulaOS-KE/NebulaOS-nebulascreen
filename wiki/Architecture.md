@@ -10,7 +10,7 @@ example the `GuppyScreen` class in `src/guppyscreen.cpp`).
   `bedmesh_panel`, `calibration_menu_panel`, `finetune_panel`). `src/main.cpp` sets up the display and
   input drivers and reads the config; `src/guppyscreen.cpp` sets up logging and the theme and wires
   the app together. The Settings pages share helpers in `src/settings_ui.cpp`.
-- **Display / input** — `lv_drivers` (submodule, `coreflake1/lv_drivers`): framebuffer and evdev on
+- **Display / input** — `lv_drivers` (submodule, `NebulaOS-KE/lv_drivers`): framebuffer and evdev on
   the printer, SDL2 in the simulator.
 - **Moonraker** — `libhv` provides the websocket client (`src/websocket_client.cpp`, JSON-RPC).
   `src/notify_consumer.cpp` dispatches Moonraker notifications to the panels; `src/state.cpp` holds the

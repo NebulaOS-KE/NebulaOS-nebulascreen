@@ -36,7 +36,7 @@ import time
 import zipfile
 
 PROJECT_NAME = "NebulaOS-nebulascreen"
-PROJECT_OWNER = "coreflake1"
+PROJECT_OWNER = "NebulaOS-KE"
 # The image path/name contract this app needs (see src/nebulascreen_paths.h):
 # an image provides it in /opt/nebulaos-version.json "nebulaos_ui_api".
 NEBULAOS_UI_API = 1

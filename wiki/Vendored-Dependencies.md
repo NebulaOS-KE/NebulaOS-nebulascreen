@@ -4,7 +4,7 @@ Two different things in this repository are called "vendored".
 
 ## The app's own dependencies
 
-`lvgl` (LVGL v8), `lv_drivers` (from `coreflake1/lv_drivers`), `libhv` and `spdlog` are git submodules,
+`lvgl` (LVGL v8), `lv_drivers` (from `NebulaOS-KE/lv_drivers`), `libhv` and `spdlog` are git submodules,
 fetched with `git clone --recurse-submodules`. Two patches in `patches/` are applied before building
 (`0002-spdlog_fmt_initializer_list.patch`, `0003-lvgl-dpi-text-scale.patch`);
 `scripts/build-release.sh` applies them itself when needed. `lv_touch_calibration/` is in the tree.

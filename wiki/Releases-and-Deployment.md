@@ -22,7 +22,7 @@ Both are built by the **same recipe**, `scripts/build-release.sh`:
 |---|---|
 | `nebulascreen`, `nebulabeep` | static ELF32 little-endian MIPS executables (mode 0755) |
 | `themes/` | themes |
-| `release_info.json` | `project_name` NebulaOS-nebulascreen, `project_owner` coreflake1, `version` (= tag = release name), `nebulaos_ui_api` |
+| `release_info.json` | `project_name` NebulaOS-nebulascreen, `project_owner` NebulaOS-KE, `version` (= tag = release name), `nebulaos_ui_api` |
 | `LICENSE`, `NOTICE` | GPL-3; based on GuppyScreen by ballaswag |
 
 Never in the zip: symlinks or the user's config (`nebulascreen.json`, or the

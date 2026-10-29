@@ -3,7 +3,7 @@
 Common problems with the screen and with print quality. For anything else, use
 **Settings → System → Report a problem** on the printer: it sets the log level, saves the logs to a
 USB stick and shows where to report the issue
-([github.com/coreflake1/NebulaOS/issues](https://github.com/coreflake1/NebulaOS/issues)).
+([github.com/NebulaOS-KE/NebulaOS/issues](https://github.com/NebulaOS-KE/NebulaOS/issues)).
 
 ---
 

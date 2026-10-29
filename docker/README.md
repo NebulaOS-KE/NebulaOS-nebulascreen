@@ -45,7 +45,7 @@ day, the pinned digest is simpler and already reproducible on its own.
 GuppyScreen itself (the touchscreen binary) builds with a different toolchain — musl, fully static.
 As of 2026-08-15, both the normal NebulaOS build and this repo's own CI cross-compile it inside
 `NebulaOS-firmware`'s unified build image — see
-[`NebulaOS-firmware`'s Build Environment doc](https://github.com/coreflake1/NebulaOS-firmware/wiki/Build-Environment).
+[`NebulaOS-firmware`'s Build Environment doc](https://github.com/NebulaOS-KE/NebulaOS-firmware/wiki/Build-Environment).
 
 Before that, this used a separate, standalone image, `ghcr.io/coreflake1/guppydev` (built from
 [`docker/Dockerfile`](../docker/Dockerfile), top-level, not under this directory). That image's
