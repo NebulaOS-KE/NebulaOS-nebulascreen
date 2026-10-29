@@ -17,6 +17,10 @@
 // writes it into the slot that is not running (image.install) while a box
 // above everything follows the progress (image.status) until the printer
 // restarts into it. Only offered here, never in Mainsail.
+// G79 (Run 23): Online asks GitHub for a newer NebulaOS (ota.check); after a
+// confirmation the printer downloads it (ota.download, progress from
+// ota.status) and checks it against the release; it then is a row in the list,
+// installed like any other.
 class ImagePanel {
  public:
   ImagePanel(KWebSocketClient &ws, std::mutex &lock);
@@ -27,6 +31,7 @@ class ImagePanel {
   void sim_fill();
   void sim_check(const char *reply_json);   // the confirmation for a check reply
   void sim_progress(const char *status_json);
+  void sim_online(const char *check_json);
 #endif
 
   static void _handle_callback(lv_event_t *e) {
@@ -44,6 +49,9 @@ class ImagePanel {
   void poll();
   void show_job(const json &status_reply);
   void stop_busy();
+  void online();
+  void online_checked(const json &check_reply);
+  void show_download(const json &status_reply);
 
   KWebSocketClient &ws;
   std::mutex &lv_lock;
@@ -54,13 +62,15 @@ class ImagePanel {
   lv_obj_t *slot_b;
   lv_obj_t *list;
   lv_obj_t *refresh_btn;
+  lv_obj_t *online_btn;
   ButtonContainer back_btn;
 
   ImageFiles files;
   lv_obj_t *busy_label = NULL;
   lv_timer_t *poll_timer = NULL;
   uint32_t busy_since = 0;
-  bool working = false;     // checking or installing: no second start
+  bool working = false;     // checking, downloading or installing: no second start
+  bool downloading = false; // the busy box follows ota.status, not image.status
 };
 
 #endif // __IMAGE_PANEL_H__

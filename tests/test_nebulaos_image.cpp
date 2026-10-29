@@ -232,6 +232,53 @@ TEST(Swap, text_from_the_other_slot) {
   ASSERT_TRUE(has(swap_confirm_text(json()), "other boot slot (A/B)"));
 }
 
+TEST(Ota, downloaded_file_in_the_list) {
+  auto f = image_files(json{{"result", {{"usb", json::array()}, {"slots", slots("B", "", "nebulaos")},
+    {"files", {{{"id", "ota/NebulaOS-Ender3V3KE-0.9.2.img"}, {"source", "ota"},
+                {"name", "NebulaOS-Ender3V3KE-0.9.2.img"}, {"size", 130000000}}}}}}});
+  ASSERT_TRUE(f.ok);
+  ASSERT_EQ(f.files[0].detail, std::string("Downloaded, 130 MB"));
+}
+
+TEST(Ota, check_offers_a_download) {
+  auto c = ota_check(json{{"result", {{"result", "AVAILABLE"}, {"available", true},
+    {"version", "0.9.2"}, {"running_version", "0.9.1"},
+    {"img", {{"name", "NebulaOS-Ender3V3KE-0.9.2.img"}, {"size", 130000000}}}}}});
+  ASSERT_TRUE(c.available);
+  ASSERT_EQ(c.title, std::string("NebulaOS 0.9.2"));
+  ASSERT_TRUE(has(c.text, "this printer runs 0.9.1"));
+  ASSERT_TRUE(has(c.text, "GitHub (130 MB)"));
+}
+
+TEST(Ota, check_without_an_offer) {
+  auto up = ota_check(json{{"result", {{"result", "UP_TO_DATE"}, {"available", false},
+                                       {"version", "0.9.1"}, {"running_version", "0.9.1"}}}});
+  ASSERT_FALSE(up.available);
+  ASSERT_TRUE(has(up.text, "up to date (0.9.1)"));
+  auto off = ota_check(json{{"result", {{"result", "OFFLINE"}, {"available", false},
+    {"message", "Could not reach the release channel (URLError)."}}}});
+  ASSERT_TRUE(has(off.text, "Could not reach"));
+  ASSERT_TRUE(has(ota_check(error("PRINTING: a print is active")).text, "print is active"));
+}
+
+TEST(Ota, download_reply_and_job) {
+  ASSERT_EQ(ota_download_error(json{{"result", {{"result", "STARTED"}}}}), std::string(""));
+  auto again = json{{"result", {{"result", "ALREADY_DOWNLOADED"}}}};
+  ASSERT_TRUE(ota_already_downloaded(again));
+  ASSERT_TRUE(has(ota_download_error(again), "already downloaded"));
+  ASSERT_TRUE(has(ota_download_error(error("NO_SPACE: not enough free space")), "free space"));
+  auto run = ota_download(json{{"result", {{"download", {{"state", "running"}, {"percent", 42},
+                                                          {"version", "0.9.2"}}}}}});
+  ASSERT_TRUE(run.active);
+  ASSERT_TRUE(has(run.text, "0.9.2: 42%"));
+  auto bad = ota_download(json{{"result", {{"download", {{"state", "failed"},
+    {"message", "the download does not match the release record (sha256)"}}}}}});
+  ASSERT_TRUE(bad.failed);
+  ASSERT_TRUE(has(bad.text, "Nothing was installed"));
+  ASSERT_TRUE(ota_download(json{{"result", {{"download", {{"state", "finished"}}}}}}).finished);
+  ASSERT_FALSE(ota_download(json{{"result", {{"download", nullptr}}}}).active);
+}
+
 int main() {
   return minitest::run_all("nebulaos_image") > 0 ? 1 : 0;
 }

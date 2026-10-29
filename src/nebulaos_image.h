@@ -24,6 +24,12 @@ extern const char *const IMAGE_CHECK_METHOD;    // machine.nebulaos.image.check 
 extern const char *const IMAGE_INSTALL_METHOD;  // machine.nebulaos.image.install {"file","sha256"}
 extern const char *const IMAGE_STATUS_METHOD;   // machine.nebulaos.image.status
 extern const char *const IMAGE_ACK_METHOD;      // machine.nebulaos.image.ack
+// G79 (Run 23): updates over the internet (nebulaos_osconfig/ota.py). The
+// download lands in the image list as source "ota"; installing it is the
+// ordinary image.install.
+extern const char *const OTA_CHECK_METHOD;      // machine.nebulaos.ota.check {"force"}
+extern const char *const OTA_DOWNLOAD_METHOD;   // machine.nebulaos.ota.download
+extern const char *const OTA_STATUS_METHOD;     // machine.nebulaos.ota.status
 
 struct ImageSlot {
   std::string system;     // "nebulaos" | "creality" | "unknown"
@@ -54,9 +60,9 @@ std::string image_identity_text(const std::string &system, const std::string &bu
 std::string image_slot_line(const ImageSlots &s, const std::string &slot);
 
 struct ImageFile {
-  std::string id;         // "upload/x.img" | "usb/sda1/x.img"
+  std::string id;         // "upload/x.img" | "usb/sda1/x.img" | "ota/x.img"
   std::string name;
-  std::string source;     // "upload" | "usb"
+  std::string source;     // "upload" | "usb" | "ota" (downloaded)
   long size = 0;
   std::string build;      // from the .img's NebulaOS build record
   std::string date;
@@ -118,5 +124,30 @@ bool image_trial_pending(const json &status_reply);
 // Settings > Reset > Swap boot slot: the confirmation, from what the other slot
 // holds (image.status "slots"); the generic text when unknown.
 std::string swap_confirm_text(const json &status_reply);
+
+// After ota.check: an offer to download, or why there is none.
+struct OtaCheck {
+  bool available = false;
+  std::string version;
+  std::string title;        // confirmation / notice title
+  std::string text;
+};
+
+OtaCheck ota_check(const json &check_reply);
+// A message for an ota.download call that did not start a download; "" when it
+// started. ALREADY_DOWNLOADED gets a message too (ota_already_downloaded).
+std::string ota_download_error(const json &reply);
+bool ota_already_downloaded(const json &reply);
+
+// The download job from ota.status.
+struct OtaDownload {
+  bool active = false;
+  bool finished = false;
+  bool failed = false;
+  int percent = 0;
+  std::string text;
+};
+
+OtaDownload ota_download(const json &status_reply);
 
 #endif // __NEBULAOS_IMAGE_H__

@@ -5,6 +5,9 @@ const char *const IMAGE_CHECK_METHOD = "machine.nebulaos.image.check";
 const char *const IMAGE_INSTALL_METHOD = "machine.nebulaos.image.install";
 const char *const IMAGE_STATUS_METHOD = "machine.nebulaos.image.status";
 const char *const IMAGE_ACK_METHOD = "machine.nebulaos.image.ack";
+const char *const OTA_CHECK_METHOD = "machine.nebulaos.ota.check";
+const char *const OTA_DOWNLOAD_METHOD = "machine.nebulaos.ota.download";
+const char *const OTA_STATUS_METHOD = "machine.nebulaos.ota.status";
 
 static const json &result_of(const json &reply) {
   static const json empty = json::object();
@@ -135,7 +138,9 @@ ImageFiles image_files(const json &list_reply) {
       i.date = str_at(f, "/date"_json_pointer);
       i.version = str_at(f, "/version"_json_pointer);
       if (i.id.empty()) continue;
-      i.detail = (i.source == "usb" ? "USB stick, " : "Uploaded, ") + megabytes(i.size);
+      i.detail = (i.source == "usb" ? "USB stick, " : i.source == "ota" ? "Downloaded, "
+                                                                        : "Uploaded, ") +
+                 megabytes(i.size);
       if (!i.build.empty()) {
         i.detail += " - " + image_identity_text("nebulaos", i.build, i.date, "");
       } else if (!i.version.empty()) {
@@ -362,4 +367,92 @@ std::string swap_confirm_text(const json &status_reply) {
          "slots) or USB recovery.\n"
          "Do not switch the printer off and on while the other slot runs: its "
          "firmware can re-flash the printer board.";
+}
+
+// -- updates over the internet (G79) ---------------------------------------------------
+
+OtaCheck ota_check(const json &check_reply) {
+  OtaCheck c;
+  std::string err = error_of(check_reply);
+  const json &r = result_of(check_reply);
+  if (!err.empty()) {
+    c.title = "No update check";
+    c.text = starts_with(err, "PRINTING") || starts_with(err, "REFUSED")
+               ? "Not possible while a print is active."
+               : after_code(err) + ".";
+    return c;
+  }
+  std::string result = str_at(r, "/result"_json_pointer);
+  std::string running = str_at(r, "/running_version"_json_pointer);
+  c.version = str_at(r, "/version"_json_pointer);
+  c.available = bool_at(r, "/available"_json_pointer, false);
+  if (c.available) {
+    c.title = "NebulaOS " + c.version;
+    long size = long_at(r, "/img/size"_json_pointer);
+    c.text = "NebulaOS " + c.version + " is available" +
+             (running.empty() ? "" : " (this printer runs " + running + ")") + ".\n"
+             "Download it from GitHub (" + megabytes(size) + ")? The printer checks it "
+             "against the release, then it appears in the list; tap Install to install it.";
+    return c;
+  }
+  c.title = "System update";
+  if (result == "UP_TO_DATE") {
+    c.text = "NebulaOS is up to date" + (running.empty() ? "" : " (" + running + ")") + ".";
+  } else if (result == "NOT_FROM_THIS_VERSION") {
+    c.text = "NebulaOS " + c.version + " cannot be installed over this version over the "
+             "internet. See the release notes on GitHub.";
+  } else if (result == "RUNNING_VERSION_UNKNOWN") {
+    c.text = "This printer's NebulaOS version is unknown, so no update is offered.";
+  } else {
+    std::string msg = str_at(r, "/message"_json_pointer);
+    c.text = msg.empty() ? "No update information (" + result + ")." : msg;
+  }
+  return c;
+}
+
+std::string ota_download_error(const json &reply) {
+  std::string err = error_of(reply);
+  if (!err.empty()) {
+    if (starts_with(err, "PRINTING") || starts_with(err, "REFUSED")) {
+      return "Not possible while a print is active.";
+    }
+    return after_code(err) + ".";
+  }
+  std::string result = str_at(result_of(reply), "/result"_json_pointer);
+  if (result == "ALREADY_DOWNLOADED") {
+    return "It is already downloaded: tap Install next to it in the list.";
+  }
+  if (result != "STARTED") {
+    return "Unexpected answer from the printer.";
+  }
+  return "";
+}
+
+bool ota_already_downloaded(const json &reply) {
+  return str_at(result_of(reply), "/result"_json_pointer) == "ALREADY_DOWNLOADED";
+}
+
+OtaDownload ota_download(const json &status_reply) {
+  OtaDownload d;
+  const json &r = result_of(status_reply);
+  if (!r.contains("download") || !r["download"].is_object()) return d;
+  const json &job = r["download"];
+  std::string state = str_at(job, "/state"_json_pointer);
+  d.percent = (int)long_at(job, "/percent"_json_pointer);
+  std::string version = str_at(job, "/version"_json_pointer);
+  if (state == "running") {
+    d.active = true;
+    d.text = "Downloading NebulaOS " + version + ": " + std::to_string(d.percent) + "%";
+  } else if (state == "finished") {
+    d.finished = true;
+    d.percent = 100;
+    d.text = "NebulaOS " + version + " is downloaded and checked. Tap Install next to it "
+             "in the list.";
+  } else if (state == "failed") {
+    d.failed = true;
+    std::string msg = str_at(job, "/message"_json_pointer);
+    d.text = (msg.empty() ? std::string("The download failed.") : msg) +
+             "\nNothing was installed.";
+  }
+  return d;
 }
