@@ -210,11 +210,21 @@ void CameraPanel::handle_callback(lv_event_t *e) {
   }
   if (code != LV_EVENT_CLICKED) return;
   if (obj == defaults_btn) {
-    ws.send_jsonrpc(CAMERA_DEFAULTS_METHOD, json::object(), [this](json &reply) {
-      after(reply);
-      std::lock_guard<std::mutex> lock(lv_lock);
-      shown();
-    });
+    // Every setting, night mode and anti-flicker included (Tim 2026-10-29);
+    // manual exposure only ends with a camera restart.
+    bool manual = camera_bool(config, "exposure_manual", false);
+    SettingsUi::confirm("Defaults",
+      manual ? "Put every camera setting back to its default?\n\nThe camera restarts to get "
+               "automatic exposure back; the picture is gone for a few seconds."
+             : "Put every camera setting back to its default?",
+      "Defaults", SettingsUi::Tone::Warning, [this, manual]() {
+        if (manual) lv_label_set_text(info, "Restarting the camera...");
+        ws.send_jsonrpc(CAMERA_DEFAULTS_METHOD, json::object(), [this](json &reply) {
+          after(reply);
+          std::lock_guard<std::mutex> lock(lv_lock);
+          shown();
+        });
+      });
   } else if (obj == reset_btn) {
     SettingsUi::confirm("Reset camera",
       "Restart the camera?\n\nThe picture is gone for a few seconds; your settings are applied "
