@@ -377,6 +377,25 @@ TEST(SavedMesh, texts) {
             std::string("No bed mesh yet - run Calibration > Auto Calibration."));
 }
 
+TEST(Pid, running_text_with_progress) {
+  json heater = {{"temperature", 52.4}, {"target", 65.0}};
+  json none = json::object();
+  // older extensions: the plain text
+  ASSERT_EQ(pid_running_text(PidHeater::BED, heater, none), pid_running_text(PidHeater::BED, heater));
+  json other = {{"progress", {{"flow", "esteps"}, {"step", 1}, {"total", 5}}}};
+  ASSERT_EQ(pid_running_text(PidHeater::BED, heater, other), pid_running_text(PidHeater::BED, heater));
+  json heat = {{"progress", {{"flow", "pid"}, {"step", 1}, {"total", 2}, {"key", "heating"},
+                             {"label", "Heating up"}, {"detail", "Bed 52/65 C"}}}};
+  std::string t = pid_running_text(PidHeater::BED, heater, heat);
+  ASSERT_TRUE(t.find("Heating up: Bed 52/65 C") != std::string::npos);
+  json meas = {{"progress", {{"flow", "pid"}, {"step", 2}, {"total", 2}, {"key", "cycles"},
+                             {"label", "Measuring"},
+                             {"detail", "Bed 65 C, cycle 2 of 6, about 10 min left"}}}};
+  t = pid_running_text(PidHeater::BED, heater, meas);
+  ASSERT_TRUE(t.find("Measuring: Bed 65 C, cycle 2 of 6, about 10 min left") != std::string::npos);
+  ASSERT_TRUE(t.find("Tuning the bed at 65 C") == 0);
+}
+
 int main() {
   return minitest::run_all("nebulaos_calibration_status") > 0 ? 1 : 0;
 }

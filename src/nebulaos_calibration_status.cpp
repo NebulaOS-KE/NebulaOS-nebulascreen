@@ -169,6 +169,26 @@ std::string pid_running_text(PidHeater h, const json &heater_status) {
   return t;
 }
 
+std::string pid_running_text(PidHeater h, const json &heater_status,
+                             const json &calibration_status) {
+  const json *p = nullptr;
+  if (calibration_status.is_object() && calibration_status.contains("progress")) {
+    p = &calibration_status["progress"];
+  }
+  if (p == nullptr || !p->is_object() || str(*p, "flow") != "pid") {
+    return pid_running_text(h, heater_status);
+  }
+  bool bed = h == PidHeater::BED;
+  double step = 0;
+  num(*p, "step", step);
+  std::string t = std::string("Tuning the ") + (bed ? "bed" : "hotend") + " at " +
+                  std::to_string(pid_default_target(h)) + " C. The temperature rises and "
+                  "falls a few times; this is normal.\n\n";
+  std::string detail = str(*p, "detail");
+  t += (step >= 2 ? "Measuring: " : "Heating up: ") + detail;
+  return t;
+}
+
 // ---- G104: progress ---------------------------------------------------------
 
 const char *const CAL_RESTART_NOTICE =

@@ -77,7 +77,9 @@ void PidCalibrationPanel::refresh() {
   std::string t;
   if (running) {
     const char *obj = heater == PidHeater::BED ? "/printer_state/heater_bed" : "/printer_state/extruder";
-    t = pid_running_text(heater, State::get_instance()->get_data(json::json_pointer(obj)));
+    State *st = State::get_instance();
+    t = pid_running_text(heater, st->get_data(json::json_pointer(obj)),
+                         st->get_data("/printer_state/nebulaos_calibration"_json_pointer));
   } else {
     t = result.empty() ? std::string(PID_DESCRIPTION) : result + "\n\n" + PID_DESCRIPTION;
     if (KUtils::is_printing()) t += "\n\nNot available while printing.";
@@ -94,7 +96,8 @@ void PidCalibrationPanel::consume(json &j) {
   if (!running) return;
   const json &n = j;
   const char *ptr = heater == PidHeater::BED ? "/params/0/heater_bed" : "/params/0/extruder";
-  if (!n.contains(json::json_pointer(ptr))) return;
+  if (!n.contains(json::json_pointer(ptr)) &&
+      !n.contains("/params/0/nebulaos_calibration"_json_pointer)) return;
   std::lock_guard<std::mutex> lock(lv_lock);
   refresh();
 }

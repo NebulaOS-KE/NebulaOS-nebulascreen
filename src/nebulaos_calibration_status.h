@@ -68,6 +68,11 @@ extern const char *const PID_DESCRIPTION;
 // While PID_CALIBRATE runs: what, how long, the live temperature from the
 // heater's status object (heater_bed / extruder; {} -> no temperature line).
 std::string pid_running_text(PidHeater h, const json &heater_status);
+// G119 (Run 22): the same with nebulaos_calibration's PID progress (step 1
+// heating / step 2 "cycle n of 6, about m min left") when the extension reports
+// it; without it (older extensions) exactly the text above.
+std::string pid_running_text(PidHeater h, const json &heater_status,
+                             const json &calibration_status);
 
 // ---- G104: guided page feedback ------------------------------------------
 // "auto_calibrate" / "input_shaper" / "esteps" / "load_cell" / "bed_tram"
