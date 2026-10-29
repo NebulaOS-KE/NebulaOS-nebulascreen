@@ -176,6 +176,8 @@ void InitPanel::connected(KWebSocketClient &ws) {
 			    this->bedmesh_panel.refresh_views_with_lock(
 									data["/result/status/bed_mesh"_json_pointer]);
 			    spdlog::debug("done init");
+			    // G80: ask about a power-loss resume right away
+			    this->main_panel.get_tune_panel().get_power_panel().check_recovery();
 			    std::lock_guard<std::mutex> lock(this->lv_lock);
 			    lv_obj_add_flag(this->cont, LV_OBJ_FLAG_HIDDEN);
 			    lv_obj_move_background(this->cont);

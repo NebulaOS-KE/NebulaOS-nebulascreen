@@ -167,6 +167,31 @@ TEST(Commands, confirm_text_names_the_file_and_the_z_assumption) {
   ASSERT_TRUE(t.find("Z is NOT re-homed") != std::string::npos);
 }
 
+TEST(Offer, asked_once_per_physical_record) {
+  PlrStatus s;
+  s.present = true;
+  s.state = "RECOVERY_AVAILABLE";
+  s.resume_mode = "physical";
+  s.file = "benchy.gcode";
+  s.progress = 0.37;
+  std::string k = plr_offer_key(s, false);
+  ASSERT_FALSE(k.empty());
+  ASSERT_EQ(plr_offer_key(s, false), k);              // same record: same key
+  PlrStatus later = s;
+  later.progress = 0.52;
+  ASSERT_TRUE(plr_offer_key(later, false) != k);      // a new power loss: asked again
+  ASSERT_EQ(plr_offer_key(s, true), std::string(""));  // printing
+  PlrStatus restore = s;
+  restore.resume_mode = "state_restore_only";
+  ASSERT_EQ(plr_offer_key(restore, false), std::string(""));
+  PlrStatus going = s;
+  going.resume_in_progress = true;
+  ASSERT_EQ(plr_offer_key(going, false), std::string(""));
+  PlrStatus none = s;
+  none.state = "NONE";
+  ASSERT_EQ(plr_offer_key(none, false), std::string(""));
+}
+
 int main() {
   return minitest::run_all("plr_status") > 0 ? 1 : 0;
 }

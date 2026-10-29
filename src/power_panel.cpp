@@ -92,6 +92,50 @@ void PowerPanel::refresh_recovery() {
   } else {
     lv_obj_add_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
   }
+  std::string key = plr_offer_key(plr, KUtils::is_printing());
+  if (!key.empty() && key != offered_key) {
+    offered_key = key;
+    offer_resume();
+  }
+}
+
+void PowerPanel::check_recovery() {
+  std::lock_guard<std::mutex> lock(lv_lock);
+  refresh_recovery();
+}
+
+// G80: "Resume?" without opening the Power page. Later keeps the record (the
+// Power page still offers Resume and Discard); Discard is only offered there.
+void PowerPanel::offer_resume() {
+  auto plr = parse_plr_status(State::get_instance()
+    ->get_data("/printer_state/nebulaos_power_loss_recovery"_json_pointer));
+  static const char *btns[] = {"Later", "Resume", ""};
+  std::string text = "A print was interrupted by a power loss.\n\n" +
+                     plr_resume_confirm_text(plr);
+  lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, text.c_str(), btns, false);
+  lv_obj_add_event_cb(mbox, [](lv_event_t *e) {
+    lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(e));
+    auto *panel = (PowerPanel *)lv_event_get_user_data(e);
+    bool resume = lv_msgbox_get_active_btn(obj) == 1;
+    lv_msgbox_close(obj);
+    if (resume) panel->start_resume();
+  }, LV_EVENT_VALUE_CHANGED, this);
+  KUtils::style_lock_mbox(mbox, 90);
+}
+
+// LVGL thread.
+void PowerPanel::start_resume() {
+  auto plr = parse_plr_status(State::get_instance()
+    ->get_data("/printer_state/nebulaos_power_loss_recovery"_json_pointer));
+  if (!plr_view(plr, KUtils::is_printing()).show_resume) {
+    refresh_recovery();
+    return;
+  }
+  send_plr_command(PLR_RESUME_COMMAND, "Resume failed");
+  KUtils::notify_toast("Resuming print after power loss...", 2500);
+  lv_label_set_text(recovery_status, "Resuming...");
+  lv_obj_add_flag(recovery_resume_btn, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
 }
 
 void PowerPanel::consume(json &j) {
@@ -141,13 +185,7 @@ void PowerPanel::confirm_resume() {
     auto *panel = (PowerPanel *)lv_event_get_user_data(e);
     bool resume = lv_msgbox_get_active_btn(obj) == 1;
     lv_msgbox_close(obj);
-    if (resume) {
-      panel->send_plr_command(PLR_RESUME_COMMAND, "Resume failed");
-      KUtils::notify_toast("Resuming print after power loss...", 2500);
-      lv_label_set_text(panel->recovery_status, "Resuming...");
-      lv_obj_add_flag(panel->recovery_resume_btn, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(panel->recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
-    }
+    if (resume) panel->start_resume();
   }, LV_EVENT_VALUE_CHANGED, this);
   KUtils::style_lock_mbox(mbox, 90);
 }

@@ -54,6 +54,11 @@ PlrView plr_view(const PlrStatus &s, bool printing);
 extern const char *const PLR_RESUME_COMMAND;
 extern const char *const PLR_DISCARD_COMMAND;
 
+// G80 (Run 22): the popup after a power loss ("Resume?") - asked once per
+// record. "" = nothing to ask (no physical resume available, a print running,
+// a resume already going); else a key that changes with the record.
+std::string plr_offer_key(const PlrStatus &s, bool printing);
+
 // Confirmation text for the resume dialog.
 std::string plr_resume_confirm_text(const PlrStatus &s);
 

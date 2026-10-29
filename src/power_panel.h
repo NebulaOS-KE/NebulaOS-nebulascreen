@@ -19,6 +19,9 @@ class PowerPanel : public NotifyConsumer {
     void consume(json &j);
     
     void foreground();
+    // G80: once after the printer state arrived (InitPanel) - the popup
+    // after a power loss does not wait for the next status change.
+    void check_recovery();
     void handle_callback(lv_event_t *event);
 
     static void _handle_callback(lv_event_t *event) {
@@ -36,6 +39,11 @@ class PowerPanel : public NotifyConsumer {
     void build_recovery_section();
     void refresh_recovery();
     void confirm_resume();
+    // G80 (Run 22): after a power loss the screen asks by itself, once per
+    // record (plr_offer_key), whichever page is open.
+    void offer_resume();
+    void start_resume();
+    std::string offered_key;
     void send_plr_command(const char *cmd, const char *failure);
 
     KWebSocketClient &ws;

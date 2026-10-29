@@ -101,6 +101,13 @@ PlrView plr_view(const PlrStatus &s, bool printing) {
   return v;
 }
 
+std::string plr_offer_key(const PlrStatus &s, bool printing) {
+  if (!plr_view(s, printing).show_resume) return "";
+  char buf[32];
+  std::snprintf(buf, sizeof(buf), "|%.6f", s.progress);
+  return s.file + buf;
+}
+
 std::string plr_resume_confirm_text(const PlrStatus &s) {
   return "Resume " + plr_display_name(s.file) + "?\n\n"
     "The printer heats up, homes X and Y, lifts the nozzle, primes and continues printing. "
