@@ -98,7 +98,7 @@ std::string camera_result_text(const json &reply) {
   std::string err = error_of(reply);
   if (!err.empty()) {
     if (err.rfind("EXPOSURE_ONE_WAY", 0) == 0) {
-      return "Automatic exposure comes back only with Reset camera.";
+      return "Automatic exposure comes back only with Restart camera.";
     }
     if (err.rfind("CAMERA_ABSENT", 0) == 0) return "No Nebula Camera is connected.";
     return after_code(err);

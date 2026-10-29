@@ -14,7 +14,7 @@ using json = nlohmann::json;
 //   machine.nebulaos.camera.status     {config, defaults, ranges, present, firmware}
 //   machine.nebulaos.camera.settings   {"settings": {key: value, ...}}
 //   machine.nebulaos.camera.defaults / .reset / .version
-// Exposure is one-way: once manual, only Reset camera brings automatic back.
+// Exposure is one-way: once manual, only Restart camera brings automatic back.
 //
 // This file may be distributed under the terms of the GNU GPLv3 license.
 

@@ -50,7 +50,7 @@ CameraPanel::CameraPanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   defaults_btn = small_button(row, "Defaults", &CameraPanel::_handle_callback, this);
-  reset_btn = small_button(row, "Reset camera", &CameraPanel::_handle_callback, this);
+  reset_btn = small_button(row, "Restart camera", &CameraPanel::_handle_callback, this);
   SettingsUi::set_tone(reset_btn, SettingsUi::Tone::Warning);
   info = SettingsUi::hint(left, "...");
 
@@ -115,7 +115,7 @@ void CameraPanel::update_visibility() {
   else lv_obj_add_flag(slider_rows["wb_temperature"], LV_OBJ_FLAG_HIDDEN);
   if (manual) {
     lv_obj_clear_flag(slider_rows["exposure_time"], LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_state(exposure_dd, LV_STATE_DISABLED);    // one-way: Reset camera
+    lv_obj_add_state(exposure_dd, LV_STATE_DISABLED);    // one-way: Restart camera
   } else {
     lv_obj_add_flag(slider_rows["exposure_time"], LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_state(exposure_dd, LV_STATE_DISABLED);
@@ -199,7 +199,7 @@ void CameraPanel::handle_callback(lv_event_t *e) {
       lv_dropdown_set_selected(exposure_dd, 0);          // until confirmed
       SettingsUi::confirm("Manual exposure",
         "Set the exposure by hand?\n\nThe camera cannot switch back to automatic exposure "
-        "by itself: only Reset camera brings it back.", "Manual", SettingsUi::Tone::Warning,
+        "by itself: only Restart camera brings it back.", "Manual", SettingsUi::Tone::Warning,
         [this]() {
           lv_dropdown_set_selected(exposure_dd, 1);
           send({{"exposure_manual", true},
@@ -226,9 +226,9 @@ void CameraPanel::handle_callback(lv_event_t *e) {
         });
       });
   } else if (obj == reset_btn) {
-    SettingsUi::confirm("Reset camera",
+    SettingsUi::confirm("Restart camera",
       "Restart the camera?\n\nThe picture is gone for a few seconds; your settings are applied "
-      "again afterwards and the exposure goes back to automatic.", "Reset",
+      "again afterwards and the exposure goes back to automatic.", "Restart",
       SettingsUi::Tone::Warning, [this]() {
         lv_label_set_text(info, "Restarting the camera...");
         ws.send_jsonrpc(CAMERA_RESET_METHOD, json::object(), [this](json &reply) {

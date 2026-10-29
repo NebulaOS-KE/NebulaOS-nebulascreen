@@ -44,7 +44,7 @@ TEST(Camera, params_and_results) {
   ASSERT_EQ(camera_result_text(json::parse(R"({"result":{"result":"SAVED_APPLIES_LATER"}})")),
             std::string("Saved - applied when the camera is connected."));
   ASSERT_EQ(camera_result_text(json::parse(R"({"error":{"message":"EXPOSURE_ONE_WAY: x"}})")),
-            std::string("Automatic exposure comes back only with Reset camera."));
+            std::string("Automatic exposure comes back only with Restart camera."));
   ASSERT_EQ(camera_result_text(json::parse(R"({"error":{"message":"PRINTING: A print is running."}})")),
             std::string("A print is running."));
   ASSERT_EQ(camera_version_of(json::parse(R"({"result":{"firmware":"UVC-V020"}})")), std::string("UVC-V020"));
