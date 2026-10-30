@@ -36,6 +36,7 @@ static lv_obj_t *text_input(lv_obj_t *parent, const char *placeholder, uint32_t 
   lv_textarea_set_placeholder_text(ta, placeholder);
   lv_obj_add_event_cb(ta, &SpoolmanServerPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, user);
   lv_obj_add_event_cb(ta, &SpoolmanServerPanel::_handle_callback, LV_EVENT_FOCUSED, user);
+  lv_obj_add_event_cb(ta, &SpoolmanServerPanel::_handle_callback, LV_EVENT_CLICKED, user);
   lv_obj_add_event_cb(ta, &SpoolmanServerPanel::_handle_callback, LV_EVENT_READY, user);
   lv_obj_add_event_cb(ta, &SpoolmanServerPanel::_handle_callback, LV_EVENT_CANCEL, user);
   return ta;
@@ -46,40 +47,72 @@ SpoolmanServerPanel::SpoolmanServerPanel(KWebSocketClient &c, std::mutex &lock)
   , lv_lock(lock)
   , cont(SettingsUi::page("Spoolman server", &body))
 {
-  lv_obj_t *col = SettingsUi::column(body, 100);
-  lv_obj_set_style_pad_row(col, 4, 0);
-  SettingsUi::hint(col, "The Spoolman server the printer uses for spool tracking. "
-                        "Moonraker restarts after a change.");
-  current = SettingsUi::info_line(col, "Now");
+  // Laid out like Printers: a new server on the left, the one in use on the right.
+  lv_obj_t *left = SettingsUi::column(body, 52);
+  lv_obj_set_style_pad_row(left, 8, 0);
+  SettingsUi::hint(left, "Set or change the server. Moonraker restarts.");
+  // Above the fields: the keyboard covers the lower half while typing.
+  message = lv_label_create(left);
+  lv_obj_set_width(message, LV_PCT(100));
+  lv_label_set_long_mode(message, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_font(message, &lv_font_montserrat_10, 0);
+  lv_label_set_text(message, "");
 
-  lv_obj_t *row = plain_row(col);
-  host_input = text_input(row, "IP address or name", 253, this);
+  host_input = text_input(left, "Server IP address or name", 253, this);
+  lv_obj_set_width(host_input, LV_PCT(100));
   lv_textarea_set_accepted_chars(host_input, "abcdefghijklmnopqrstuvwxyz"
                                              "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-");
-  lv_obj_set_flex_grow(host_input, 1);
+
+  lv_obj_t *row = plain_row(left);
   port_input = text_input(row, "Port", 5, this);
   lv_textarea_set_accepted_chars(port_input, "0123456789");
   lv_obj_set_width(port_input, 90);
+  save_btn = small_button(row, LV_SYMBOL_PLUS " Use", &SpoolmanServerPanel::_handle_callback, this);
 
-  row = plain_row(col);
-  save_btn = small_button(row, "Save", &SpoolmanServerPanel::_handle_callback, this);
-  remove_btn = small_button(row, "Remove", &SpoolmanServerPanel::_handle_callback, this);
+  lv_obj_t *right = SettingsUi::column(body, 46);
+  lv_obj_set_height(right, LV_SIZE_CONTENT);   // clear of the Back tile
+  lv_obj_set_style_border_width(right, 2, 0);
+  lv_obj_set_style_border_opa(right, LV_OPA_COVER, 0);
+  lv_obj_set_style_pad_all(right, 6, 0);
+  lv_obj_t *t = lv_label_create(right);
+  lv_label_set_text(t, "In use");
+  lv_obj_set_style_text_font(t, &lv_font_montserrat_12, 0);
+  lv_obj_set_style_text_color(t, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
+
+  none_label = lv_label_create(right);
+  lv_obj_set_width(none_label, LV_PCT(100));
+  lv_label_set_long_mode(none_label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_font(none_label, &lv_font_montserrat_12, 0);
+
+  card = lv_obj_create(right);
+  lv_obj_set_size(card, LV_PCT(100), LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_all(card, 4, 0);
+  lv_obj_set_style_pad_left(card, 8, 0);
+  lv_obj_set_style_border_width(card, 2, 0);
+  lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_flex_flow(card, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(card, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_CENTER);
+  card_label = lv_label_create(card);
+  lv_obj_set_flex_grow(card_label, 1);
+  lv_label_set_long_mode(card_label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_font(card_label, &lv_font_montserrat_12, 0);
+  remove_btn = lv_btn_create(card);
+  lv_obj_set_size(remove_btn, 28, 28);
   lv_obj_set_style_bg_color(remove_btn, lv_palette_darken(LV_PALETTE_RED, 2), 0);
-  cancel_btn = small_button(row, "Cancel", &SpoolmanServerPanel::_handle_callback, this);
-  lv_obj_set_style_bg_color(cancel_btn, lv_palette_darken(LV_PALETTE_GREY, 3), 0);
+  lv_obj_t *x = lv_label_create(remove_btn);
+  lv_label_set_text(x, LV_SYMBOL_CLOSE);
+  lv_obj_center(x);
+  lv_obj_add_event_cb(remove_btn, &SpoolmanServerPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
-  message = lv_label_create(col);
-  lv_obj_set_width(message, LV_PCT(100));
-  lv_label_set_long_mode(message, LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_text_font(message, &lv_font_montserrat_12, 0);
-  lv_label_set_text(message, "");
+  back_btn = SettingsUi::back_tile(cont, &SpoolmanServerPanel::_handle_callback, this);
 
   kb = lv_keyboard_create(cont);
   lv_obj_add_flag(kb, LV_OBJ_FLAG_FLOATING);
   lv_obj_set_size(kb, LV_PCT(100), 136);
   lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
-  lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_TEXT_LOWER);
-  lv_keyboard_set_textarea(kb, host_input);
+  hide_keyboard();
+  show_current("", true);
 }
 
 SpoolmanServerPanel::~SpoolmanServerPanel() {
@@ -90,26 +123,48 @@ SpoolmanServerPanel::~SpoolmanServerPanel() {
 }
 
 // LVGL lock held by the caller (Connections button).
-void SpoolmanServerPanel::foreground() {
-  lv_label_set_text(current, "...");
+void SpoolmanServerPanel::foreground(const std::string &known) {
   lv_textarea_set_text(host_input, "");
   lv_textarea_set_text(port_input, std::to_string(SPOOLMAN_DEFAULT_PORT).c_str());
-  lv_obj_add_state(host_input, LV_STATE_FOCUSED);
-  lv_keyboard_set_textarea(kb, host_input);
-  lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_TEXT_LOWER);   // names too; "1#" has the digits
+  hide_keyboard();
+  configured = !known.empty();
+  show_current(known, known.empty());
   lv_obj_move_foreground(cont);
   validate();
   ws.send_jsonrpc(SPOOLMAN_STATUS_METHOD, json::object(), [this](json &reply) {
     auto v = spoolman_view(reply);
     std::lock_guard<std::mutex> lock(lv_lock);
     configured = v.configured;
-    lv_label_set_text(current, v.configured ? v.server.c_str() : "not configured");
-    if (v.configured && !v.host.empty()) {
-      lv_textarea_set_text(host_input, v.host.c_str());
-      if (v.port > 0) lv_textarea_set_text(port_input, std::to_string(v.port).c_str());
-    }
+    show_current(v.configured ? v.server : "", false);
     validate();
   });
+}
+
+// LVGL lock held by the caller. loading: nothing known yet, the status is on its way.
+void SpoolmanServerPanel::show_current(const std::string &server, bool loading) {
+  if (!server.empty()) {
+    lv_label_set_text(card_label, spoolman_card_text(server).c_str());
+    lv_obj_clear_flag(card, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(none_label, LV_OBJ_FLAG_HIDDEN);
+    return;
+  }
+  lv_label_set_text(none_label, loading ? "Reading..." : "No server set");
+  lv_obj_clear_flag(none_label, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(card, LV_OBJ_FLAG_HIDDEN);
+}
+
+void SpoolmanServerPanel::show_keyboard(lv_obj_t *ta) {
+  lv_keyboard_set_textarea(kb, ta);
+  lv_keyboard_set_mode(kb, ta == port_input ? LV_KEYBOARD_MODE_NUMBER
+                                            : LV_KEYBOARD_MODE_TEXT_LOWER);
+  lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(kb);
+}
+
+void SpoolmanServerPanel::hide_keyboard() {
+  lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_state(host_input, LV_STATE_FOCUSED);
+  lv_obj_clear_state(port_input, LV_STATE_FOCUSED);
 }
 
 void SpoolmanServerPanel::set_message(const std::string &text, bool error) {
@@ -125,11 +180,9 @@ void SpoolmanServerPanel::set_message(const std::string &text, bool error) {
 void SpoolmanServerPanel::validate() {
   auto c = spoolman_check(lv_textarea_get_text(host_input), lv_textarea_get_text(port_input));
   bool empty = std::string(lv_textarea_get_text(host_input)).empty();
-  set_message(c.message, !c.ok && !empty);
+  set_message(empty || c.ok ? "" : c.message, true);   // only what is wrong
   if (c.ok) lv_obj_clear_state(save_btn, LV_STATE_DISABLED);
   else lv_obj_add_state(save_btn, LV_STATE_DISABLED);
-  if (configured) lv_obj_clear_state(remove_btn, LV_STATE_DISABLED);
-  else lv_obj_add_state(remove_btn, LV_STATE_DISABLED);
 }
 
 void SpoolmanServerPanel::save() {
@@ -186,25 +239,27 @@ void SpoolmanServerPanel::handle_callback(lv_event_t *e) {
   lv_event_code_t code = lv_event_get_code(e);
   lv_obj_t *obj = lv_event_get_current_target(e);
   if (obj == host_input || obj == port_input) {
-    if (code == LV_EVENT_FOCUSED) {
-      lv_keyboard_set_textarea(kb, obj);
-      lv_keyboard_set_mode(kb, obj == port_input ? LV_KEYBOARD_MODE_NUMBER
-                                                 : LV_KEYBOARD_MODE_TEXT_LOWER);
+    // CLICKED too: a second tap on a field that kept its focus brings the keyboard back.
+    if (code == LV_EVENT_FOCUSED || code == LV_EVENT_CLICKED) {
+      show_keyboard(obj);
     } else if (code == LV_EVENT_VALUE_CHANGED) {
       validate();
     } else if (code == LV_EVENT_READY) {
+      hide_keyboard();
       save();
     } else if (code == LV_EVENT_CANCEL) {
-      lv_obj_move_background(cont);
+      hide_keyboard();
     }
     return;
   }
   if (code != LV_EVENT_CLICKED) return;
   if (obj == save_btn) {
+    hide_keyboard();
     save();
   } else if (obj == remove_btn) {
     remove();
-  } else if (obj == cancel_btn) {
+  } else if (obj == back_btn) {
+    hide_keyboard();
     lv_obj_move_background(cont);
   }
 }
@@ -213,6 +268,12 @@ void SpoolmanServerPanel::handle_callback(lv_event_t *e) {
 void SpoolmanServerPanel::sim_fill(const char *host, const char *port) {
   lv_textarea_set_text(host_input, host);
   lv_textarea_set_text(port_input, port);
+  show_keyboard(host_input);
   validate();
+}
+
+void SpoolmanServerPanel::sim_none() {
+  configured = false;
+  show_current("", false);
 }
 #endif

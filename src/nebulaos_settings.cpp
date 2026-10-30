@@ -450,6 +450,16 @@ SpoolmanView spoolman_view(const json &reply) {
   return v;
 }
 
+std::string spoolman_card_text(const std::string &server) {
+  std::string s = server;
+  auto scheme = s.find("://");
+  if (scheme != std::string::npos) s = s.substr(scheme + 3);
+  while (!s.empty() && s.back() == '/') s.pop_back();
+  auto colon = s.rfind(':');
+  if (colon == std::string::npos || s.find(':') != colon) return s;   // no port, or IPv6
+  return s.substr(0, colon) + "\nPort " + s.substr(colon + 1);
+}
+
 bool spoolman_restart_needed(const json &reply) {
   const json &r = result_of(reply);
   return str_at(r, "/result"_json_pointer) == "APPLIED" &&

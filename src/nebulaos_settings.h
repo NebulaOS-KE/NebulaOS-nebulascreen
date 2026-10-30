@@ -163,6 +163,8 @@ struct SpoolmanView {
 SpoolmanCheck spoolman_check(const std::string &host, const std::string &port);
 json spoolman_params(const std::string &host, int port);
 SpoolmanView spoolman_view(const json &status_reply);
+// "http://10.0.0.5:7912" -> "10.0.0.5\nPort 7912" for the Spoolman page's server card.
+std::string spoolman_card_text(const std::string &server);
 // After a successful change: Moonraker must restart to read it.
 bool spoolman_restart_needed(const json &reply);
 // A message for a failed call; "" when it worked (refusals: the busy text).

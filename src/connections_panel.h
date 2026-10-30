@@ -28,6 +28,7 @@ class ConnectionsPanel {
   void sim_fill();
   void sim_wifi();
   HostnamePanel &sim_hostname() { return hostname_panel; }
+  SpoolmanServerPanel &sim_spoolman() { return spoolman_server_panel; }
   void sim_rename() { lv_event_send(rename_btn, LV_EVENT_CLICKED, NULL); }
 #endif
 
@@ -60,6 +61,7 @@ class ConnectionsPanel {
   lv_obj_t *mainsail_value;
   lv_obj_t *moonraker_value;
   lv_obj_t *spoolman_value;
+  std::string spoolman;    // as last read, so the Spoolman page shows it at once
   lv_obj_t *wifi_btn;
   lv_obj_t *printers_btn;
   lv_obj_t *spoolman_btn;

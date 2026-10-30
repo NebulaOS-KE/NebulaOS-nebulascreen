@@ -387,6 +387,9 @@ TEST(Spoolman, params_view_restart_errors) {
   ASSERT_EQ(v.port, 7912);
   ASSERT_EQ(v.server, std::string("http://10.0.0.5:7912"));
   ASSERT_FALSE(spoolman_view(json::parse(R"({"result":{"configured":false,"server":null,"host":null,"port":null}})")).configured);
+  ASSERT_EQ(spoolman_card_text("http://10.0.0.5:7912"), std::string("10.0.0.5\nPort 7912"));
+  ASSERT_EQ(spoolman_card_text("http://spoolman.lan:7912/"), std::string("spoolman.lan\nPort 7912"));
+  ASSERT_EQ(spoolman_card_text("http://spoolman.lan"), std::string("spoolman.lan"));
   ASSERT_TRUE(spoolman_restart_needed(json::parse(R"({"result":{"result":"APPLIED","restart":"moonraker"}})")));
   ASSERT_FALSE(spoolman_restart_needed(json::parse(R"({"result":{"result":"UNCHANGED"}})")));
   ASSERT_EQ(spoolman_error_text(json::parse(R"({"result":{"result":"APPLIED"}})")), std::string(""));

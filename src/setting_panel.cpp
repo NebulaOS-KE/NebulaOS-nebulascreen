@@ -211,6 +211,14 @@ void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
         R"({"result":{"busy":true,"reason":"ACTIVE","klippy":"ready","profile":"restart",
             "message":"Not possible while the printer is moving or heating."}})"));
       SettingsUi::refusal(d.refusal); }},
+    // Spoolman server (Printers-style layout, 2026-10-30).
+    {"36-spoolman", [this, close_dialogs]() {
+      close_dialogs(); connections_panel.foreground(); connections_panel.sim_fill();
+      connections_panel.sim_spoolman().foreground("http://192.168.0.235:7912"); }},
+    {"37-spoolman-typing", [this]() {
+      connections_panel.sim_spoolman().sim_fill("192.168.0.20", "7912"); }},
+    {"38-spoolman-none", [this]() {
+      connections_panel.sim_spoolman().foreground(""); connections_panel.sim_spoolman().sim_none(); }},
   };
   sim_run_tour(dir, std::move(steps), []() { exit(0); });
 }

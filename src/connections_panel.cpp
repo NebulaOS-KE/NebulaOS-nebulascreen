@@ -93,6 +93,7 @@ void ConnectionsPanel::show(const json &net, const json &cfg) {
   lv_label_set_text(mainsail_value, v.mainsail.empty() ? "-" : v.mainsail.c_str());
   lv_label_set_text(moonraker_value, v.moonraker.empty() ? "-" : v.moonraker.c_str());
   lv_label_set_text(spoolman_value, v.spoolman.empty() ? "not configured" : v.spoolman.c_str());
+  spoolman = v.spoolman;
 }
 
 #ifdef SIMULATOR
@@ -123,6 +124,6 @@ void ConnectionsPanel::handle_callback(lv_event_t *e) {
   } else if (obj == printers_btn) {
     printer_select_panel.foreground();
   } else if (obj == spoolman_btn) {
-    spoolman_server_panel.foreground();
+    spoolman_server_panel.foreground(spoolman);
   }
 }
