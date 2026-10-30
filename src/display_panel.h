@@ -22,6 +22,7 @@ class DisplayPanel {
   void foreground();
 #ifdef SIMULATOR
   void sim_fill();
+  CameraPanel &sim_camera() { return camera_panel; }
 #endif
 
   static void _handle_callback(lv_event_t *e) {

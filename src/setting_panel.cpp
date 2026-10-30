@@ -219,6 +219,8 @@ void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
       connections_panel.sim_spoolman().sim_fill("192.168.0.20", "7912"); }},
     {"38-spoolman-none", [this]() {
       connections_panel.sim_spoolman().foreground(""); connections_panel.sim_spoolman().sim_none(); }},
+    {"39-camera", [this, close_dialogs]() {
+      close_dialogs(); display_panel.sim_camera().foreground(); }},
   };
   sim_run_tour(dir, std::move(steps), []() { exit(0); });
 }

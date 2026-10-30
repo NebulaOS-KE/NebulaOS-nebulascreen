@@ -121,6 +121,8 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	  if (!components.is_null()) {
 	    const auto &has_spoolman = components.template get<std::vector<std::string>>();
 	    if (std::find(has_spoolman.begin(), has_spoolman.end(), "spoolman") != has_spoolman.end()) {
+	      // This runs on the websocket thread; it changes LVGL state.
+	      std::lock_guard<std::mutex> lock(this->lv_lock);
 	      this->main_panel.enable_spoolman();
 	    }
 	    // Power devices only exist with a [power] section (NebulaOS ships

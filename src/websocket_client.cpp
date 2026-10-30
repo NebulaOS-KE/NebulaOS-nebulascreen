@@ -44,44 +44,66 @@ int KWebSocketClient::connect(const char* url,
     // }
     auto j = json::parse(msg);
 
-    if (j.contains("id")) {
-      // XXX: get rid of consumers and use function ptrs for callback
-      const auto &entry = consumers.find(j["id"]);
-      if (entry != consumers.end()) {
-        entry->second->consume(j);
-        consumers.erase(entry);
+    NotifyConsumer *consumer = nullptr;
+    std::function<void(json&)> cb;
+    std::vector<NotifyConsumer*> notify;
+    std::vector<std::function<void(json&)>> handlers;
+    std::string method;
+    if (j.contains("method")) {
+      method = j["method"].template get<std::string>();
+    }
+    {
+      std::lock_guard<std::mutex> guard(maps_lock);
+      if (j.contains("id") && j["id"].is_number_unsigned()) {
+        uint32_t rid = j["id"].template get<uint32_t>();
+        const auto &entry = consumers.find(rid);
+        if (entry != consumers.end()) {
+          consumer = entry->second;
+          consumers.erase(entry);
+        }
+        const auto &cb_entry = callbacks.find(rid);
+        if (cb_entry != callbacks.end()) {
+          cb = std::move(cb_entry->second);
+          callbacks.erase(cb_entry);
+        }
       }
-
-      const auto &cb_entry = callbacks.find(j["id"]);
-      if (cb_entry != callbacks.end()) {
-        cb_entry->second(j);
-        callbacks.erase(cb_entry);
+      if (!method.empty()) {
+        if ("notify_status_update" == method || "notify_filelist_changed" == method) {
+          notify = notify_consumers;
+        }
+        const auto &entry = method_resp_cbs.find(method);
+        if (entry != method_resp_cbs.end()) {
+          for (const auto &handler_entry : entry->second) {
+            handlers.push_back(handler_entry.second);
+          }
+        }
       }
     }
 
-    if (j.contains("method")) {
-      std::string method = j["method"].template get<std::string>();
-      if ("notify_status_update" == method || "notify_filelist_changed" == method) {
-        for (const auto &entry : notify_consumers) {
-          entry->consume(j);
-        }
-      }  //  else if ("notify_gcode_response" == method) {
+    if (consumer != nullptr) {
+      consumer->consume(j);
+    }
+    if (cb) {
+      cb(j);
+    }
+
+    if (!method.empty()) {
+      for (const auto &entry : notify) {
+        entry->consume(j);
+      }
+      //  else if ("notify_gcode_response" == method) {
       // 	for (const auto &gcode_cb : gcode_resp_cbs) {
       // 	  gcode_cb(j);
       // 	}
       // }
-      else if ("notify_klippy_disconnected" == method) {
+      if ("notify_klippy_disconnected" == method) {
         disconnected();
       } else if ("notify_klippy_ready" == method) {
         connected();
       }
 
-      for (const auto &entry : method_resp_cbs) {
-        if (method == entry.first) {
-          for (const auto &handler_entry : entry.second) {
-            handler_entry.second(j);
-          }
-        }
+      for (const auto &handler : handlers) {
+        handler(j);
       }
     }
   };
@@ -108,77 +130,70 @@ int KWebSocketClient::connect(const char* url,
 int KWebSocketClient::send_jsonrpc(const std::string &method,
 				   const json &params,
 				   std::function<void(json&)> cb) {
-  const auto &entry = callbacks.find(id);
-  if (entry == callbacks.end()) {
-    // spdlog::debug("registering consume %d, %x\n", id, consumer);
-    callbacks.insert({id, cb});
-    // XXX: check success, remove consumer if send is unsuccessfull
-    return send_jsonrpc(method, params);
-  } else {
-    // spdlog::debug("WARN: id %d is already register with a consumer\n", id);
+  uint64_t rid = id++;
+  {
+    std::lock_guard<std::mutex> guard(maps_lock);
+    callbacks[rid] = cb;
   }
-
-  return 0;
+  // XXX: check success, remove the callback if the send is unsuccessful
+  return send_rpc(method, &params, rid);
 }
 
 int KWebSocketClient::send_jsonrpc(const std::string &method,
 				   std::function<void(json&)> cb) {
-  const auto &entry = callbacks.find(id);
-  if (entry == callbacks.end()) {
-    // spdlog::debug("registering consume %d, %x\n", id, consumer);
-    callbacks.insert({id, cb});
-    // XXX: check success, remove consumer if send is unsuccessfull
-    return send_jsonrpc(method);
-  } else {
-    // spdlog::debug("WARN: id %d is already register with a consumer\n", id);
+  uint64_t rid = id++;
+  {
+    std::lock_guard<std::mutex> guard(maps_lock);
+    callbacks[rid] = cb;
   }
-
-  return 0;
+  return send_rpc(method, nullptr, rid);
 }
 
 int KWebSocketClient::send_jsonrpc(const std::string &method, const json &params, NotifyConsumer *consumer) {
-  const auto &entry = consumers.find(id);
-  if (entry == consumers.end()) {
-    consumers.insert({id, consumer});
-    return send_jsonrpc(method, params);
+  uint64_t rid = id++;
+  {
+    std::lock_guard<std::mutex> guard(maps_lock);
+    consumers[rid] = consumer;
   }
-  return 0;
+  return send_rpc(method, &params, rid);
 }
 
 void KWebSocketClient::register_notify_update(NotifyConsumer *consumer) {
+  std::lock_guard<std::mutex> guard(maps_lock);
   if (std::find(notify_consumers.begin(), notify_consumers.end(), consumer) == std::end(notify_consumers)) {
     notify_consumers.push_back(consumer);
   }
 }
 
 void KWebSocketClient::unregister_notify_update(NotifyConsumer *consumer) {
+  std::lock_guard<std::mutex> guard(maps_lock);
   notify_consumers.erase(std::remove_if(
     notify_consumers.begin(), notify_consumers.end(),
     [consumer](NotifyConsumer *c) {
       return c == consumer;
-    }));
+    }), notify_consumers.end());
+}
+
+int KWebSocketClient::send_rpc(const std::string &method, const json *params, uint64_t rid) {
+  json rpc;
+  rpc["jsonrpc"] = "2.0";
+  rpc["method"] = method;
+  if (params != nullptr) {
+    rpc["params"] = *params;
+  }
+  rpc["id"] = rid;
+
+  spdlog::debug("send_jsonrpc: {}", rpc.dump());
+  return send(rpc.dump());
 }
 
 int KWebSocketClient::send_jsonrpc(const std::string &method,
 				   const json &params) {
-  json rpc;
-  rpc["jsonrpc"] = "2.0";
-  rpc["method"] = method;
-  rpc["params"] = params;
-  rpc["id"] = id++;
-
-  spdlog::debug("send_jsonrpc: {}", rpc.dump());
-  return send(rpc.dump());
+  return send_rpc(method, &params, id++);
 }
 
 int KWebSocketClient::send_jsonrpc(const std::string &method) {
-  json rpc;
-  rpc["jsonrpc"] = "2.0";
-  rpc["method"] = method;
-  rpc["id"] = id++;
-
-  spdlog::debug("send_jsonrpc: {}", rpc.dump());
-  return send(rpc.dump());
+  return send_rpc(method, nullptr, id++);
 }
 
 int KWebSocketClient::gcode_script(const std::string &gcode) {
@@ -194,7 +209,7 @@ int KWebSocketClient::gcode_script(const std::string &gcode, std::function<void(
 void KWebSocketClient::register_method_callback(std::string resp_method,
 						std::string handler_name,
 						std::function<void(json&)> cb) {
-
+  std::lock_guard<std::mutex> guard(maps_lock);
   const auto &entry = method_resp_cbs.find(resp_method);
   if (entry == method_resp_cbs.end()) {
     spdlog::debug("registering new method {}, handler {}", resp_method, handler_name);

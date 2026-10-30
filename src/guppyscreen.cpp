@@ -271,15 +271,19 @@ void GuppyScreen::loop() {
           // refuses (backlight stays on) when no touch-wake path can run, so
           // the black screen_saver overlay is what always shows.
           display_call(DISPLAY_SLEEP_METHOD);
+          lv_lock.lock();
           lv_obj_move_foreground(screen_saver);
+          lv_lock.unlock();
           is_sleeping = true;
         }
       } else {
         if (is_sleeping.load()) {
           spdlog::debug("waking up display");
           nsfb::unblank(nsfb::device());
+          lv_lock.lock();
           lv_obj_move_background(screen_saver);
           lv_obj_invalidate(lv_scr_act());
+          lv_lock.unlock();
           // NebulaOS's touch watcher has usually woken the backlight
           // already; this is idempotent and restores the selected level.
           display_call(DISPLAY_WAKE_METHOD);

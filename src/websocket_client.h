@@ -9,6 +9,7 @@
 #include <vector>
 #include <atomic>
 #include <functional>
+#include <mutex>
 
 using json = nlohmann::json;
 
@@ -39,6 +40,12 @@ class KWebSocketClient : public hv::WebSocketClient {
 				std::function<void(json&)> cb);
   
  private:
+  int send_rpc(const std::string &method, const json *params, uint64_t rid);
+
+  // Requests are sent from the LVGL thread and from reply callbacks (the
+  // websocket thread); these maps are shared between both. Callbacks are
+  // invoked outside the lock, so they may send again.
+  std::mutex maps_lock;
   std::map<uint32_t, std::function<void(json&)>> callbacks;
   std::map<uint32_t, NotifyConsumer*> consumers;
   std::vector<NotifyConsumer*> notify_consumers;

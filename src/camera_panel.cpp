@@ -15,9 +15,10 @@ static lv_obj_t *right_dropdown(lv_obj_t *row, const char *options) {
 static lv_obj_t *small_button(lv_obj_t *parent, const char *text, lv_event_cb_t cb, void *user) {
   lv_obj_t *b = lv_btn_create(parent);
   lv_obj_set_size(b, LV_PCT(48), 36);
+  lv_obj_set_style_pad_hor(b, 4, 0);
   lv_obj_t *l = lv_label_create(b);
   lv_label_set_text(l, text);
-  lv_obj_set_style_text_font(l, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_font(l, &lv_font_montserrat_12, 0);
   lv_obj_center(l);
   lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, user);
   return b;
