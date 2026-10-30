@@ -21,8 +21,8 @@ The printer has two system slots, A and B. A system image installed from
 - If the other slot runs NebulaOS, you come back the same way: **Settings → Reset → Swap boot slot**
   there.
 - If the other slot runs the Creality system, coming back needs SSH on that system, installing a
-  NebulaOS `.img` with Creality's own updater, or USB recovery (see the NebulaOS-firmware
-  documentation). Do not switch the printer off and on while the Creality system runs: it can
+  NebulaOS `.img` with Creality's own updater ([Installing NebulaOS](Installing-NebulaOS)), or USB
+  recovery ([Recovery](Recovery)). Do not switch the printer off and on while the Creality system runs: it can
   re-flash the printer board.
 
 ## Freeing space from the Creality system

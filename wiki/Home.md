@@ -13,8 +13,8 @@ repository. See [Installation](Installation).
 
 ## Start here
 
-1. **[Installation and updates](Installation)** — how NebulaScreen gets onto the printer and how it
-   is updated.
+1. **[Installing NebulaOS](Installing-NebulaOS)** — from stock Creality firmware or OpenKE, with
+   Creality's own updater. Later: **[Updating NebulaOS](Updating-NebulaOS)** from the screen.
 2. **[Screen reference](Using-NebulaScreen)** — every tab and panel.
 3. **[Calibration walkthrough](Calibration-Explained)** — the order to calibrate a KE in.
 
@@ -39,8 +39,9 @@ repository. See [Installation](Installation).
 - Live tuning during a print: speed, flow, Z offset, pressure advance; firmware retraction and machine
   limits on their own panels
 - Power-loss recovery through NebulaOS
-- NebulaOS settings on the screen: Wi-Fi and static IP, printer name, display brightness and sleep,
-  boot logo, updates (packages and system image), logs, reset and A/B boot slot swap
+- NebulaOS settings on the screen: Wi-Fi and static IP, printer name, Spoolman server, display
+  brightness and sleep, boot logo, Nebula Camera settings ([Camera](Camera-Image-Tuning)), updates
+  (apps, and system images from USB, upload or online), logs, reset and A/B boot slot swap
 - Buzzer: touch click, `M300` with real pitch, `PLAY_TUNE` songs ([Beeps & songs](Buzzer-and-Sounds))
 - Print-state locks: actions that could ruin a running print are blocked or ask first
 

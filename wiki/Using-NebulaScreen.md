@@ -141,7 +141,7 @@ cancel that too.
 
 ### Spoolman
 
-Shortcut straight to the [Spoolman panel](#spoolman-panel) — same one reachable from Settings.
+Opens the [Spoolman panel](#spoolman-panel) (the spool list). The server is set in Settings → Connections → **Spoolman**.
 
 ### Manual extrude / retract
 
@@ -494,7 +494,7 @@ actually works.
 | Section | What it does |
 |---|---|
 | **Power devices** | On/off buttons for smart plugs or relays configured in Moonraker's `[power]` section. NebulaOS ships none, so this section is normally not shown. |
-| **Power Loss Recovery** | Shows the state of NebulaOS power-loss recovery (the Klipper object `nebulaos_power_loss_recovery`). Not automatic: after power comes back, open this screen. While a print runs it says the print is being recorded. After a power cut it shows the interrupted file and, when the printer allows a physical resume, a **Resume Print** button (asks to confirm); **Discard** drops the record. If the record cannot be resumed (file or printer configuration changed), it says why and offers only **Discard**. |
+| **Power Loss Recovery** | Shows the state of NebulaOS power-loss recovery (the Klipper object `nebulaos_power_loss_recovery`). After a power cut the screen asks by itself: "A print was interrupted by a power loss... Resume?" with **Later** and **Resume** (Mainsail shows the same question). **Resume** heats, homes X and Y, lifts, primes and continues; **Later** keeps the record for this screen. While a print runs it says the print is being recorded. After a power cut it shows the interrupted file and, when the printer allows a physical resume, a **Resume Print** button (asks to confirm); **Discard** drops the record. If the record cannot be resumed (file or printer configuration changed), it says why and offers only **Discard**. |
 
 ### TMC Metrics
 
@@ -608,10 +608,10 @@ A grid of six tiles. Each opens its own page; **Back** returns to the grid.
 | Tile | What's there |
 |---|---|
 | **Connections** | Wi-Fi, address, printer name, Mainsail / Moonraker / Spoolman |
-| **Display** | Brightness, sleep, theme, touch beep, boot logo |
+| **Display** | Brightness, sleep, theme, touch beep, boot logo, camera |
 | **Printer** | Jog and temperature defaults, Klipper and MCU restarts, MCU firmware |
 | **System** | Version info, report a problem, storage, logs, restart / reboot / shut down |
-| **Updates** | Package updates and system image install |
+| **Updates** | App updates and system image install (USB, upload, online) |
 | **Reset** | GUI settings, touch calibration, clean reset, boot slot swap |
 
 ### Connections
@@ -622,7 +622,12 @@ has no Spoolman). Buttons:
 
 - **Wi-Fi networks** — see [Wi-Fi panel](#wi-fi-panel).
 - **Printers** — see [Printers panel](#printers-panel).
-- **Spoolman** — see [Spoolman panel](#spoolman-panel).
+- **Spoolman** — the Spoolman server the printer uses. On the right, **In use** shows the current
+  server (address and port); its **✕** stops using Spoolman. On the left, type a new address (IP or
+  name) and port (Spoolman's default is 7912) and tap **Use**: NebulaOS writes it into
+  `moonraker.conf` (`[spoolman] server`) and restarts Moonraker; the screen reconnects after a few
+  seconds. The keyboard's keyboard key hides it; tap a field to bring it back. The spool list itself
+  is in the Filament panel ([Spoolman panel](#spoolman-panel)).
 
 **Change** (printer name) sets the network name: the printer is then reachable as `<name>.local`.
 Invalid names are flagged while you type; saving asks to confirm first.
@@ -636,6 +641,7 @@ Invalid names are flagged while you type; saving asks to confirm first.
 | **Theme colour** | Blue, Red, Green, Purple, Pink, Yellow. Applies immediately. |
 | **Touch beep** | A short click through the buzzer on every tap. A test beep plays when you turn it on. |
 | **Boot logo** | Choose the boot screen and power-on logo of this boot slot: the NebulaOS logo, an image added from a USB stick or uploaded in Mainsail (PNG, BMP or JPEG, max 4 MB), or **Restore Creality logo**. |
+| **Camera** | Creality Nebula Camera settings: night mode, anti-flicker, white balance, exposure, picture sliders, **Defaults**, **Restart camera**. See [Camera](Camera-Image-Tuning). |
 
 ### Printer
 
@@ -669,9 +675,11 @@ update, and each row has its own **Update** button. Klipper stops while Klipper 
 update.
 
 **System image** installs a NebulaOS (or Creality) `.img` from a USB stick or from
-`config/uploads/system-image` into the boot slot that is not running, then restarts into it. After a
-NebulaOS image, the new slot gets one trial boot: if Klipper and the screen do not come up, NebulaOS
-goes back to the previous slot. See [Installation and updates](Installation#updates).
+`config/uploads/system-image` into the boot slot that is not running, then restarts into it.
+**Online** asks GitHub for a newer NebulaOS release and downloads it (checked against the
+release); it then shows in the list as **Downloaded** and installs the same way. After a NebulaOS
+image, the new slot gets a trial start: if Klipper and the screen do not come up, NebulaOS goes
+back to the previous slot. See [Updating NebulaOS](Updating-NebulaOS).
 
 ### Reset
 
@@ -743,9 +751,8 @@ Each configured printer is a card with its name, IP and port, plus:
 
 ![Spoolman panel](images/spoolman-panel.png)
 
-Opens from Settings → Connections → **Spoolman**, and from the Filament panel. Requires a
-[Spoolman](https://github.com/Donkie/Spoolman) server configured in Moonraker; the button is greyed
-out until Moonraker reports one.
+Opens from the Filament panel. Requires a [Spoolman](https://github.com/Donkie/Spoolman) server,
+set in Settings → Connections → **Spoolman** (or by hand in `moonraker.conf`).
 
 | Feature | What it does |
 |---|---|

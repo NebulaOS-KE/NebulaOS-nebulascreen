@@ -3,8 +3,7 @@
 NebulaScreen is not installed on its own. It is part of the **NebulaOS** image for the Ender-3 V3 KE:
 [`NebulaOS-firmware`](https://github.com/NebulaOS-KE/NebulaOS-firmware) pins a commit of this
 repository, cross-compiles it with `scripts/build-release.sh` and puts it into the read-only system
-image. Installing NebulaOS installs NebulaScreen. Follow the NebulaOS-firmware documentation for
-installing NebulaOS itself.
+image. Installing NebulaOS installs NebulaScreen: see [Installing NebulaOS](Installing-NebulaOS).
 
 > **Mounting the screen:** a 3D-printable bracket for the KE display is on Thingiverse —
 > [Ender-3 V3 KE screen mount](https://www.thingiverse.com/thing:6617266). For a mount closer to the
@@ -32,21 +31,18 @@ To restart only the screen, use **Settings → System → Restart GUI**. Over SS
 
 ## Updates
 
-- **With NebulaOS images.** A new NebulaOS image brings its own NebulaScreen. Images can be installed
-  from the screen: **Settings → Updates → System image** (a `.img` from a USB stick or from
-  `config/uploads/system-image`). The image is written to the boot slot (A/B) that is not running,
-  and the printer restarts into it.
-- **As a release zip.** Each release tag of this repository publishes one asset,
-  `nebulascreen-vX.Y.Z.zip` ([Releases and deployment](Releases-and-Deployment)). It is made for
-  Moonraker's update manager (`type: zip`), which installs it into
+- **With NebulaOS images.** A new NebulaOS image brings its own NebulaScreen: **Settings → Updates →
+  System image**, from a USB stick, a Mainsail upload or **Online** ([Updating NebulaOS](Updating-NebulaOS)).
+  After a new image is installed, the image's own NebulaScreen is used again.
+- **On its own.** Each release tag of this repository publishes `nebulascreen-vX.Y.Z.zip`
+  ([Releases and deployment](Releases-and-Deployment)). Moonraker's update manager lists it as
+  `nebulascreen` (type `zip`, since NebulaOS Run 19) and installs it into
   `/usr/data/nebulaos/apps/nebulascreen`; the NebulaOS update supervisor checks it and rolls it back
-  if it fails. The image's `moonraker.conf` has no update-manager entry for NebulaScreen yet, so in
-  practice NebulaScreen updates come with NebulaOS images. After a new image is installed, the
-  image's own NebulaScreen is used again.
+  if it fails. Without a downloaded release, the image's copy in `/opt/nebulascreen` runs.
 
 **Settings → Updates** on the screen lists what Moonraker's update manager knows (Klipper, Moonraker,
-Mainsail, NebulaOS extensions, ...), with **Check now**, **Update all** and one **Update** button per
-entry.
+Mainsail, NebulaOS extensions, NebulaScreen, ...), with **Check now**, **Update all** and one
+**Update** button per entry.
 
 ## Coming from a GuppyScreen-era NebulaOS image
 

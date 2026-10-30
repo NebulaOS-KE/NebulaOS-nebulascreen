@@ -7,7 +7,7 @@ the [full calibration walkthrough](Calibration-Explained).
 | # | Menu row | You need | Time |
 |---|---|---|---|
 | 1 | **Bed Tramming** | an empty bed (and maybe a printed shim) | 5-15 min |
-| 2 | **Heaters (PID)** | an empty, cool printer | about 5 min per heater |
+| 2 | **Heaters (PID)** | an empty, cool printer | hotend a few minutes, bed longer |
 | 3 | **Axis Twist** | a sheet of paper | about 5 min |
 | 4 | **Auto Calibration** | an empty bed - no tools | about 7 min |
 | 5 | **Input Shaper** | the accelerometer | about 5 min |
@@ -57,9 +57,11 @@ Details: [Bed tramming](Bed-Tramming).
 ## 2. Heaters (PID)
 
 Teaches the bed and the hotend heaters to hold their temperature steadily. Two buttons:
-**Bed 65 C** and **Hotend 230 C** - start with the bed. Each heats and cools a few times (about
-5 minutes; the temperature going up and down is normal), then saves with one Klipper restart.
-Redo it after changing a heater, a thermistor or the hotend.
+**Bed 65 C** and **Hotend 230 C** - start with the bed. Each heats and cools a few times (the
+temperature going up and down is normal), then saves with one Klipper restart. The screen shows
+the progress: "Heating up", then "Measuring: cycle n of 6, about m min left". The hotend takes a few
+minutes; the bed much longer, because each of its swings takes about 3 minutes. The Calibration
+menu remembers both heaters. Redo it after changing a heater, a thermistor or the hotend.
 
 It comes before Auto Calibration on purpose: the hotend oozes during the long hot phase, and Auto
 Calibration's nozzle clean removes that before the Z offset is measured.

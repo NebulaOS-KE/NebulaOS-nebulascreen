@@ -2,7 +2,8 @@
 
 **Get started**
 - [Home](Home)
-- [Installation and updates](Installation)
+- [Installing NebulaOS](Installing-NebulaOS)
+- [Updating NebulaOS](Updating-NebulaOS)
 
 **Get great prints**
 - [Calibration guide (4 steps)](Calibration-Guide)
@@ -16,11 +17,13 @@
 
 **Using the screen**
 - [Screen reference (every setting)](Using-NebulaScreen)
+- [Camera](Camera-Image-Tuning)
 - [Beeps & songs (buzzer)](Buzzer-and-Sounds)
 
 **Help**
 - [Troubleshooting](Troubleshooting)
 - [Resetting](Resetting)
+- [Recovery](Recovery)
 
 ---
 ### 🛠️ Developers
@@ -36,6 +39,7 @@
 
 **NebulaOS**
 - [Integration with NebulaOS](Integration-with-NebulaOS)
+- [Screen app install and files](Installation)
 - [Config and theme](Config-and-Theme)
 - [Vendored dependencies](Vendored-Dependencies)
 - [History and credits](History-and-Credits)
