@@ -153,6 +153,9 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	    std::string obj_name = obj.template get<std::string>();
 	    if (obj_name.rfind("gcode_macro ", 0 ) != 0) {
 	      sub_objs[obj_name] = nullptr;
+	    } else if (obj_name == "gcode_macro START_PRINT") {
+	      // G112 (2026-10-31): its step variable feeds the print start step list.
+	      sub_objs[obj_name] = nullptr;
 	    } else if (obj_name == "gcode_macro M600") {
 	      // gcode_macro objects are deliberately excluded from the live
 	      // subscription above, so FilamentRunoutPanel can never discover

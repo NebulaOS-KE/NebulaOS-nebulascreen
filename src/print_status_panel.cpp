@@ -1,5 +1,6 @@
 #include "print_status_panel.h"
 #include "finetune_panel.h"
+#include "settings_ui.h"
 #include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
@@ -160,6 +161,15 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   lv_obj_set_style_text_align(filename_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_text(filename_label, "");
   lv_obj_move_to_index(filename_label, 1);
+
+  // G112: while START_PRINT runs, its steps stand in for the thumbnail.
+  start_label = lv_label_create(thumbnail_cont);
+  lv_obj_set_width(start_label, LV_PCT(100));
+  lv_label_set_long_mode(start_label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_font(start_label, &lv_font_montserrat_12, 0);
+  lv_obj_set_style_text_line_space(start_label, 3, 0);
+  lv_obj_move_to_index(start_label, 0);
+  lv_obj_add_flag(start_label, LV_OBJ_FLAG_HIDDEN);
 
   // row 1
   lv_obj_set_grid_cell(thumbnail_cont, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
@@ -438,6 +448,32 @@ void PrintStatusPanel::consume(json &j) {
     lv_obj_add_flag(objects_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   }
 
+  // G112: START_PRINT's step and the temperatures it waits for.
+  {
+    bool changed = false;
+    static const auto step_ptr = "/params/0/gcode_macro START_PRINT/step"_json_pointer;
+    static const auto soak_ptr = "/params/0/gcode_macro START_PRINT/soak_seconds"_json_pointer;
+    json st = j.contains(step_ptr) ? j[step_ptr] : json();
+    if (st.is_string()) {
+      std::string step = st.template get<std::string>();
+      if (step == "preparing" && start_in.step != "preparing") start_in.soaked = false;
+      if (step == "soak" && start_in.step != "soak") {
+        start_in.soaked = true;
+        soak_seen = std::chrono::steady_clock::now();
+      }
+      start_in.step = step;
+      changed = true;
+    }
+    if (j.contains(soak_ptr) && j[soak_ptr].is_number()) {
+      start_in.soak_seconds = j[soak_ptr].template get<int>();
+      changed = true;
+    }
+    for (auto *p : {"/params/0/heater_bed", "/params/0/extruder"}) {
+      if (j.contains(json::json_pointer(p))) changed = true;
+    }
+    if (changed) update_start();
+  }
+
   auto printfile = j["/params/0/print_stats/filename"_json_pointer];
   if (!printfile.is_null()) {
     // filename change indicates a start of a print
@@ -637,6 +673,19 @@ void PrintStatusPanel::handle_callback(lv_event_t *event) {
   } else if (btn == emergency_btn.get_container()) {
     ws.send_jsonrpc("printer.emergency_stop");
   } else if (btn == pause_btn.get_container()) {
+    if (start_running(start_in.step)) {
+      // G112: Klipper runs START_PRINT to the end before it can pause.
+      SettingsUi::confirm("Pause",
+        "The printer is still preparing (heating, bed mesh, purge line). A pause takes "
+        "effect after that - Cancel waits too. Only the emergency stop acts at once.",
+        "Pause after start", SettingsUi::Tone::Warning, [this]() {
+          ws.send_jsonrpc("printer.print.pause");
+          pause_btn.disable();
+          pause_requested = true;
+          update_start();
+        });
+      return;
+    }
     ws.send_jsonrpc("printer.print.pause");
     pause_btn.disable();
 
@@ -837,6 +886,39 @@ FineTunePanel &PrintStatusPanel::get_finetune_panel() {
 
 ZOffsetPanel &PrintStatusPanel::get_zoffset_panel() {
   return zoffset_panel;
+}
+
+// G112. LVGL lock held.
+void PrintStatusPanel::update_start() {
+  auto *s = State::get_instance();
+  auto num = [s](const char *ptr) {
+    auto v = s->get_data(json::json_pointer(ptr));
+    return v.is_number() ? v.template get<double>() : 0.0;
+  };
+  start_in.bed = num("/printer_state/heater_bed/temperature");
+  start_in.bed_target = num("/printer_state/heater_bed/target");
+  start_in.nozzle = num("/printer_state/extruder/temperature");
+  start_in.nozzle_target = num("/printer_state/extruder/target");
+  start_in.soak_elapsed = (int)std::chrono::duration_cast<std::chrono::seconds>(
+    std::chrono::steady_clock::now() - soak_seen).count();
+  auto rows = start_steps(start_in);
+  if (rows.empty()) {
+    pause_requested = false;
+    lv_obj_add_flag(start_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(thumbnail, LV_OBJ_FLAG_HIDDEN);
+    return;
+  }
+  std::string text = "Starting the print\n";
+  for (const auto &r : rows) {
+    const char *mark = r.state == StartStepState::Done ? LV_SYMBOL_OK "  "
+                     : r.state == StartStepState::Current ? LV_SYMBOL_RIGHT "  " : "      ";
+    text += std::string(mark) + r.text + "\n";
+  }
+  if (pause_requested) text += LV_SYMBOL_PAUSE "  Pause requested - after the start";
+  else text.pop_back();
+  lv_label_set_text(start_label, text.c_str());
+  lv_obj_clear_flag(start_label, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(thumbnail, LV_OBJ_FLAG_HIDDEN);
 }
 
 #ifdef SIMULATOR

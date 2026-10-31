@@ -1,6 +1,8 @@
 #ifndef __PRINT_STATUS_PANEL_H__
 #define __PRINT_STATUS_PANEL_H__
 
+#include "print_start.h"
+#include <chrono>
 #include "websocket_client.h"
 #include "notify_consumer.h"
 #include "button_container.h"
@@ -54,6 +56,7 @@ class PrintStatusPanel : public NotifyConsumer {
   lv_obj_t *get_mini_chip() { return mini_print_status.get_chip(); }
 
 #ifdef SIMULATOR
+  void sim_click_pause() { lv_event_send(pause_btn.get_container(), LV_EVENT_CLICKED, NULL); }
   // Populate fake print state (filename, progress, elapsed) so the panel can be
   // visually verified without a Moonraker connection.
   void sim_setup_mock_data();
@@ -114,6 +117,13 @@ class PrintStatusPanel : public NotifyConsumer {
   // Tracks the previous /printer_state/print_stats/state so we can dismiss the
   // panel only when we transition out of an active print (#94).
   std::string last_print_state;
+
+  // G112 (2026-10-31): the step list while START_PRINT runs (print_start.h).
+  void update_start();
+  lv_obj_t *start_label = NULL;
+  StartInput start_in;
+  std::chrono::steady_clock::time_point soak_seen;
+  bool pause_requested = false;
 
   // flow rate
   std::time_t flow_ts;

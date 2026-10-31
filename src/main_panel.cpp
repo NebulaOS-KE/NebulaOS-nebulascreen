@@ -1,4 +1,5 @@
 #include "main_panel.h"
+#include "settings_ui.h"
 #include "state.h"
 #include "utils.h"
 #include "lvgl/lvgl.h"
@@ -951,6 +952,36 @@ void MainPanel::sim_tour(const char *dir) {
       print_status_panel.foreground(); }},
     {"m61-finetune-printing", [this]() { print_status_panel.get_finetune_panel().foreground(); }},
     {"m62-home-printing", [tab, this]() { tab(main_tab); }},
+    // G112 (2026-10-31): the step list while START_PRINT runs.
+    {"m63-print-start-heating", [this]() {
+      json mock = {{"params", {{
+        {"gcode_macro START_PRINT", {{"step", "preparing"}, {"soak_seconds", 0}}},
+        {"heater_bed", {{"temperature", 41.3}, {"target", 85}}},
+        {"extruder", {{"temperature", 150}, {"target", 150}}}}}}};
+      State::get_instance()->consume(mock);
+      lv_lock.unlock();
+      print_status_panel.consume(mock);
+      json mock2 = {{"params", {{{"gcode_macro START_PRINT", {{"step", "heating_bed"}}}}}}};
+      State::get_instance()->consume(mock2);
+      print_status_panel.consume(mock2);
+      lv_lock.lock();
+      print_status_panel.foreground(); }},
+    {"m64-print-start-soak", [this]() {
+      json mock = {{"params", {{
+        {"gcode_macro START_PRINT", {{"step", "soak"}, {"soak_seconds", 680}}},
+        {"heater_bed", {{"temperature", 85.1}, {"target", 85}}}}}}};
+      State::get_instance()->consume(mock);
+      lv_lock.unlock();
+      print_status_panel.consume(mock);
+      lv_lock.lock(); }},
+    {"m65-print-start-pause", [this]() { print_status_panel.sim_click_pause(); }},
+    {"m66-print-start-done", [this]() {
+      json mock = {{"params", {{{"gcode_macro START_PRINT", {{"step", ""}}}}}}};
+      SettingsUi::dismiss_confirms();
+      State::get_instance()->consume(mock);
+      lv_lock.unlock();
+      print_status_panel.consume(mock);
+      lv_lock.lock(); }},
   };
   sim_run_tour(dir, std::move(steps), [this, st, dir]() {
     st({{"print_stats", {{"state", "standby"}}}});
