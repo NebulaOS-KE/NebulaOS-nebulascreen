@@ -27,7 +27,7 @@ static lv_obj_t *small_button(lv_obj_t *parent, const char *text, lv_event_cb_t 
 CameraPanel::CameraPanel(KWebSocketClient &c, std::mutex &lock)
   : ws(c)
   , lv_lock(lock)
-  , cont(SettingsUi::page("Camera", &body))
+  , cont(SettingsUi::page("Nebula Camera", &body))
 {
   SettingsUi::on_shown(cont, [this]() { shown(); });
   lv_obj_t *left = SettingsUi::column(body, 48);
@@ -42,6 +42,17 @@ CameraPanel::CameraPanel(KWebSocketClient &c, std::mutex &lock)
     lv_obj_add_event_cb(dd, &CameraPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
   }
 
+  // 2026-10-31 (Tim): nothing reaches the camera until Save, which applies
+  // the changes and keeps them for every start.
+  save_btn = lv_btn_create(left);
+  lv_obj_set_size(save_btn, LV_PCT(100), 32);
+  lv_obj_t *save_label = lv_label_create(save_btn);
+  lv_label_set_text(save_label, LV_SYMBOL_SAVE " Save");
+  lv_obj_set_style_text_font(save_label, &lv_font_montserrat_12, 0);
+  lv_obj_center(save_label);
+  lv_obj_add_event_cb(save_btn, &CameraPanel::_handle_callback, LV_EVENT_CLICKED, this);
+  lv_obj_add_state(save_btn, LV_STATE_DISABLED);
+
   lv_obj_t *row = lv_obj_create(left);
   lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(row, 0, 0);
@@ -53,7 +64,7 @@ CameraPanel::CameraPanel(KWebSocketClient &c, std::mutex &lock)
   defaults_btn = small_button(row, "Defaults", &CameraPanel::_handle_callback, this);
   reset_btn = small_button(row, "Restart camera", &CameraPanel::_handle_callback, this);
   SettingsUi::set_tone(reset_btn, SettingsUi::Tone::Warning);
-  info = SettingsUi::hint(left, "...");
+  info = SettingsUi::hint(right, "...");   // on top of the sliders (scrolls with them)
 
   for (const auto &s : camera_sliders()) {
     lv_obj_t *r = lv_obj_create(right);
@@ -91,6 +102,21 @@ CameraPanel::~CameraPanel() {
 void CameraPanel::foreground() {
   lv_obj_move_foreground(cont);
 }
+
+#ifdef SIMULATOR
+void CameraPanel::sim_fill() {
+  show(json::parse(R"({"result":{"present":true,"firmware":"V1.2.5",
+    "config":{"ir_mode":"auto","power_line":"50","wb_auto":true,"exposure_manual":false,
+              "brightness":0,"contrast":32,"saturation":64,"sharpness":3,"zoom":100},
+    "defaults":{"brightness":0,"contrast":32,"saturation":64,"sharpness":3,"zoom":100,
+                "wb_temperature":4600,"exposure_time":156}}})"));
+}
+
+void CameraPanel::sim_edit() {
+  lv_dropdown_set_selected(ir_dd, 1);
+  change({{"ir_mode", camera_ir_values()[1]}});
+}
+#endif
 
 // LVGL thread, lock held (SettingsUi::on_shown).
 void CameraPanel::shown() {
@@ -132,6 +158,8 @@ void CameraPanel::show(const json &reply) {
   }
   loading = true;
   config = v.config;
+  pending = json::object();
+  show_pending();
   lv_dropdown_set_selected(ir_dd, camera_index_of(camera_ir_values(),
                                                   camera_str(config, "ir_mode", "auto")));
   lv_dropdown_set_selected(flicker_dd, camera_index_of(camera_flicker_values(),
@@ -159,9 +187,28 @@ void CameraPanel::show(const json &reply) {
   }
 }
 
-void CameraPanel::send(const json &changes) {
-  for (auto &kv : changes.items()) config[kv.key()] = kv.value();
+// LVGL lock held. A change stays on the page until Save.
+void CameraPanel::change(const json &changes) {
+  for (auto &kv : changes.items()) {
+    config[kv.key()] = kv.value();
+    pending[kv.key()] = kv.value();
+  }
   update_visibility();
+  show_pending();
+}
+
+// LVGL lock held.
+void CameraPanel::show_pending() {
+  if (pending.empty()) lv_obj_add_state(save_btn, LV_STATE_DISABLED);
+  else lv_obj_clear_state(save_btn, LV_STATE_DISABLED);
+}
+
+// LVGL lock held. Applies the changes and keeps them (the backend saves).
+void CameraPanel::save() {
+  if (pending.empty()) return;
+  json changes = pending;
+  pending = json::object();
+  show_pending();
   ws.send_jsonrpc(CAMERA_SETTINGS_METHOD, camera_settings_params(changes),
                   [this](json &reply) { after(reply); });
 }
@@ -178,7 +225,20 @@ void CameraPanel::handle_callback(lv_event_t *e) {
   lv_event_code_t code = lv_event_get_code(e);
   lv_obj_t *obj = lv_event_get_current_target(e);
   if (code == LV_EVENT_CLICKED && obj == back_tile) {
-    lv_obj_move_background(cont);
+    if (pending.empty()) {
+      lv_obj_move_background(cont);
+      return;
+    }
+    SettingsUi::confirm("Unsaved changes", "Leave without saving?\n\nThe camera keeps its "
+      "saved settings.", "Discard", SettingsUi::Tone::Warning, [this]() {
+        pending = json::object();
+        show_pending();
+        lv_obj_move_background(cont);
+      });
+    return;
+  }
+  if (code == LV_EVENT_CLICKED && obj == save_btn) {
+    save();
     return;
   }
   if (loading) return;
@@ -186,24 +246,24 @@ void CameraPanel::handle_callback(lv_event_t *e) {
     if (obj != kv.second) continue;
     int value = lv_slider_get_value(obj);
     lv_label_set_text(slider_values[kv.first], std::to_string(value).c_str());
-    if (code == LV_EVENT_RELEASED) send({{kv.first, value}});
+    if (code == LV_EVENT_RELEASED) change({{kv.first, value}});
     return;
   }
   if (code == LV_EVENT_VALUE_CHANGED) {
     if (obj == ir_dd) {
-      send({{"ir_mode", camera_ir_values()[lv_dropdown_get_selected(ir_dd)]}});
+      change({{"ir_mode", camera_ir_values()[lv_dropdown_get_selected(ir_dd)]}});
     } else if (obj == flicker_dd) {
-      send({{"power_line", camera_flicker_values()[lv_dropdown_get_selected(flicker_dd)]}});
+      change({{"power_line", camera_flicker_values()[lv_dropdown_get_selected(flicker_dd)]}});
     } else if (obj == wb_dd) {
-      send({{"wb_auto", lv_dropdown_get_selected(wb_dd) == 0}});
+      change({{"wb_auto", lv_dropdown_get_selected(wb_dd) == 0}});
     } else if (obj == exposure_dd && lv_dropdown_get_selected(exposure_dd) == 1) {
       lv_dropdown_set_selected(exposure_dd, 0);          // until confirmed
       SettingsUi::confirm("Manual exposure",
-        "Set the exposure by hand?\n\nThe camera cannot switch back to automatic exposure "
-        "by itself: only Restart camera brings it back.", "Manual", SettingsUi::Tone::Warning,
+        "Set the exposure by hand?\n\nAfter Save, the camera cannot switch back to "
+        "automatic exposure by itself: only Restart camera brings it back.", "Manual", SettingsUi::Tone::Warning,
         [this]() {
           lv_dropdown_set_selected(exposure_dd, 1);
-          send({{"exposure_manual", true},
+          change({{"exposure_manual", true},
                 {"exposure_time", (int)lv_slider_get_value(sliders["exposure_time"])}});
         });
     }

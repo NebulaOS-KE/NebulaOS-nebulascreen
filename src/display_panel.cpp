@@ -1,6 +1,7 @@
 #include "display_panel.h"
 #include "config.h"
 #include "guppyscreen.h"
+#include "nebulaos_camera.h"
 #include "nebulaos_display.h"
 #include "nebulaos_system.h"
 #include "settings_ui.h"
@@ -102,8 +103,11 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
                                           &DisplayPanel::_handle_callback, this);
   power_label = SettingsUi::hint(right, "Power-on logo: ...");
   // G121 (Run 22): the Nebula Camera controls - the Settings home grid is full
-  camera_btn = SettingsUi::icon_button(right, &camera_img, "Camera",
+  // 2026-10-31: only for the Nebula Camera - greyed out unless one is connected
+  // (checked every time this page comes on top).
+  camera_btn = SettingsUi::icon_button(right, &camera_img, "Nebula Camera",
                                        &DisplayPanel::_handle_callback, this);
+  lv_obj_add_state(camera_btn, LV_STATE_DISABLED);
 
   for (lv_obj_t *w : {brightness_dd, sleep_dd, theme_dd, beep_sw}) {
     lv_obj_add_event_cb(w, &DisplayPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
@@ -131,6 +135,17 @@ void DisplayPanel::shown() {
     std::lock_guard<std::mutex> lock(lv_lock);
     lv_label_set_text(power_label, power_on_view(status).text.c_str());
   });
+  ws.send_jsonrpc(CAMERA_STATUS_METHOD, json::object(), [this](json &status) {
+    auto v = camera_view(status);
+    std::lock_guard<std::mutex> lock(lv_lock);
+    show_camera_present(v.ok && v.present);
+  });
+}
+
+// LVGL lock held.
+void DisplayPanel::show_camera_present(bool present) {
+  if (present) lv_obj_clear_state(camera_btn, LV_STATE_DISABLED);
+  else lv_obj_add_state(camera_btn, LV_STATE_DISABLED);
 }
 
 void DisplayPanel::report_error(json &reply, const char *what) {

@@ -219,8 +219,15 @@ void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
       connections_panel.sim_spoolman().sim_fill("192.168.0.20", "7912"); }},
     {"38-spoolman-none", [this]() {
       connections_panel.sim_spoolman().foreground(""); connections_panel.sim_spoolman().sim_none(); }},
-    {"39-camera", [this, close_dialogs]() {
-      close_dialogs(); display_panel.sim_camera().foreground(); }},
+    // Nebula Camera (2026-10-31): button greyed out without one, Save on the page.
+    {"39-display-no-nebula-camera", [this, close_dialogs]() {
+      close_dialogs(); display_panel.foreground(); display_panel.sim_fill();
+      display_panel.sim_camera_present(false); }},
+    {"40-display-nebula-camera", [this]() { display_panel.sim_camera_present(true); }},
+    {"41-camera", [this]() {
+      display_panel.sim_camera().foreground(); display_panel.sim_camera().sim_fill(); }},
+    {"42-camera-unsaved", [this]() { display_panel.sim_camera().sim_edit(); }},
+    {"43-camera-back-unsaved", [this]() { display_panel.sim_camera().sim_back(); }},
   };
   sim_run_tour(dir, std::move(steps), []() { exit(0); });
 }

@@ -40,10 +40,11 @@ HostnamePanel::HostnamePanel(KWebSocketClient &c, std::mutex &lock)
   lv_textarea_set_max_length(input, 63);
   lv_textarea_set_placeholder_text(input, "e.g. ke-workshop");
   lv_obj_set_flex_grow(input, 1);
-  lv_obj_add_state(input, LV_STATE_FOCUSED);   // cursor visible; the keyboard is always up
+  lv_obj_add_state(input, LV_STATE_FOCUSED);   // cursor visible
   lv_obj_add_event_cb(input, &HostnamePanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
   lv_obj_add_event_cb(input, &HostnamePanel::_handle_callback, LV_EVENT_READY, this);
   lv_obj_add_event_cb(input, &HostnamePanel::_handle_callback, LV_EVENT_CANCEL, this);
+  lv_obj_add_event_cb(input, &HostnamePanel::_handle_callback, LV_EVENT_CLICKED, this);
 
   save_btn = small_button(row, "Save", &HostnamePanel::_handle_callback, this);
   cancel_btn = small_button(row, "Cancel", &HostnamePanel::_handle_callback, this);
@@ -75,6 +76,7 @@ void HostnamePanel::foreground(const std::string &cur, const std::string &addr) 
   address = addr;
   lv_textarea_set_text(input, cur.c_str());
   lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_TEXT_LOWER);
+  lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
   lv_obj_move_foreground(cont);
   validate();
 }
@@ -149,7 +151,11 @@ void HostnamePanel::handle_callback(lv_event_t *e) {
     } else if (code == LV_EVENT_READY) {
       save();
     } else if (code == LV_EVENT_CANCEL) {
-      lv_obj_move_background(cont);
+      // The keyboard key hides the keyboard (the page stays); tap the field
+      // to bring it back. Cancel leaves the page.
+      lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    } else if (code == LV_EVENT_CLICKED) {
+      lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
     }
     return;
   }

@@ -19,6 +19,11 @@ class CameraPanel {
   ~CameraPanel();
 
   void foreground();
+#ifdef SIMULATOR
+  void sim_fill();
+  void sim_edit();
+  void sim_back() { lv_event_send(back_tile, LV_EVENT_CLICKED, NULL); }
+#endif
 
   static void _handle_callback(lv_event_t *e) {
     ((CameraPanel *)e->user_data)->handle_callback(e);
@@ -28,7 +33,9 @@ class CameraPanel {
   void shown();
   void show(const json &status_reply);
   void handle_callback(lv_event_t *e);
-  void send(const json &changes);
+  void change(const json &changes);
+  void save();
+  void show_pending();
   void after(const json &reply);
   void set_slider(const std::string &key, int value);
   void update_visibility();
@@ -36,6 +43,7 @@ class CameraPanel {
   KWebSocketClient &ws;
   std::mutex &lv_lock;
   json config;
+  json pending = json::object();   // changed on the page, not saved yet
   bool loading = false;
 
   lv_obj_t *body;   // set by SettingsUi::page() while cont is built
@@ -44,6 +52,7 @@ class CameraPanel {
   lv_obj_t *flicker_dd;
   lv_obj_t *wb_dd;
   lv_obj_t *exposure_dd;
+  lv_obj_t *save_btn;
   lv_obj_t *defaults_btn;
   lv_obj_t *reset_btn;
   lv_obj_t *info;

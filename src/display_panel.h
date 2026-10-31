@@ -23,6 +23,7 @@ class DisplayPanel {
 #ifdef SIMULATOR
   void sim_fill();
   CameraPanel &sim_camera() { return camera_panel; }
+  void sim_camera_present(bool present) { show_camera_present(present); }
 #endif
 
   static void _handle_callback(lv_event_t *e) {
@@ -34,6 +35,7 @@ class DisplayPanel {
   void handle_callback(lv_event_t *e);
   void refresh_brightness();
   void show_brightness(const json &display_status_reply);
+  void show_camera_present(bool present);
   void report_error(json &reply, const char *what);
 
   KWebSocketClient &ws;
