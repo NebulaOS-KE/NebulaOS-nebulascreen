@@ -108,9 +108,12 @@ std::string plr_offer_key(const PlrStatus &s, bool printing) {
   return s.file + buf;
 }
 
+// Short (Run 23: the longer text overflowed the popup): the file, what the
+// printer does, and the one assumption the user must check.
 std::string plr_resume_confirm_text(const PlrStatus &s) {
-  return "Resume " + plr_display_name(s.file) + "?\n\n"
-    "The printer heats up, homes X and Y, lifts the nozzle, primes and continues printing. "
-    "Z is NOT re-homed: it assumes the bed and nozzle did not move while the power was off. "
-    "Only continue if the part is still firmly on the bed.";
+  char pct[16];
+  std::snprintf(pct, sizeof(pct), "%d%%", (int)std::lround(s.progress * 100.0));
+  return "Resume " + plr_display_name(s.file) + " at " + pct + "?\n\n"
+    "It heats up, homes X and Y and continues. Z is NOT re-homed: "
+    "only resume if the part is still on the bed.";
 }

@@ -165,6 +165,8 @@ TEST(Commands, confirm_text_names_the_file_and_the_z_assumption) {
   auto t = plr_resume_confirm_text(parse_plr_status(available("physical")));
   ASSERT_TRUE(t.find("bracket.gcode") != std::string::npos);
   ASSERT_TRUE(t.find("Z is NOT re-homed") != std::string::npos);
+  // Fits the popup with a long slicer file name (Run 23: it overflowed).
+  ASSERT_TRUE(t.size() - std::string("bracket.gcode").size() <= 140);
 }
 
 TEST(Offer, asked_once_per_physical_record) {

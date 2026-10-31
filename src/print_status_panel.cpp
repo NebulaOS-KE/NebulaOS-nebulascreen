@@ -476,10 +476,13 @@ void PrintStatusPanel::consume(json &j) {
 
   auto printfile = j["/params/0/print_stats/filename"_json_pointer];
   if (!printfile.is_null()) {
-    // filename change indicates a start of a print
+    // filename change: a new file. Only a running print brings the panel to
+    // the front - a file loaded without printing (M23; Run 23: a power-loss
+    // resume that stopped after opening the file) never got a state change
+    // that could dismiss it again.
     reset();
     populate();
-    foreground(); // auto move to front when print is detected
+    if (KUtils::is_printing()) foreground();
   }
 
   auto& pstate = j["/params/0/print_stats/state"_json_pointer];
@@ -509,6 +512,9 @@ void PrintStatusPanel::consume(json &j) {
       // actively printing: make sure any leftover completion summary is gone
       // (covers a new print started externally, including a same-file reprint)
       lv_obj_move_background(complete_cont);
+      if (last_print_state != "printing" && last_print_state != "paused") {
+        foreground();  // a print just started
+      }
       mini_print_status.show();
       mini_print_status.hide_chip();
     }

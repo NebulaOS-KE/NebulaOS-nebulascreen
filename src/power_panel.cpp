@@ -110,8 +110,7 @@ void PowerPanel::offer_resume() {
   auto plr = parse_plr_status(State::get_instance()
     ->get_data("/printer_state/nebulaos_power_loss_recovery"_json_pointer));
   static const char *btns[] = {"Later", "Resume", ""};
-  std::string text = "A print was interrupted by a power loss.\n\n" +
-                     plr_resume_confirm_text(plr);
+  std::string text = "Power loss.\n" + plr_resume_confirm_text(plr);
   lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, text.c_str(), btns, false);
   lv_obj_add_event_cb(mbox, [](lv_event_t *e) {
     lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(e));
