@@ -60,6 +60,7 @@ class PrintStatusPanel : public NotifyConsumer {
   // Populate fake print state (filename, progress, elapsed) so the panel can be
   // visually verified without a Moonraker connection.
   void sim_setup_mock_data();
+  void sim_thumb();
 #endif
 
  private:
@@ -121,6 +122,12 @@ class PrintStatusPanel : public NotifyConsumer {
   // G112 (2026-10-31): the step list while START_PRINT runs (print_start.h).
   void update_start();
   lv_obj_t *start_label = NULL;
+  // Run 23 (Tim): the preview is sized by fit_thumbnail() to the room left in
+  // the column - above the step list while START_PRINT runs if it fits, full
+  // size again when the start is done.
+  void fit_thumbnail();
+  uint32_t thumb_w = 0;
+  uint32_t thumb_h = 0;
   StartInput start_in;
   std::chrono::steady_clock::time_point soak_seen;
   bool pause_requested = false;

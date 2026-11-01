@@ -949,6 +949,7 @@ void MainPanel::sim_tour(const char *dir) {
       lv_lock.unlock();
       print_status_panel.consume(mock);
       lv_lock.lock();
+      print_status_panel.sim_thumb();  // the file's preview (Run 23)
       print_status_panel.foreground(); }},
     {"m61-finetune-printing", [this]() { print_status_panel.get_finetune_panel().foreground(); }},
     {"m62-home-printing", [tab, this]() { tab(main_tab); }},

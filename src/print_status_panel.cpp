@@ -5,7 +5,9 @@
 #include "utils.h"
 #include "spdlog/spdlog.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstring>
 
 
 LV_IMG_DECLARE(extruder);
@@ -162,13 +164,15 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   lv_label_set_text(filename_label, "");
   lv_obj_move_to_index(filename_label, 1);
 
-  // G112: while START_PRINT runs, its steps stand in for the thumbnail.
+  // G112: while START_PRINT runs, its steps go between the preview and the
+  // file name. Run 23 (Tim): sized to its text so the column centres it as
+  // a block, the lines left-aligned under each other.
   start_label = lv_label_create(thumbnail_cont);
-  lv_obj_set_width(start_label, LV_PCT(100));
-  lv_label_set_long_mode(start_label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(start_label, LV_SIZE_CONTENT);
+  lv_obj_set_style_max_width(start_label, LV_PCT(100), 0);
   lv_obj_set_style_text_font(start_label, &lv_font_montserrat_12, 0);
   lv_obj_set_style_text_line_space(start_label, 3, 0);
-  lv_obj_move_to_index(start_label, 0);
+  lv_obj_move_to_index(start_label, 1);
   lv_obj_add_flag(start_label, LV_OBJ_FLAG_HIDDEN);
 
   // row 1
@@ -283,6 +287,7 @@ void PrintStatusPanel::reset() {
   heater_bed_target = -1;
 
   // free src
+  thumb_w = thumb_h = 0;
   lv_img_set_src(thumbnail, NULL);
   // hack to color in empty space.
   ((lv_img_t*)thumbnail)->src_type = LV_IMG_SRC_SYMBOL;
@@ -418,19 +423,9 @@ void PrintStatusPanel::handle_metadata(const std::string &gcode_file, json &j) {
     const std::string img_path = "A:" + fullpath;
 
     lv_img_set_src(thumbnail, img_path.c_str());
-    auto thumb_w = thumb_detail.second.first;
-    auto thumb_h = thumb_detail.second.second;
-
-    auto available_w = lv_obj_get_width(thumbnail_cont);
-    auto available_h = lv_obj_get_height(thumbnail_cont) - lv_obj_get_height(pbar_cont) - lv_obj_get_style_pad_row(thumbnail_cont, LV_PART_MAIN);
-
-    double scale_x = (double)available_w / (double)thumb_w;
-    double scale_y = (double)available_h / (double)thumb_h;
-    double scale = std::min(scale_x, scale_y);
-
-    uint32_t lv_zoom = static_cast<uint32_t>(scale * 256.0);
-    lv_img_set_pivot(thumbnail, thumb_w / 2, thumb_h);
-    lv_img_set_zoom(thumbnail, lv_zoom);
+    thumb_w = thumb_detail.second.first;
+    thumb_h = thumb_detail.second.second;
+    fit_thumbnail();
     mini_print_status.update_img(img_path, thumb_detail.second.first);
   }
 }
@@ -894,6 +889,37 @@ ZOffsetPanel &PrintStatusPanel::get_zoffset_panel() {
   return zoffset_panel;
 }
 
+// Zooms the preview to the room the column has left: its height minus the
+// file name, the progress bar and, while START_PRINT runs, the step list.
+// The layout keeps the image's own size (LV_IMG_SIZE_MODE_REAL draws
+// nothing here); the zoom grows it up from its bottom centre, which the
+// column puts right above the steps or the file name. LVGL lock held.
+void PrintStatusPanel::fit_thumbnail() {
+  if (thumb_w == 0 || thumb_h == 0) return;
+  lv_obj_update_layout(thumbnail_cont);
+  lv_coord_t gap = lv_obj_get_style_pad_row(thumbnail_cont, LV_PART_MAIN);
+  lv_coord_t avail_w = lv_obj_get_content_width(thumbnail_cont);
+  lv_coord_t avail_h = lv_obj_get_content_height(thumbnail_cont)
+    - lv_obj_get_height(pbar_cont) - lv_obj_get_height(filename_label) - 2 * gap;
+  if (!lv_obj_has_flag(start_label, LV_OBJ_FLAG_HIDDEN)) {
+    avail_h -= lv_obj_get_height(start_label) + gap;
+  }
+  // KE screen (480x272): the full step list leaves no room - no speck then,
+  // the preview comes back when the start is done
+  if (avail_w < 40 || avail_h < 40) {
+    lv_obj_add_flag(thumbnail, LV_OBJ_FLAG_HIDDEN);
+    spdlog::info("print status: no room for the preview ({}x{})", avail_w, avail_h);
+    return;
+  }
+  lv_obj_clear_flag(thumbnail, LV_OBJ_FLAG_HIDDEN);
+  double scale = std::min((double)avail_w / thumb_w, (double)avail_h / thumb_h);
+  uint16_t zoom = (uint16_t)std::max(1.0, std::min(scale * 256.0, 4096.0));
+  lv_img_set_pivot(thumbnail, thumb_w / 2, thumb_h);
+  lv_img_set_zoom(thumbnail, zoom);
+  spdlog::info("print status: preview {}x{} in {}x{}, zoom {}", thumb_w, thumb_h,
+               avail_w, avail_h, zoom);
+}
+
 // G112. LVGL lock held.
 void PrintStatusPanel::update_start() {
   auto *s = State::get_instance();
@@ -910,8 +936,10 @@ void PrintStatusPanel::update_start() {
   auto rows = start_steps(start_in);
   if (rows.empty()) {
     pause_requested = false;
-    lv_obj_add_flag(start_label, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(thumbnail, LV_OBJ_FLAG_HIDDEN);
+    if (!lv_obj_has_flag(start_label, LV_OBJ_FLAG_HIDDEN)) {
+      lv_obj_add_flag(start_label, LV_OBJ_FLAG_HIDDEN);
+      fit_thumbnail();  // full size again
+    }
     return;
   }
   std::string text = "Starting the print\n";
@@ -922,12 +950,25 @@ void PrintStatusPanel::update_start() {
   }
   if (pause_requested) text += LV_SYMBOL_PAUSE "  Pause requested - after the start";
   else text.pop_back();
+  bool resize = lv_obj_has_flag(start_label, LV_OBJ_FLAG_HIDDEN)
+    || std::count(text.begin(), text.end(), '\n')
+       != std::count(lv_label_get_text(start_label),
+                     lv_label_get_text(start_label) + strlen(lv_label_get_text(start_label)), '\n');
   lv_label_set_text(start_label, text.c_str());
   lv_obj_clear_flag(start_label, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_add_flag(thumbnail, LV_OBJ_FLAG_HIDDEN);
+  if (resize) fit_thumbnail();  // smaller, above the steps
 }
 
 #ifdef SIMULATOR
+LV_IMG_DECLARE(print);  // stand-in preview (no gcode thumbnail in the sim)
+
+void PrintStatusPanel::sim_thumb() {
+  lv_img_set_src(thumbnail, &print);
+  thumb_w = print.header.w;
+  thumb_h = print.header.h;
+  fit_thumbnail();
+}
+
 void PrintStatusPanel::sim_setup_mock_data() {
   // Mid-print snapshot: 20% in, 10 minutes elapsed.
   // To preview the auto-dismiss (#94) on this build, change "printing" to
@@ -974,6 +1015,7 @@ void PrintStatusPanel::sim_setup_mock_data() {
     std::lock_guard<std::mutex> lock(lv_lock);
     update_time_progress();
     mini_print_status.sim_thumb();  // placeholder preview for the home overlay
+    sim_thumb();
   }
 
   // preview the completion summary (no real print finishes in the sim)
