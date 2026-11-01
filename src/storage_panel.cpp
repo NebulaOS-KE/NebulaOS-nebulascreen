@@ -25,7 +25,12 @@ StoragePanel::StoragePanel(KWebSocketClient &c, std::mutex &lock)
   lv_obj_set_style_text_line_space(usage_label, 4, 0);
   lv_label_set_text(usage_label, "Adding up...");
   SettingsUi::hint(left, "Logs, old backups and installed system images are cleaned up "
-                         "automatically.");
+                         "automatically. Free up space does it now.");
+
+  free_space_btn = SettingsUi::icon_button(right, &delete_img, "Free up space",
+                                           &StoragePanel::_handle_callback, this);
+  SettingsUi::hint(right, "Old logs, old update backups and downloads. Print files, "
+                          "settings and calibration stay.");
 
   cleanup_btn = SettingsUi::icon_button(right, &delete_img, "Clean up Creality files",
                                         &StoragePanel::_handle_callback, this);
@@ -105,6 +110,48 @@ void StoragePanel::run_cleanup(bool videos) {
   });
 }
 
+// LVGL thread: first what it would free, then the dialog.
+void StoragePanel::start_free_space() {
+  if (busy) return;
+  if (SettingsUi::refuse_if_printing()) {
+    return;
+  }
+  busy = true;
+  lv_obj_t *wait = SettingsUi::busy("Free up space", "Checking what can be removed...");
+  ws.send_jsonrpc(FREE_SPACE_PLAN_METHOD, json::object(), [this, wait](json &reply) {
+    FreeSpacePlan plan = free_space_plan(reply);
+    std::lock_guard<std::mutex> lock(lv_lock);
+    SettingsUi::close_busy(wait);
+    busy = false;
+    if (!plan.ok || plan.bytes <= 0) {
+      SettingsUi::notice("Free up space", plan.text.c_str());
+      return;
+    }
+    SettingsUi::confirm("Free up space", plan.text.c_str(), "Free up space",
+                        SettingsUi::Tone::Normal, [this]() { run_free_space(); });
+  });
+}
+
+// LVGL thread.
+void StoragePanel::run_free_space() {
+  if (SettingsUi::refuse_if_printing()) {   // a print may have started meanwhile
+    return;
+  }
+  busy = true;
+  lv_obj_t *wait = SettingsUi::busy("Free up space", "Deleting... this can take a minute.");
+  ws.send_jsonrpc(FREE_SPACE_METHOD, json::object(), [this, wait](json &reply) {
+    std::string msg = free_space_result_text(reply);
+    spdlog::info("storage: free up space: {}", msg);
+    std::lock_guard<std::mutex> lock(lv_lock);
+    SettingsUi::close_busy(wait);
+    busy = false;
+    if (!SettingsUi::show_if_refused(reply)) {
+      SettingsUi::notice("Free up space", msg.c_str());
+    }
+    shown();
+  });
+}
+
 void StoragePanel::handle_callback(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
   lv_obj_t *obj = lv_event_get_current_target(e);
@@ -112,5 +159,7 @@ void StoragePanel::handle_callback(lv_event_t *e) {
     lv_obj_move_background(cont);
   } else if (obj == cleanup_btn) {
     start_cleanup();
+  } else if (obj == free_space_btn) {
+    start_free_space();
   }
 }

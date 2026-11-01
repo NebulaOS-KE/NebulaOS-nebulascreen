@@ -140,6 +140,20 @@ std::string cleanup_text(const CleanupPlan &p, bool videos);
 // After cleanup.creality: the line for the dialog.
 std::string cleanup_result_text(const json &reply);
 
+// Run 23 (Tim): "Free up space" - NebulaOS's own leftovers (old logs, old
+// update backups, unfinished downloads, uploaded images, the download cache);
+// never print files, settings, calibration or Creality's data.
+extern const char *const FREE_SPACE_PLAN_METHOD;   // machine.nebulaos.cleanup.nebulaos.plan
+extern const char *const FREE_SPACE_METHOD;        // machine.nebulaos.cleanup.nebulaos
+struct FreeSpacePlan {
+  bool ok = false;
+  std::string text;             // the dialog text (or why there is no plan)
+  double bytes = 0;
+};
+FreeSpacePlan free_space_plan(const json &plan_reply);
+// After cleanup.nebulaos: the line for the dialog.
+std::string free_space_result_text(const json &reply);
+
 // G34 (2026-10-16): after an MCU flash, what the board runs - from a
 // printer.objects.query {"mcu": ["mcu_version"]} reply. Empty when unknown.
 std::string mcu_running_version(const json &objects_reply);

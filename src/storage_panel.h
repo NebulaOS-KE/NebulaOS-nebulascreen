@@ -13,6 +13,9 @@
 // plainly what happens - the Creality system in the other slot stops working
 // - with Creality's timelapse videos as an opt-in checkbox, then
 // machine.nebulaos.cleanup.creality (refused while printing).
+// Run 23 (Tim): "Free up space" removes NebulaOS's own leftovers now
+// (machine.nebulaos.cleanup.nebulaos[.plan]) - never print files, settings,
+// calibration or Creality's data, so going back to stock keeps working.
 class StoragePanel {
  public:
   StoragePanel(KWebSocketClient &ws, std::mutex &lock);
@@ -29,6 +32,8 @@ class StoragePanel {
   void handle_callback(lv_event_t *e);
   void start_cleanup();
   void run_cleanup(bool videos);
+  void start_free_space();
+  void run_free_space();
 
   KWebSocketClient &ws;
   std::mutex &lv_lock;
@@ -37,6 +42,7 @@ class StoragePanel {
   lv_obj_t *cont;
   lv_obj_t *usage_label;
   lv_obj_t *cleanup_btn;
+  lv_obj_t *free_space_btn;
   bool busy = false;
   ButtonContainer back_btn;
 };

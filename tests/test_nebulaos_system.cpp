@@ -262,6 +262,23 @@ TEST(Storage, text_and_cleanup) {
   ASSERT_TRUE(cleanup_result_text(json::parse(R"({"error":{"message":"refused while a print is active"}})")).find("print") != std::string::npos);
 }
 
+TEST(Storage, free_up_space) {
+  ASSERT_EQ(std::string(FREE_SPACE_PLAN_METHOD), std::string("machine.nebulaos.cleanup.nebulaos.plan"));
+  ASSERT_EQ(std::string(FREE_SPACE_METHOD), std::string("machine.nebulaos.cleanup.nebulaos"));
+  auto p = free_space_plan(json::parse(R"({"result":{"bytes":600000000,"items":[{"label":"Old logs","bytes":20000000,"count":3},{"label":"Old update backups","bytes":580000000,"count":2}]}})"));
+  ASSERT_TRUE(p.ok);
+  ASSERT_TRUE(p.text.find("Frees 600 MB") == 0);
+  ASSERT_TRUE(p.text.find("- Old update backups  580 MB") != std::string::npos);
+  ASSERT_TRUE(p.text.find("calibration") != std::string::npos);
+  auto none = free_space_plan(json::parse(R"({"result":{"bytes":0,"items":[]}})"));
+  ASSERT_TRUE(none.ok && none.text.find("Nothing to clean up") == 0);
+  auto refused = free_space_plan(json::parse(R"({"error":{"message":"Not now: an update is running."}})"));
+  ASSERT_FALSE(refused.ok);
+  ASSERT_EQ(refused.text, std::string("Not now: an update is running."));
+  ASSERT_TRUE(free_space_result_text(json::parse(R"({"result":{"result":"CLEANED","freed_bytes":600000000}})")).find("Freed 600 MB") != std::string::npos);
+  ASSERT_EQ(free_space_result_text(json::parse(R"({"error":{"message":"Not now: the printer is printing."}})")), std::string("Not now: the printer is printing."));
+}
+
 TEST(Mcu, running_version) {
   ASSERT_EQ(mcu_running_version(json::parse(R"({"result":{"eventtime":1.0,"status":{"mcu":{"mcu_version":"v0.13.0-742-g01a9c2f92"}}}})")), std::string("v0.13.0-742-g01a9c2f92"));
   ASSERT_EQ(mcu_running_version(json::parse(R"({"error":{"message":"Klippy not ready"}})")), std::string(""));

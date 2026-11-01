@@ -19,6 +19,8 @@ const char *const REPORT_ISSUES_URL = "https://github.com/NebulaOS-KE/NebulaOS/i
 const char *const STORAGE_METHOD = "machine.nebulaos.storage";
 const char *const CLEANUP_PLAN_METHOD = "machine.nebulaos.cleanup.plan";
 const char *const CLEANUP_CREALITY_METHOD = "machine.nebulaos.cleanup.creality";
+const char *const FREE_SPACE_PLAN_METHOD = "machine.nebulaos.cleanup.nebulaos.plan";
+const char *const FREE_SPACE_METHOD = "machine.nebulaos.cleanup.nebulaos";
 const char *const LOG_LEVEL_OPTIONS = "Info\nWarning\nDebug";
 const char *const BOOT_DISPLAY_IMAGES_METHOD = "machine.nebulaos.boot_display.images";
 const char *const BOOT_DISPLAY_PREVIEW_METHOD = "machine.nebulaos.boot_display.preview";
@@ -455,6 +457,52 @@ std::string cleanup_result_text(const json &reply) {
     out += "\nSome files were left in place (in use or on another drive).";
   }
   return out;
+}
+
+static std::string error_message(const json &reply) {
+  if (!reply.is_object() || !reply.contains("error")) return "";
+  const json &e = reply["error"];
+  return e.is_object() && e.contains("message") && e["message"].is_string()
+    ? e["message"].get<std::string>() : "";
+}
+
+FreeSpacePlan free_space_plan(const json &plan_reply) {
+  FreeSpacePlan p;
+  if (plan_reply.is_object() && plan_reply.contains("error")) {
+    std::string msg = error_message(plan_reply);
+    p.text = msg.rfind("Not now", 0) == 0 ? msg : "The printer could not check the files.";
+    return p;
+  }
+  const json &r = result_of(plan_reply);
+  if (!r.is_object() || !r.contains("bytes")) {
+    p.text = "No answer from the printer.";
+    return p;
+  }
+  p.ok = true;
+  p.bytes = num_at(r, "bytes");
+  if (p.bytes <= 0) {
+    p.text = "Nothing to clean up - NebulaOS has no leftovers right now.";
+    return p;
+  }
+  p.text = "Frees " + human_bytes(p.bytes) + ":\n";
+  if (r.contains("items") && r["items"].is_array()) {
+    for (const auto &i : r["items"]) {
+      if (!i.is_object() || !i.contains("label") || !i["label"].is_string()) continue;
+      p.text += "- " + i["label"].get<std::string>() + "  " + human_bytes(num_at(i, "bytes")) + "\n";
+    }
+  }
+  p.text += "\nPrint files, settings, calibration and the Creality files stay.";
+  return p;
+}
+
+std::string free_space_result_text(const json &reply) {
+  if (reply.is_object() && reply.contains("error")) {
+    std::string msg = error_message(reply);
+    if (msg.rfind("Not now", 0) == 0) return msg;
+    if (msg.find("print") != std::string::npos) return "Not while a print is running.";
+    return "The cleanup did not finish. Nothing NebulaOS needs was touched.";
+  }
+  return "Done. Freed " + human_bytes(num_at(result_of(reply), "freed_bytes")) + ".";
 }
 
 bool database_has_namespace(const json &list_reply, const std::string &ns) {
