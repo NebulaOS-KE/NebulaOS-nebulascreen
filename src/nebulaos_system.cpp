@@ -21,6 +21,9 @@ const char *const CLEANUP_PLAN_METHOD = "machine.nebulaos.cleanup.plan";
 const char *const CLEANUP_CREALITY_METHOD = "machine.nebulaos.cleanup.creality";
 const char *const FREE_SPACE_PLAN_METHOD = "machine.nebulaos.cleanup.nebulaos.plan";
 const char *const FREE_SPACE_METHOD = "machine.nebulaos.cleanup.nebulaos";
+const char *const STATS_METHOD = "machine.nebulaos.stats";
+// what fits above Back on the 480x272 panel, two lines each
+static const int STATS_RECENT_SHOWN = 4;
 const char *const LOG_LEVEL_OPTIONS = "Info\nWarning\nDebug";
 const char *const BOOT_DISPLAY_IMAGES_METHOD = "machine.nebulaos.boot_display.images";
 const char *const BOOT_DISPLAY_PREVIEW_METHOD = "machine.nebulaos.boot_display.preview";
@@ -512,6 +515,84 @@ bool database_has_namespace(const json &list_reply, const std::string &ns) {
     if (n.is_string() && n.get<std::string>() == ns) return true;
   }
   return false;
+}
+
+std::string print_hours(double seconds) {
+  if (!std::isfinite(seconds) || seconds < 0) seconds = 0;
+  long minutes = (long)(seconds / 60.0 + 0.5);
+  if (minutes < 60) return std::to_string(minutes) + " min";
+  char buf[48];
+  snprintf(buf, sizeof(buf), "%ld h %02ld min", minutes / 60, minutes % 60);
+  return buf;
+}
+
+static std::string metres(double mm) {
+  char buf[32];
+  snprintf(buf, sizeof(buf), mm < 100000 ? "%.1f m" : "%.0f m", mm / 1000.0);
+  return buf;
+}
+
+static std::string before_line(const char *name, const json &src) {
+  std::string status = str_at(src, "/status"_json_pointer);
+  if (status == "imported") {
+    std::string line = std::string(name) + ": " + print_hours(num_at(src, "print_time"));
+    double jobs = num_at(src, "jobs");
+    if (jobs > 0) line += ", " + std::to_string((long)jobs) + " prints";
+    return line;
+  }
+  return std::string(name) + ": " + (status == "unreadable" ? "could not be read" : "none found");
+}
+
+StatsText stats_text(const json &reply) {
+  StatsText t;
+  const json &r = result_of(reply);
+  if (!r.is_object() || !r.contains("nebulaos") || !r["nebulaos"].is_object()) {
+    t.summary = reply.is_object() && reply.contains("error")
+      ? "The printer could not read the statistics." : "No answer from the printer.";
+    return t;
+  }
+  t.ok = true;
+  const json &n = r["nebulaos"];
+  double completed = 0, cancelled = 0, failed = 0;
+  if (n.contains("by_status") && n["by_status"].is_object()) {
+    for (auto &kv : n["by_status"].items()) {
+      double c = kv.value().is_number() ? kv.value().get<double>() : 0;
+      if (kv.key() == "completed") completed += c;
+      else if (kv.key() == "cancelled") cancelled += c;
+      else if (kv.key() != "in_progress") failed += c;
+    }
+  }
+  double lifetime = r.contains("lifetime") ? num_at(r["lifetime"], "print_time") : 0;
+  t.summary = "Total print time: " + print_hours(lifetime) +
+    "\n\nSince NebulaOS\nPrint time: " + print_hours(num_at(n, "print_time")) +
+    "\nPrints: " + std::to_string((long)num_at(n, "jobs")) +
+    "\n  " + std::to_string((long)completed) + " done, " + std::to_string((long)cancelled) +
+    " cancelled, " + std::to_string((long)failed) + " failed" +
+    "\nFilament: " + metres(num_at(n, "filament_mm")) +
+    "\nLongest print: " + print_hours(num_at(n, "longest_print"));
+  const json empty = json::object();
+  const json &before = r.contains("before") && r["before"].is_object() ? r["before"] : empty;
+  t.summary += "\n\nBefore NebulaOS\n" +
+    before_line("Creality", before.contains("creality") ? before["creality"] : empty) + "\n" +
+    before_line("Earlier Moonraker", before.contains("moonraker") ? before["moonraker"] : empty);
+
+  t.recent = "Recent prints";
+  if (!n.contains("recent") || !n["recent"].is_array() || n["recent"].empty()) {
+    t.recent += "\nNone yet.";
+  } else {
+    int shown = 0;
+    for (const auto &job : n["recent"]) {
+      if (++shown > STATS_RECENT_SHOWN) break;
+      std::string name = str_at(job, "/filename"_json_pointer);
+      if (name.size() > 20) name = name.substr(0, 18) + "...";
+      std::string status = str_at(job, "/status"_json_pointer);
+      // LV_SYMBOL_OK / CLOSE / PLAY / WARNING (lv_symbol_def.h; no LVGL here)
+      std::string mark = status == "completed" ? "\xEF\x80\x8C" : status == "cancelled"
+        ? "\xEF\x80\x8D" : status == "in_progress" ? "\xEF\x81\x8B" : "\xEF\x81\xB1";
+      t.recent += "\n" + mark + " " + name + "\n      " + print_hours(num_at(job, "print_time"));
+    }
+  }
+  return t;
 }
 
 std::string mcu_running_version(const json &objects_reply) {

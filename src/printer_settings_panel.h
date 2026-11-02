@@ -4,6 +4,7 @@
 #include "button_container.h"
 #include "mcu_panel.h"
 #include "nebulaos_refusal.h"
+#include "statistics_panel.h"
 #include "websocket_client.h"
 #include "lvgl/lvgl.h"
 
@@ -13,6 +14,7 @@
 // FIRMWARE_RESTART), MCU firmware (install a .bin, run 4), and the screen's
 // printer preferences: default extruder
 // temperature, ask before an emergency stop, inverted Y/Z jog arrows.
+// Run 23 (Tim): Statistics (print time, prints, filament).
 class PrinterSettingsPanel {
  public:
   PrinterSettingsPanel(KWebSocketClient &ws, std::mutex &lock);
@@ -21,6 +23,7 @@ class PrinterSettingsPanel {
   void foreground();
 #ifdef SIMULATOR
   McuPanel &sim_mcu() { return mcu_panel; }
+  StatisticsPanel &sim_stats() { return statistics_panel; }
 #endif
 
   static void _handle_callback(lv_event_t *e) {
@@ -40,7 +43,9 @@ class PrinterSettingsPanel {
   lv_obj_t *restart_klipper_btn;
   lv_obj_t *restart_mcu_btn;
   lv_obj_t *mcu_fw_btn;
+  lv_obj_t *stats_btn;
   McuPanel mcu_panel;
+  StatisticsPanel statistics_panel;
   lv_obj_t *temp_dd;
   lv_obj_t *estop_sw;
   lv_obj_t *invert_y_sw;

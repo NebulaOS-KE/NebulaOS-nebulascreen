@@ -262,6 +262,39 @@ TEST(Storage, text_and_cleanup) {
   ASSERT_TRUE(cleanup_result_text(json::parse(R"({"error":{"message":"refused while a print is active"}})")).find("print") != std::string::npos);
 }
 
+TEST(Statistics, text) {
+  ASSERT_EQ(std::string(STATS_METHOD), std::string("machine.nebulaos.stats"));
+  ASSERT_EQ(print_hours(0), std::string("0 min"));
+  ASSERT_EQ(print_hours(45 * 60), std::string("45 min"));
+  ASSERT_EQ(print_hours(1234 * 3600 + 5 * 60), std::string("1234 h 05 min"));
+  auto t = stats_text(json::parse(R"({"result":{"lifetime":{"print_time":4449600},
+    "nebulaos":{"print_time":9000,"jobs":14,"filament_mm":45200,"longest_print":11400,
+      "by_status":{"completed":11,"cancelled":2,"error":1},
+      "recent":[{"filename":"benchy.gcode","status":"completed","print_time":3900},
+                {"filename":"cube.gcode","status":"cancelled","print_time":120}]},
+    "before":{"creality":{"status":"imported","print_time":4440600},
+              "moonraker":{"status":"absent"}}}})"));
+  ASSERT_TRUE(t.ok);
+  ASSERT_TRUE(t.summary.find("Total print time: 1236 h 00 min") == 0);
+  ASSERT_TRUE(t.summary.find("Prints: 14\n  11 done, 2 cancelled, 1 failed") != std::string::npos);
+  ASSERT_TRUE(t.summary.find("Filament: 45.2 m") != std::string::npos);
+  ASSERT_TRUE(t.summary.find("Longest print: 3 h 10 min") != std::string::npos);
+  ASSERT_TRUE(t.summary.find("Creality: 1233 h 30 min") != std::string::npos);
+  ASSERT_TRUE(t.summary.find("Earlier Moonraker: none found") != std::string::npos);
+  ASSERT_TRUE(t.recent.find("benchy.gcode\n      1 h 05 min") != std::string::npos);
+  auto many = stats_text(json::parse(R"({"result":{"nebulaos":{"recent":[
+    {"filename":"a_very_long_slicer_file_name_PLA_0.2mm.gcode","status":"completed","print_time":60},
+    {"filename":"b.gcode"},{"filename":"c.gcode"},{"filename":"d.gcode"},{"filename":"e.gcode"}]}}})"));
+  ASSERT_TRUE(many.recent.find("a_very_long_slicer...") != std::string::npos);
+  ASSERT_TRUE(many.recent.find("d.gcode") != std::string::npos);
+  ASSERT_TRUE(many.recent.find("e.gcode") == std::string::npos);
+  auto unreadable = stats_text(json::parse(R"({"result":{"lifetime":{"print_time":0},"nebulaos":{},
+    "before":{"creality":{"status":"unreadable"}}}})"));
+  ASSERT_TRUE(unreadable.summary.find("Creality: could not be read") != std::string::npos);
+  ASSERT_TRUE(unreadable.recent.find("None yet.") != std::string::npos);
+  ASSERT_FALSE(stats_text(json::parse(R"({"error":{"message":"x"}})")).ok);
+}
+
 TEST(Storage, free_up_space) {
   ASSERT_EQ(std::string(FREE_SPACE_PLAN_METHOD), std::string("machine.nebulaos.cleanup.nebulaos.plan"));
   ASSERT_EQ(std::string(FREE_SPACE_METHOD), std::string("machine.nebulaos.cleanup.nebulaos"));

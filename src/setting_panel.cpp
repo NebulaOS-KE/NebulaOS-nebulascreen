@@ -154,6 +154,19 @@ void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
     {"20-mcu-failed", [this, close_dialogs]() {
       close_dialogs(); printer_panel.sim_mcu().sim_result(
         R"({"error":{"code":500,"message":"FLASH_FAILED: Could not enter bootloader: no handshake"}})"); }},
+    // Run 23 (Tim): Settings > Printer > Statistics.
+    {"20a-statistics", [this, close_dialogs]() {
+      close_dialogs(); printer_panel.sim_stats().foreground(); printer_panel.sim_stats().sim_fill(
+        R"({"result":{"lifetime":{"print_time":4449600},
+        "nebulaos":{"print_time":9000,"jobs":14,"filament_mm":45200,"longest_print":11400,
+          "by_status":{"completed":11,"cancelled":2,"error":1},
+          "recent":[{"filename":"3dbenchy_PLA_46m54s.gcode","status":"completed","print_time":2814},
+                    {"filename":"xyz-10mm-calibration-cube.gcode","status":"completed","print_time":321},
+                    {"filename":"bracket_v3.gcode","status":"cancelled","print_time":640},
+                    {"filename":"vase.gcode","status":"error","print_time":4100},
+                    {"filename":"benchy.gcode","status":"completed","print_time":2900}]},
+        "before":{"creality":{"status":"imported","print_time":4440600},
+                  "moonraker":{"status":"absent"}}}})"); }},
     // System image (on-printer image updates, 2026-10-14).
     {"21-updates", [this, close_dialogs]() {
       close_dialogs(); updates_panel.foreground(); updates_panel.sim_fill(); }},

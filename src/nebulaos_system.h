@@ -154,6 +154,19 @@ FreeSpacePlan free_space_plan(const json &plan_reply);
 // After cleanup.nebulaos: the line for the dialog.
 std::string free_space_result_text(const json &reply);
 
+// Run 23 (Tim): Settings > Printer > Statistics - machine.nebulaos.stats:
+// NebulaOS's own prints (Moonraker's history) and, imported once, what the
+// printer printed before NebulaOS (Creality's counter, an earlier Moonraker).
+extern const char *const STATS_METHOD;             // machine.nebulaos.stats
+struct StatsText {
+  bool ok = false;
+  std::string summary;          // lifetime, since NebulaOS, before NebulaOS
+  std::string recent;           // the most recent prints
+};
+StatsText stats_text(const json &reply);
+// "1234 h 05 min", "45 min", "0 min".
+std::string print_hours(double seconds);
+
 // G34 (2026-10-16): after an MCU flash, what the board runs - from a
 // printer.objects.query {"mcu": ["mcu_version"]} reply. Empty when unknown.
 std::string mcu_running_version(const json &objects_reply);

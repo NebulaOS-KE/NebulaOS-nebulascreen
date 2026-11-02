@@ -35,8 +35,8 @@ StoragePanel::StoragePanel(KWebSocketClient &c, std::mutex &lock)
   cleanup_btn = SettingsUi::icon_button(right, &delete_img, "Clean up Creality files",
                                         &StoragePanel::_handle_callback, this);
   SettingsUi::set_tone(cleanup_btn, SettingsUi::Tone::Danger);
-  SettingsUi::hint(right, "Removes the Creality system's data from the data drive. "
-                          "Shows what it frees first.");
+  SettingsUi::hint(right, "Removes the Creality system's data from the data drive; "
+                          "its print statistics stay. Shows what it frees first.");
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
   SettingsUi::place_back(back_btn.get_container());  // G94: one Back position
