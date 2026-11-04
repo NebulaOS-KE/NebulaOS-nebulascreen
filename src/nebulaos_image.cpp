@@ -281,12 +281,16 @@ ImageJob image_job(const json &status_reply) {
     j.percent = 100;
     j.text = "Install finished; the printer starts the new system at the next power-on.";
   } else if (state == "failed" && phase == "stopped_print") {
-    // G91 v2.2: a print started during the install; the worker stopped at a
-    // point of no return (it does not wait for the print any more).
+    // G91 v2.2: the worker stopped at a point of no return because the printer
+    // became busy. The phase is named after a print, but any busy reason stops
+    // it (calibration, another update, ...): the worker's message names the real
+    // one. Run 23: a stop for low memory read "a print was started".
     j.failed = true;
     j.stopped = true;
-    j.text = "Stopped because a print was started. Nothing changed. "
-             "Install again after the print.";
+    std::string msg = str_at(job, "/message"_json_pointer);
+    j.text = msg.empty() ? std::string("Stopped because the printer became busy. Nothing "
+                                       "changed. Install again later.")
+                         : msg;
   } else if (state == "failed") {
     j.failed = true;
     std::string msg = str_at(job, "/message"_json_pointer);
@@ -412,6 +416,11 @@ OtaCheck ota_check(const json &check_reply) {
 
 std::string ota_download_error(const json &reply) {
   std::string err = error_of(reply);
+  // A download that already runs (a second tap, or one started from Mainsail):
+  // follow it instead of reporting a failure - the poll shows its progress.
+  if (starts_with(err, "BUSY: a download")) {
+    return "";
+  }
   if (!err.empty()) {
     if (starts_with(err, "PRINTING") || starts_with(err, "REFUSED")) {
       return "Not possible while a print is active.";

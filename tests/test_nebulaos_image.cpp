@@ -189,8 +189,19 @@ TEST(Job, phases) {
                 {"stopped", true}, {"target_cleared", true}});
   ASSERT_TRUE(s.failed);
   ASSERT_TRUE(s.stopped);
-  ASSERT_EQ(s.text, std::string("Stopped because a print was started. Nothing changed. "
-                                "Install again after the print."));
+  ASSERT_EQ(s.text, std::string("Stopped: Not possible while a print is running. Nothing was "
+                                "changed on the running system. Install again after that."));
+  // Run 23: any busy reason stops it, and the worker's message names it
+  auto lm = job({{"state", "failed"}, {"phase", "stopped_print"}, {"error", "LOW_MEMORY"},
+                 {"message", "Stopped: Not possible right now: the printer is low on memory. "
+                             "Nothing was changed on the running system. Install again after that."},
+                 {"stopped", true}, {"target_cleared", true}});
+  ASSERT_TRUE(lm.stopped);
+  ASSERT_TRUE(has(lm.text, "low on memory"));
+  ASSERT_FALSE(has(lm.text, "print was started"));
+  auto bare = job({{"state", "failed"}, {"phase", "stopped_print"}, {"error", "CALIBRATING"}});
+  ASSERT_TRUE(bare.stopped);
+  ASSERT_FALSE(has(bare.text, "print was started"));
   // G91: installed, but the slot selection could not be put back - no reboot now
   auto n = job({{"state", "finished"}, {"phase", "next_power_on"}, {"percent", 100}, {"target", "A"},
                 {"error", "PRINTING"}, {"message", "Install finished; ..."}});
@@ -263,6 +274,9 @@ TEST(Ota, check_without_an_offer) {
 
 TEST(Ota, download_reply_and_job) {
   ASSERT_EQ(ota_download_error(json{{"result", {{"result", "STARTED"}}}}), std::string(""));
+  // Run 23: a second tap while the download runs follows it, no error
+  ASSERT_EQ(ota_download_error(error("BUSY: a download is already running")), std::string(""));
+  ASSERT_FALSE(ota_download_error(error("BUSY: an image install is running")).empty());
   auto again = json{{"result", {{"result", "ALREADY_DOWNLOADED"}}}};
   ASSERT_TRUE(ota_already_downloaded(again));
   ASSERT_TRUE(has(ota_download_error(again), "already downloaded"));
