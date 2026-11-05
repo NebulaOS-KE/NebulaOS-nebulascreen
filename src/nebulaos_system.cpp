@@ -558,19 +558,27 @@ StatsText stats_text(const json &reply) {
   }
   t.ok = true;
   const json &n = r["nebulaos"];
+  // "Prints" is the sum of the split below, so the two always agree. The
+  // endpoint's "jobs" (Moonraker's job_totals) counts only prints Moonraker
+  // saw finish: a print still running when Moonraker stopped (power loss)
+  // becomes "interrupted" in the history without ever reaching the totals.
+  // "jobs" is used only when there is no split.
   double completed = 0, cancelled = 0, failed = 0;
+  bool split = false;
   if (n.contains("by_status") && n["by_status"].is_object()) {
     for (auto &kv : n["by_status"].items()) {
       double c = kv.value().is_number() ? kv.value().get<double>() : 0;
+      if (kv.key() != "in_progress") split = true;
       if (kv.key() == "completed") completed += c;
       else if (kv.key() == "cancelled") cancelled += c;
       else if (kv.key() != "in_progress") failed += c;
     }
   }
+  double prints = split ? completed + cancelled + failed : num_at(n, "jobs");
   double lifetime = r.contains("lifetime") ? num_at(r["lifetime"], "print_time") : 0;
   t.summary = "Total print time: " + print_hours(lifetime) +
     "\n\nSince NebulaOS\nPrint time: " + print_hours(num_at(n, "print_time")) +
-    "\nPrints: " + std::to_string((long)num_at(n, "jobs")) +
+    "\nPrints: " + std::to_string((long)prints) +
     "\n  " + std::to_string((long)completed) + " done, " + std::to_string((long)cancelled) +
     " cancelled, " + std::to_string((long)failed) + " failed" +
     "\nFilament: " + metres(num_at(n, "filament_mm")) +

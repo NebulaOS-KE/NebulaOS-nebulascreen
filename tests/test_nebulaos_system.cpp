@@ -291,6 +291,15 @@ TEST(Statistics, text) {
   ASSERT_TRUE(t.summary.find("Creality: 1233 h 30 min") != std::string::npos);
   ASSERT_TRUE(t.summary.find("Earlier Moonraker: none found") != std::string::npos);
   ASSERT_TRUE(t.recent.find("benchy.gcode\n      1 h 05 min") != std::string::npos);
+  // ke-dev, Run 23: Moonraker's totals (jobs 16) miss the 4 interrupted prints
+  auto interrupted = stats_text(json::parse(R"({"result":{"nebulaos":{"jobs":16,
+      "by_status":{"cancelled":9,"completed":7,"interrupted":4}}}})"));
+  ASSERT_TRUE(interrupted.summary.find("Prints: 20\n  7 done, 9 cancelled, 4 failed") != std::string::npos);
+  auto running = stats_text(json::parse(R"({"result":{"nebulaos":{"jobs":3,
+      "by_status":{"completed":3,"in_progress":1}}}})"));
+  ASSERT_TRUE(running.summary.find("Prints: 3\n  3 done, 0 cancelled, 0 failed") != std::string::npos);
+  auto no_split = stats_text(json::parse(R"({"result":{"nebulaos":{"jobs":5}}})"));
+  ASSERT_TRUE(no_split.summary.find("Prints: 5\n") != std::string::npos);
   auto many = stats_text(json::parse(R"({"result":{"nebulaos":{"recent":[
     {"filename":"a_very_long_slicer_file_name_PLA_0.2mm.gcode","status":"completed","print_time":60},
     {"filename":"b.gcode"},{"filename":"c.gcode"},{"filename":"d.gcode"},{"filename":"e.gcode"}]}}})"));
