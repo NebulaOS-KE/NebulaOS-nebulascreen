@@ -290,7 +290,10 @@ TEST(Statistics, text) {
   ASSERT_TRUE(t.summary.find("Longest print: 3 h 10 min") != std::string::npos);
   ASSERT_TRUE(t.summary.find("Creality: 1233 h 30 min") != std::string::npos);
   ASSERT_TRUE(t.summary.find("Earlier Moonraker: none found") != std::string::npos);
-  ASSERT_TRUE(t.recent.find("benchy.gcode\n      1 h 05 min") != std::string::npos);
+  ASSERT_EQ(t.recent, std::string("Recent prints"));
+  ASSERT_EQ(t.prints.size(), (size_t)2);
+  ASSERT_EQ(t.prints[0].name, std::string("benchy.gcode"));
+  ASSERT_EQ(t.prints[0].time, std::string("\xEF\x80\x8C 1 h 05 min"));
   // ke-dev, Run 23: Moonraker's totals (jobs 16) miss the 4 interrupted prints
   auto interrupted = stats_text(json::parse(R"({"result":{"nebulaos":{"jobs":16,
       "by_status":{"cancelled":9,"completed":7,"interrupted":4}}}})"));
@@ -303,13 +306,15 @@ TEST(Statistics, text) {
   auto many = stats_text(json::parse(R"({"result":{"nebulaos":{"recent":[
     {"filename":"a_very_long_slicer_file_name_PLA_0.2mm.gcode","status":"completed","print_time":60},
     {"filename":"b.gcode"},{"filename":"c.gcode"},{"filename":"d.gcode"},{"filename":"e.gcode"}]}}})"));
-  ASSERT_TRUE(many.recent.find("a_very_long_slicer...") != std::string::npos);
-  ASSERT_TRUE(many.recent.find("d.gcode") != std::string::npos);
-  ASSERT_TRUE(many.recent.find("e.gcode") == std::string::npos);
+  // the whole name: the page scrolls a name that does not fit
+  ASSERT_EQ(many.prints.size(), (size_t)4);
+  ASSERT_EQ(many.prints[0].name, std::string("a_very_long_slicer_file_name_PLA_0.2mm.gcode"));
+  ASSERT_TRUE(many.prints[3].name.find("d.gcode") != std::string::npos);
   auto unreadable = stats_text(json::parse(R"({"result":{"lifetime":{"print_time":0},"nebulaos":{},
     "before":{"creality":{"status":"unreadable"}}}})"));
   ASSERT_TRUE(unreadable.summary.find("Creality: could not be read") != std::string::npos);
   ASSERT_TRUE(unreadable.recent.find("None yet.") != std::string::npos);
+  ASSERT_TRUE(unreadable.prints.empty());
   ASSERT_FALSE(stats_text(json::parse(R"({"error":{"message":"x"}})")).ok);
 }
 

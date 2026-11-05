@@ -158,10 +158,15 @@ std::string free_space_result_text(const json &reply);
 // NebulaOS's own prints (Moonraker's history) and, imported once, what the
 // printer printed before NebulaOS (Creality's counter, an earlier Moonraker).
 extern const char *const STATS_METHOD;             // machine.nebulaos.stats
+struct StatsRecent {
+  std::string name;             // the full file name
+  std::string time;             // status mark + its print time
+};
 struct StatsText {
   bool ok = false;
   std::string summary;          // lifetime, since NebulaOS, before NebulaOS
-  std::string recent;           // the most recent prints
+  std::string recent;           // "Recent prints" (+ "None yet." without any)
+  std::vector<StatsRecent> prints;  // the most recent prints, newest first
 };
 StatsText stats_text(const json &reply);
 // "1234 h 05 min", "45 min", "0 min".

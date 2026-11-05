@@ -597,12 +597,11 @@ StatsText stats_text(const json &reply) {
     for (const auto &job : n["recent"]) {
       if (++shown > STATS_RECENT_SHOWN) break;
       std::string name = str_at(job, "/filename"_json_pointer);
-      if (name.size() > 20) name = name.substr(0, 18) + "...";
       std::string status = str_at(job, "/status"_json_pointer);
       // LV_SYMBOL_OK / CLOSE / PLAY / WARNING (lv_symbol_def.h; no LVGL here)
       std::string mark = status == "completed" ? "\xEF\x80\x8C" : status == "cancelled"
         ? "\xEF\x80\x8D" : status == "in_progress" ? "\xEF\x81\x8B" : "\xEF\x81\xB1";
-      t.recent += "\n" + mark + " " + name + "\n      " + print_hours(num_at(job, "print_time"));
+      t.prints.push_back({name, mark + " " + print_hours(num_at(job, "print_time"))});
     }
   }
   return t;

@@ -2,6 +2,7 @@
 #define __STATISTICS_PANEL_H__
 
 #include "button_container.h"
+#include "nebulaos_system.h"
 #include "lvgl/lvgl.h"
 #include "websocket_client.h"
 
@@ -27,6 +28,7 @@ class StatisticsPanel {
 
  private:
   void shown();
+  void show(const StatsText &t);
   void handle_callback(lv_event_t *e);
 
   KWebSocketClient &ws;
@@ -36,6 +38,7 @@ class StatisticsPanel {
   lv_obj_t *cont;
   lv_obj_t *summary_label;
   lv_obj_t *recent_label;
+  lv_obj_t *recent_list;
   ButtonContainer back_btn;
 };
 
