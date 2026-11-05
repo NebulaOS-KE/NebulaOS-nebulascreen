@@ -142,7 +142,7 @@ void CameraPanel::update_visibility() {
   else lv_obj_add_flag(slider_rows["wb_temperature"], LV_OBJ_FLAG_HIDDEN);
   if (manual) {
     lv_obj_clear_flag(slider_rows["exposure_time"], LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_state(exposure_dd, LV_STATE_DISABLED);    // one-way: Restart camera
+    lv_obj_add_state(exposure_dd, LV_STATE_DISABLED);    // one-way: Restart camera or Defaults
   } else {
     lv_obj_add_flag(slider_rows["exposure_time"], LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_state(exposure_dd, LV_STATE_DISABLED);
@@ -260,7 +260,7 @@ void CameraPanel::handle_callback(lv_event_t *e) {
       lv_dropdown_set_selected(exposure_dd, 0);          // until confirmed
       SettingsUi::confirm("Manual exposure",
         "Set the exposure by hand?\n\nAfter Save, the camera cannot switch back to "
-        "automatic exposure by itself: only Restart camera brings it back.", "Manual", SettingsUi::Tone::Warning,
+        "automatic exposure by itself: Restart camera or Defaults brings it back.", "Manual", SettingsUi::Tone::Warning,
         [this]() {
           lv_dropdown_set_selected(exposure_dd, 1);
           change({{"exposure_manual", true},
@@ -272,7 +272,7 @@ void CameraPanel::handle_callback(lv_event_t *e) {
   if (code != LV_EVENT_CLICKED) return;
   if (obj == defaults_btn) {
     // Every setting, night mode and anti-flicker included (Tim 2026-10-29);
-    // manual exposure only ends with a camera restart.
+    // manual exposure only ends with a camera restart (Defaults does one).
     bool manual = camera_bool(config, "exposure_manual", false);
     SettingsUi::confirm("Defaults",
       manual ? "Put every camera setting back to its default?\n\nThe camera restarts to get "
