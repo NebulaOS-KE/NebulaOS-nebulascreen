@@ -325,14 +325,19 @@ BedMeshPanel::BedMeshPanel(KWebSocketClient &c, std::mutex &l)
   // lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
   lv_obj_set_flex_flow(msgbox, LV_FLEX_FLOW_ROW_WRAP);
   lv_obj_set_flex_align(msgbox, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_row(msgbox, 25, 0);
-  lv_obj_set_size(msgbox, LV_PCT(60), LV_PCT(40));
-  lv_obj_align(msgbox, LV_ALIGN_TOP_MID, 0, 20);
+  // Run 23: the box sized to its content and kept above the keyboard (the
+  // upper half of the screen); a fixed 40 % box with 25 px rows overflowed
+  // and pushed the name field up behind the screen edge.
+  lv_obj_set_style_pad_all(msgbox, 8, 0);
+  lv_obj_set_style_pad_row(msgbox, 8, 0);
+  lv_obj_set_size(msgbox, LV_PCT(80), LV_SIZE_CONTENT);
+  lv_obj_align(msgbox, LV_ALIGN_TOP_MID, 0, 4);
 
   lv_obj_t *label = NULL;
 
   label = lv_label_create(msgbox);
   lv_obj_set_width(label, LV_PCT(100));
+  lv_obj_set_style_text_font(label, &lv_font_montserrat_12, 0);
   lv_label_set_text(label, "Saving the profile will restart the printer.");
 
   lv_obj_t *prompt_save_btn = lv_btn_create(msgbox);
