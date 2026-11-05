@@ -60,11 +60,19 @@ void LogsPanel::shown() {
   json params = {{"root", "logs"}};
   ws.send_jsonrpc("server.files.list", params, [this](json &reply) {
     auto names = log_files(reply);
+    bool read = files_list_read(reply);
+    if (!read) {
+      spdlog::info("logs: list failed: {}", reply.dump());
+    }
     std::lock_guard<std::mutex> lock(lv_lock);
     files = names;
     lv_obj_clean(list);
     lv_obj_t *w = lv_list_add_btn(list, LV_SYMBOL_WIFI, WIFI_ENTRY);
     lv_obj_add_event_cb(w, &LogsPanel::_handle_callback, LV_EVENT_CLICKED, this);
+    if (!read) {
+      lv_label_set_text(text, "Could not read the log list.");
+      return;
+    }
     if (files.empty()) {
       lv_label_set_text(text, "No log files found.");
       return;

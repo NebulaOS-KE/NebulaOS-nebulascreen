@@ -82,6 +82,15 @@ TEST(Logs, list) {
   ASSERT_EQ(logs[2], std::string("moonraker.log.1"));
 }
 
+TEST(Logs, list_failure_is_not_an_empty_list) {
+  ASSERT_TRUE(files_list_read(json::parse(R"({"result":[]})")));
+  ASSERT_TRUE(log_files(json::parse(R"({"result":[]})")).empty());
+  ASSERT_TRUE(files_list_read(json::parse(R"({"result":[{"path":"klippy.log"}]})")));
+  ASSERT_FALSE(files_list_read(json::parse(R"({"error":{"code":404,"message":"Invalid root logs"}})")));
+  ASSERT_FALSE(files_list_read(json::parse(R"({"result":{}})")));
+  ASSERT_FALSE(files_list_read(json()));
+}
+
 TEST(Logs, tail_starts_at_a_line) {
   ASSERT_EQ(tail_text("short", 100), std::string("short"));
   ASSERT_EQ(tail_text("line one\nline two\nline three\n", 15), std::string("line three\n"));

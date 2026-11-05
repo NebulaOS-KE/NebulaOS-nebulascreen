@@ -179,6 +179,11 @@ std::vector<std::string> log_files(const json &files_reply) {
   return out;
 }
 
+bool files_list_read(const json &files_reply) {
+  return files_reply.is_object() && files_reply.contains("result")
+    && files_reply["result"].is_array();
+}
+
 std::string tail_text(const std::string &content, size_t max_bytes) {
   if (content.size() <= max_bytes) return content;
   size_t start = content.size() - max_bytes;

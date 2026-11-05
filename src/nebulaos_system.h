@@ -177,6 +177,9 @@ bool database_has_namespace(const json &list_reply, const std::string &ns);
 // Log files from a server.files.list {"root":"logs"} reply: *.log and rotated
 // *.log.N, sorted by name.
 std::vector<std::string> log_files(const json &files_reply);
+// Whether a server.files.list reply holds a file list at all (an error or a
+// reply without a list is a failure, not an empty logs folder).
+bool files_list_read(const json &files_reply);
 
 // Updates page note under the app list: what the list covers and where
 // NebulaOS itself is updated, from system_info()'s text (first line
