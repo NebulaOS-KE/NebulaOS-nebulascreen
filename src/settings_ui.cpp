@@ -258,6 +258,11 @@ static lv_obj_t *dialog_box(const char *title, const char *text, lv_obj_t **over
   lv_obj_t *box = lv_obj_create(overlay);
   KUtils::style_dialog_box(box);
   lv_obj_set_size(box, LV_PCT(88), LV_SIZE_CONTENT);
+  // A text taller than the screen (a long cleanup plan) scrolls inside the
+  // box instead of pushing the buttons off the screen.
+  lv_obj_set_style_max_height(box, LV_PCT(96), 0);
+  lv_obj_add_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_scroll_dir(box, LV_DIR_VER);
   lv_obj_set_style_pad_row(box, 8, 0);
   lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);

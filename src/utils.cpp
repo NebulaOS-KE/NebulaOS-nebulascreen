@@ -143,13 +143,25 @@ namespace KUtils {
     lv_obj_set_width(msg, LV_PCT(100));
     lv_obj_center(msg);
 
-    lv_obj_t *btnm = lv_msgbox_get_btns(mbox);
-    lv_obj_add_flag(btnm, LV_OBJ_FLAG_FLOATING);
-    lv_obj_align(btnm, LV_ALIGN_BOTTOM_MID, 0, 0);
-
+    // The box grows with its text (Run 23: a fixed 45 % height hid the last
+    // lines of longer questions behind the buttons). The floating button row
+    // sits in the box's bottom padding, so the text always ends above it; a
+    // text taller than the screen scrolls, the buttons stay put.
     auto hscale = (double)lv_disp_get_physical_ver_res(NULL) / 480.0;
-    lv_obj_set_size(btnm, LV_PCT(btns_pct), 50 * hscale);
-    lv_obj_set_size(mbox, LV_PCT(70), LV_PCT(45));
+    lv_coord_t btn_h = 50 * hscale;
+    lv_coord_t room = btn_h + lv_obj_get_style_pad_row(mbox, LV_PART_MAIN);
+    lv_obj_t *btnm = lv_msgbox_get_btns(mbox);
+    if (btnm != NULL) {
+      lv_obj_add_flag(btnm, LV_OBJ_FLAG_FLOATING);
+      lv_obj_set_size(btnm, LV_PCT(btns_pct), btn_h);
+      lv_obj_set_style_pad_bottom(mbox, lv_obj_get_style_pad_bottom(mbox, LV_PART_MAIN) + room, 0);
+      // aligned to the content area: down into the padding made for it
+      lv_obj_align(btnm, LV_ALIGN_BOTTOM_MID, 0, room);
+    }
+    lv_obj_set_width(mbox, LV_PCT(70));
+    lv_obj_set_height(mbox, LV_SIZE_CONTENT);
+    lv_obj_set_style_min_height(mbox, LV_PCT(45), 0);
+    lv_obj_set_style_max_height(mbox, LV_PCT(96), 0);
     lv_obj_center(mbox);
   }
 
