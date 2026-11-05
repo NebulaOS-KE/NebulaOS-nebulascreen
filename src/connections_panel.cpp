@@ -99,9 +99,9 @@ void ConnectionsPanel::show(const json &net, const json &cfg) {
 #ifdef SIMULATOR
 void ConnectionsPanel::sim_fill() {
   show(json::parse(R"({"result":{"config":{"hostname":"nebulaos","ipv4":{"mode":"dhcp"}},
-    "live":{"address":"192.168.0.98","ssid":"Office_2.4Ghz"}}})"),
+    "live":{"address":"192.168.1.98","ssid":"HomeWiFi"}}})"),
        json::parse(R"({"result":{"config":{"server":{"port":7125},
-    "spoolman":{"server":"http://192.168.0.20:7912"}}}})"));
+    "spoolman":{"server":"http://192.168.1.20:7912"}}}})"));
   enable_spoolman();
 }
 

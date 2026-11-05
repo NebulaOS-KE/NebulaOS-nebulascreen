@@ -8,9 +8,10 @@
 
 using json = nlohmann::json;
 
-// Verbatim result from GET /machine/nebulaos/network/status on ke-dev, 2026-10-09.
+// Result from GET /machine/nebulaos/network/status on ke-dev, 2026-10-09, with the
+// network name and the addresses replaced by example values.
 static json live_reply() {
-  return json::parse(R"({"jsonrpc":"2.0","id":3,"result":{"boot_state":"DHCP","config":{"hostname":"nebulaos","ipv4":{"mode":"dhcp"},"schema":1},"config_error":null,"last_known_good":null,"live":{"address":"192.168.0.98","dns":["192.168.0.100"],"gateway":"192.168.0.1","hostname":"nebulaos","interface":"wlan0","prefix":24,"ssid":"Office_2.4Ghz","wpa_state":"COMPLETED"},"mdns_name":"nebulaos.local","mdns_note":"x"}})");
+  return json::parse(R"({"jsonrpc":"2.0","id":3,"result":{"boot_state":"DHCP","config":{"hostname":"nebulaos","ipv4":{"mode":"dhcp"},"schema":1},"config_error":null,"last_known_good":null,"live":{"address":"192.168.1.98","dns":["192.168.1.100"],"gateway":"192.168.1.1","hostname":"nebulaos","interface":"wlan0","prefix":24,"ssid":"HomeWiFi","wpa_state":"COMPLETED"},"mdns_name":"nebulaos.local","mdns_note":"x"}})");
 }
 
 TEST(Netmask, prefix_roundtrip) {
@@ -24,15 +25,15 @@ TEST(Netmask, prefix_roundtrip) {
 }
 
 TEST(Validate, accepts_a_normal_entry) {
-  ASSERT_EQ(validate_static_entry("192.168.0.50", "255.255.255.0", "192.168.0.1"), std::string(""));
+  ASSERT_EQ(validate_static_entry("192.168.1.50", "255.255.255.0", "192.168.1.1"), std::string(""));
 }
 
 TEST(Validate, rejects_like_the_server) {
-  ASSERT_TRUE(!validate_static_entry("192.168.0.50", "255.255.255.0", "10.0.0.1").empty());
-  ASSERT_TRUE(!validate_static_entry("192.168.0.1", "255.255.255.0", "192.168.0.1").empty());
-  ASSERT_TRUE(!validate_static_entry("192.168.0.0", "255.255.255.0", "192.168.0.1").empty());
-  ASSERT_TRUE(!validate_static_entry("192.168.0.255", "255.255.255.0", "192.168.0.1").empty());
-  ASSERT_TRUE(!validate_static_entry("192.168.0.50", "255.255.255.254", "192.168.0.51").empty());
+  ASSERT_TRUE(!validate_static_entry("192.168.1.50", "255.255.255.0", "10.0.0.1").empty());
+  ASSERT_TRUE(!validate_static_entry("192.168.1.1", "255.255.255.0", "192.168.1.1").empty());
+  ASSERT_TRUE(!validate_static_entry("192.168.1.0", "255.255.255.0", "192.168.1.1").empty());
+  ASSERT_TRUE(!validate_static_entry("192.168.1.255", "255.255.255.0", "192.168.1.1").empty());
+  ASSERT_TRUE(!validate_static_entry("192.168.1.50", "255.255.255.254", "192.168.1.51").empty());
   ASSERT_TRUE(!validate_static_entry("10.1.2.3", "254.0.0.0", "10.0.0.1").empty());
 }
 
@@ -40,23 +41,23 @@ TEST(Status, dhcp_shows_live_values) {
   auto v = parse_network_status(live_reply());
   ASSERT_TRUE(v.ok);
   ASSERT_FALSE(v.configured_static);
-  ASSERT_EQ(v.address, std::string("192.168.0.98"));
+  ASSERT_EQ(v.address, std::string("192.168.1.98"));
   ASSERT_EQ(v.netmask, std::string("255.255.255.0"));
-  ASSERT_EQ(v.gateway, std::string("192.168.0.1"));
-  ASSERT_EQ(v.dns, std::string("192.168.0.100"));
+  ASSERT_EQ(v.gateway, std::string("192.168.1.1"));
+  ASSERT_EQ(v.dns, std::string("192.168.1.100"));
 }
 
 TEST(Status, static_shows_configured_values) {
   json j = live_reply();
-  j["result"]["config"]["ipv4"] = {{"mode", "static"}, {"address", "192.168.0.50"},
-                                   {"prefix", 22}, {"gateway", "192.168.0.1"},
+  j["result"]["config"]["ipv4"] = {{"mode", "static"}, {"address", "192.168.1.50"},
+                                   {"prefix", 22}, {"gateway", "192.168.1.1"},
                                    {"dns", {"1.1.1.1"}}};
   auto v = parse_network_status(j);
   ASSERT_TRUE(v.configured_static);
-  ASSERT_EQ(v.address, std::string("192.168.0.50"));
+  ASSERT_EQ(v.address, std::string("192.168.1.50"));
   ASSERT_EQ(v.netmask, std::string("255.255.252.0"));
   ASSERT_EQ(v.dns, std::string("1.1.1.1"));
-  ASSERT_EQ(v.live_address, std::string("192.168.0.98"));
+  ASSERT_EQ(v.live_address, std::string("192.168.1.98"));
 }
 
 TEST(Status, error_reply) {
@@ -75,7 +76,7 @@ TEST(Status, missing_live_fields_do_not_throw) {
 }
 
 TEST(Params, static_and_dhcp) {
-  json p = static_ipv4_params("192.168.0.50", "255.255.255.0", "192.168.0.1", "192.168.0.1");
+  json p = static_ipv4_params("192.168.1.50", "255.255.255.0", "192.168.1.1", "192.168.1.1");
   ASSERT_EQ(p["mode"].get<std::string>(), std::string("static"));
   ASSERT_EQ(p["prefix"].get<int>(), 24);
   ASSERT_EQ(p["dns"].size(), (size_t)1);
@@ -99,7 +100,7 @@ TEST(Outcome, reverted_codes_explain_the_revert) {
 }
 
 TEST(Outcome, validation_error_is_shown) {
-  json e = {{"error", {{"code", 400}, {"message", "INVALID_GATEWAY: gateway 10.0.0.1 is not in 192.168.0.0/24"}}}};
+  json e = {{"error", {{"code", 400}, {"message", "INVALID_GATEWAY: gateway 10.0.0.1 is not in 192.168.1.0/24"}}}};
   auto o = ipv4_apply_outcome(e, true);
   ASSERT_FALSE(o.success);
   ASSERT_TRUE(o.message.find("INVALID_GATEWAY") != std::string::npos);

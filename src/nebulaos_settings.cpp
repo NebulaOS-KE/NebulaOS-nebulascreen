@@ -416,7 +416,7 @@ SpoolmanCheck spoolman_check(const std::string &host_in, const std::string &port
     start = dot + 1;
   }
   if (!labels_ok) {
-    c.message = "Use an IP address (e.g. 192.168.0.20) or a host name.";
+    c.message = "Use an IP address (e.g. 192.168.1.20) or a host name.";
     return c;
   }
   bool digits = !port_in.empty() && port_in.size() <= 5;

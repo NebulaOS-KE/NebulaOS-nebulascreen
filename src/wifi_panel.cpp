@@ -417,9 +417,9 @@ void WifiPanel::connect(const std::string &ssid, const std::string &password, bo
 void WifiPanel::sim_fill() {
   lv_obj_move_foreground(cont);
   show_scan(json::parse(R"({"result":{"complete":true,
-    "status":{"state":"COMPLETED","ssid":"Office_2.4Ghz","address":"192.168.0.98"},
+    "status":{"state":"COMPLETED","ssid":"HomeWiFi","address":"192.168.1.98"},
     "networks":[
-      {"ssid":"Office_2.4Ghz","signal":-48,"security":"psk","saved":true,"current":true},
+      {"ssid":"HomeWiFi","signal":-48,"security":"psk","saved":true,"current":true},
       {"ssid":"Workshop","signal":-63,"security":"psk","saved":true,"current":false},
       {"ssid":"Guest","signal":-58,"security":"open","saved":false,"current":false},
       {"ssid":"Neighbour-5G","signal":-79,"security":"psk","saved":false,"current":false},

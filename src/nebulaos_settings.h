@@ -38,12 +38,12 @@ extern const char *const MCU_FLASH_METHOD;       // machine.nebulaos.mcu.flash {
 // -- Connections ------------------------------------------------------------------
 
 struct ConnectionsView {
-  std::string wifi;       // "Office (connected)" / "not connected"
-  std::string address;    // "192.168.0.98 (DHCP)" / "-"
+  std::string wifi;       // "HomeWiFi (connected)" / "not connected"
+  std::string address;    // "192.168.1.98 (DHCP)" / "-"
   std::string name;       // "nebulaos.local"
   std::string hostname;   // "nebulaos" ("" when unknown)
-  std::string mainsail;   // "http://192.168.0.98" / ""
-  std::string moonraker;  // "192.168.0.98:7125" / ""
+  std::string mainsail;   // "http://192.168.1.98" / ""
+  std::string moonraker;  // "192.168.1.98:7125" / ""
   std::string spoolman;   // the configured server, "" when not configured
 };
 

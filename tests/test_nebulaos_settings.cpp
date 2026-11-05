@@ -11,26 +11,26 @@ using json = nlohmann::json;
 
 static json net_status(const char *mode) {
   return {{"result", {{"config", {{"hostname", "nebulaos"}, {"ipv4", {{"mode", mode}}}}},
-                      {"live", {{"address", "192.168.0.98"}, {"ssid", "Office_2.4Ghz"},
+                      {"live", {{"address", "192.168.1.98"}, {"ssid", "HomeWiFi"},
                                 {"hostname", "nebulaos"}}}}}};
 }
 
 TEST(Connections, full) {
   json cfg = {{"result", {{"config", {{"server", {{"port", 7125}}},
-                                      {"spoolman", {{"server", "http://192.168.0.20:7912"}}}}}}}};
+                                      {"spoolman", {{"server", "http://192.168.1.20:7912"}}}}}}}};
   auto v = connections_view(net_status("dhcp"), cfg);
-  ASSERT_EQ(v.wifi, std::string("Office_2.4Ghz"));
-  ASSERT_EQ(v.address, std::string("192.168.0.98 (DHCP)"));
+  ASSERT_EQ(v.wifi, std::string("HomeWiFi"));
+  ASSERT_EQ(v.address, std::string("192.168.1.98 (DHCP)"));
   ASSERT_EQ(v.name, std::string("nebulaos.local"));
-  ASSERT_EQ(v.mainsail, std::string("http://192.168.0.98"));
-  ASSERT_EQ(v.moonraker, std::string("192.168.0.98:7125"));
-  ASSERT_EQ(v.spoolman, std::string("http://192.168.0.20:7912"));
+  ASSERT_EQ(v.mainsail, std::string("http://192.168.1.98"));
+  ASSERT_EQ(v.moonraker, std::string("192.168.1.98:7125"));
+  ASSERT_EQ(v.spoolman, std::string("http://192.168.1.20:7912"));
 }
 
 TEST(Connections, static_no_spoolman_no_config) {
   auto v = connections_view(net_status("static"), json());
-  ASSERT_EQ(v.address, std::string("192.168.0.98 (static)"));
-  ASSERT_EQ(v.moonraker, std::string("192.168.0.98:7125"));  // default port
+  ASSERT_EQ(v.address, std::string("192.168.1.98 (static)"));
+  ASSERT_EQ(v.moonraker, std::string("192.168.1.98:7125"));  // default port
   ASSERT_EQ(v.spoolman, std::string(""));
 }
 
@@ -44,7 +44,7 @@ TEST(Connections, offline) {
 // Shape of machine.nebulaos.wifi.scan (nebulaos_osconfig/wifi.py scan()).
 static json scan_reply() {
   return json::parse(R"({"result":{"complete":true,
-    "status":{"state":"COMPLETED","ssid":"Home","id":0,"address":"192.168.0.98"},
+    "status":{"state":"COMPLETED","ssid":"Home","id":0,"address":"192.168.1.98"},
     "networks":[
       {"ssid":"Home","signal":-48,"frequency":2412,"security":"psk","saved":true,"current":true},
       {"ssid":"Cafe","signal":-61,"frequency":2437,"security":"open","saved":false,"current":false},
@@ -71,7 +71,7 @@ TEST(Wifi, current_and_saved) {
   auto c = wifi_current(scan_reply());
   ASSERT_TRUE(c.connected);
   ASSERT_EQ(c.ssid, std::string("Home"));
-  ASSERT_EQ(c.address, std::string("192.168.0.98"));
+  ASSERT_EQ(c.address, std::string("192.168.1.98"));
   json st = json::parse(R"({"result":{"status":{"state":"SCANNING","ssid":null},
     "saved":[{"id":0,"ssid":"Home","current":false,"disabled":false},{"id":1,"ssid":"Old"}]}})");
   ASSERT_FALSE(wifi_current(st).connected);
@@ -291,10 +291,10 @@ TEST(Mcu, flash_result) {
 
 TEST(Wifi, connected_text) {
   bool ok = false;
-  json dhcp = json::parse(R"({"result":{"result":"CONNECTED","ssid":"Office_2.4Ghz",
-    "address":"192.168.0.98","address_mode":"dhcp","address_ok":true,"address_note":null}})");
-  ASSERT_EQ(wifi_connected_text(dhcp, "Office_2.4Ghz", &ok),
-            std::string("Connected to\nOffice_2.4Ghz\nIP: 192.168.0.98"));
+  json dhcp = json::parse(R"({"result":{"result":"CONNECTED","ssid":"HomeWiFi",
+    "address":"192.168.1.98","address_mode":"dhcp","address_ok":true,"address_note":null}})");
+  ASSERT_EQ(wifi_connected_text(dhcp, "HomeWiFi", &ok),
+            std::string("Connected to\nHomeWiFi\nIP: 192.168.1.98"));
   ASSERT_TRUE(ok);
   json bad = json::parse(R"({"result":{"result":"CONNECTED","address":"10.0.0.5",
     "address_mode":"static","address_ok":false,
@@ -360,9 +360,9 @@ TEST(Mcu, version_shown_and_warned) {
 // -- G125: Spoolman server -------------------------------------------------------
 
 TEST(Spoolman, check_accepts_ip_and_host_name) {
-  auto c = spoolman_check(" 192.168.0.20 ", "7912");
+  auto c = spoolman_check(" 192.168.1.20 ", "7912");
   ASSERT_TRUE(c.ok);
-  ASSERT_EQ(c.host, std::string("192.168.0.20"));
+  ASSERT_EQ(c.host, std::string("192.168.1.20"));
   ASSERT_EQ(c.port, 7912);
   ASSERT_TRUE(spoolman_check("spoolman.local", "80").ok);
   ASSERT_TRUE(spoolman_check("my-nas", "65535").ok);
