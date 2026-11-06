@@ -44,11 +44,16 @@ SDL_VIDEODRIVER=offscreen GUPPY_SIM_SHOTS=../../shots ./nebulascreen
 It captures a copy of the LVGL framebuffer rather than a window, which is why
 `SDL_VIDEODRIVER=offscreen` is enough and no X or Wayland session is needed.
 
-At `3194104` this produces **129 images** at 480x272 with `GUPPY_SMALL_SCREEN=1` - not just one
+At `dee0f6f` this produces **129 images** at 480x272 with `GUPPY_SMALL_SCREEN=1` - not just one
 per screen, but per *state*: confirmation dialogs, refusals, in-progress, failed, rolled back,
 and each step of the guided calibrations. Steps are named (`07-updates`, `m19-calibration`,
 `m40-tram-idle`), so the filenames are stable across runs and can be diffed between commits to
 find screenshots that have gone stale.
+
+That diffing works in practice. Re-capturing across `94869f7` -> `3194104` -> `dee0f6f`
+changed 1 image and then 5, and at `dee0f6f` all five were print-status or print-start
+screens - matching that commit's own subject. A capture run is a cheap way to see what a UI
+change actually touched.
 
 ### Two things to know before relying on it
 
