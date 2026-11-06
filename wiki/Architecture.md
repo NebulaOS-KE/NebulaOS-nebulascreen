@@ -1,5 +1,9 @@
 # Architecture
 
+> Working on the code? [Working on NebulaScreen](Working-on-NebulaScreen) covers the
+> logic/LVGL split that makes most of it testable without a printer, how to drive the UI in the
+> simulator, and the UI API contract that stops a mismatched build from starting.
+
 NebulaScreen is a single C++17 program on LVGL 8. It is based on GuppyScreen by ballaswag (GPL-3);
 see [History and credits](History-and-Credits). Some internal names keep the upstream spelling (for
 example the `GuppyScreen` class in `src/guppyscreen.cpp`).
