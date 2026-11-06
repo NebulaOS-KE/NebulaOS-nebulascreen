@@ -35,6 +35,9 @@ rest.
 | `log_path` | Log file (`/opt/printer_data/logs/nebulascreen.log` on NebulaOS) |
 | `thumbnail_path` | Directory for cached G-code thumbnails |
 | `nebulascreen_init_script` | The screen's service script (`/etc/init.d/S58nebulascreen`) |
+| `config_path` | The path of this file, stored inside it. Re-read when switching printers; legacy-mapped from `/opt/guppyscreen/guppyconfig.json` |
+| `input_shaper_graphs` | Show the resonance graphs during guided input-shaper calibration. **Absent means on** - the code treats any non-boolean value as on - and the switch lives on the calibration page itself, not in Settings |
+| `invert_y_ke_default_applied`, `invert_z_ke_default_applied` | One-shot markers, not settings. See below |
 
 ### Per-printer fields (`printers.<name>`)
 
@@ -52,6 +55,29 @@ rest.
 The NebulaOS default shows **Extruder**, **Bed** and **MCU Temp** (`temperature_sensor mcu_temp`).
 NebulaScreen puts these three back whenever `monitored_sensors` is missing or empty. If none of the
 listed `id`s exists in Klipper, every heater and sensor is shown under its Klipper name instead.
+
+### The two `_ke_default_applied` markers
+
+`invert_y_ke_default_applied` and `invert_z_ke_default_applied` are not preferences. They record
+that the KE's defaults have been applied once.
+
+On start, if the marker is absent, NebulaScreen sets the matching `invert_*_direction` to `true`
+and writes the marker. If the marker is present it does nothing. That is the whole mechanism, and
+it exists so that **turning an inversion off stays off**: without the marker, every start would
+helpfully set it back to the KE default and a user could never change it.
+
+Delete a marker and the next start re-applies the default. That is the only supported way to get
+the KE's jog directions back by hand.
+
+### Colours are in the theme file, not here
+
+`primary_color` and `secondary_color` are read from `themes/<theme>.json`, **not** from
+`nebulascreen.json` - the config only holds `theme`, the name. Both are hexadecimal strings
+without a prefix (`"2196F3"`), parsed with base 16.
+
+If a theme file omits one, the built-in fallback is used: `0x2196F3` for primary, `0xF44336` for
+secondary. A theme file that cannot be parsed falls back to the built-in defaults rather than
+failing to start, the same way the config does.
 
 ### Settings from the GuppyScreen era
 
