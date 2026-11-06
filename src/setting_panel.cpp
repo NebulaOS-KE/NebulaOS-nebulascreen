@@ -154,7 +154,7 @@ void SettingPanel::sim_tour(const char *dir, lv_obj_t *home) {
     {"20-mcu-failed", [this, close_dialogs]() {
       close_dialogs(); printer_panel.sim_mcu().sim_result(
         R"({"error":{"code":500,"message":"FLASH_FAILED: Could not enter bootloader: no handshake"}})"); }},
-    // Run 23 (Tim): Settings > Printer > Statistics.
+    // Run 23: Settings > Printer > Statistics.
     {"20a-statistics", [this, close_dialogs]() {
       close_dialogs(); printer_panel.sim_stats().foreground(); printer_panel.sim_stats().sim_fill(
         R"({"result":{"lifetime":{"print_time":4449600},

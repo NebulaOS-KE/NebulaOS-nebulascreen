@@ -245,7 +245,7 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
   }
 
   if (flow == CalFlow::LOAD_CELL) {
-    // Run 19: Tim's load-cell icon in the free top-right corner (46 px on
+    // Run 19: the owner's load-cell icon in the free top-right corner (46 px on
     // the small screen, 64 px otherwise - the Makefile's ASSET_DIR)
     lv_obj_t *icon = lv_img_create(cont);
     lv_img_set_src(icon, &load_cell_img);

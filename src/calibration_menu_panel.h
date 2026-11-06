@@ -16,7 +16,7 @@
 #include <vector>
 
 // Entry point for every calibration flow, reached from the Tune tab's single
-// "Calibration" button. G105 (Run 19, Tim): "an idiot just does 1-2-3" -
+// "Calibration" button. G105 (Run 19): "an idiot just does 1-2-3" -
 // IN ORDER 1 Bed Tramming (mechanical first), 2 Heaters (PID) (before Auto
 // Calibration: its nozzle clean removes the ooze of the PID dwell), 3 Axis
 // Twist (before the mesh: Klipper applies its correction to every probe),

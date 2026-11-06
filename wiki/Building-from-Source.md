@@ -51,7 +51,7 @@ make libspdlog.a
 Install SDL2 headers, then build without `CROSS_COMPILE`:
 
 ```bash
-# Fedora / Nobara:   sudo dnf install sdl2-compat-devel
+# Fedora:            sudo dnf install sdl2-compat-devel
 # Debian / Ubuntu:   sudo apt install libsdl2-dev
 # Arch:              sudo pacman -S sdl2
 

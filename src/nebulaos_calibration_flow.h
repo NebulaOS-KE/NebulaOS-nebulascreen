@@ -96,7 +96,7 @@ const char *cal_input_hint(CalFlow flow);
 // What the screen says when the typed number is not usable.
 const char *cal_input_problem(CalFlow flow);
 
-// G94 (Run 18, Tim's Run 17 test): the typed number stays in the field. The
+// G94 (Run 18, the Run 17 test): the typed number stays in the field. The
 // keypad's OK key commits it (closes the keypad, the value stays for Weigh /
 // Submit); the Weigh / Submit button sends the typed value and leaves it in
 // the field, so a retry after a problem ("not stable", ...) needs no retyping.

@@ -8,7 +8,7 @@
 
 #include <mutex>
 
-// Settings > Printer > Statistics (Run 23, Tim 2026-11-02): total print time,
+// Settings > Printer > Statistics (Run 23, 2026-11-02): total print time,
 // prints and filament since NebulaOS (Moonraker's history) and, imported once,
 // what the printer printed before NebulaOS (machine.nebulaos.stats; text from
 // stats_text in nebulaos_system.h). Read-only.

@@ -61,7 +61,7 @@ bool is_refusal_line(const std::string &line);
 //     (older firmware: the screen's own "a print is running" confirmation);
 //   - Klippy not ready / unknown (hung, shut down, disconnected): Klipper is
 //     restarted as a service (machine.services.restart klipper), which works
-//     even when Klippy does not answer (Tim G95). Restart MCU always tries
+//     even when Klippy does not answer (G95). Restart MCU always tries
 //     printer.firmware_restart first (what a shut-down MCU needs);
 //   - every printer.* restart falls back to the service restart when Klippy
 //     does not take it (error reply); NebulaOS's supervisorctl shim still

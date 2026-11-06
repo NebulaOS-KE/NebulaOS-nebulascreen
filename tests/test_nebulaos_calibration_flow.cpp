@@ -275,7 +275,7 @@ TEST(BedTram, page) {
   ASSERT_TRUE(v.can_start);
 }
 
-// Run 17 (Tim): signed values from signed_deviations + reference.
+// Run 17: signed values from signed_deviations + reference.
 TEST(BedTram, signed_grid_rigid) {
   json s = json::object();
   s["state"] = "awaiting_adjustment";
@@ -336,7 +336,7 @@ TEST(BedTram, bad_signed_values_fall_back) {
   ASSERT_TRUE(v.text.find("0.00 highest") == v.text.rfind("0.00 highest"));
 }
 
-// G94 (Run 18, Tim's Run 17 test): the typed grams were lost on OK / Weigh.
+// G94 (Run 18, the Run 17 test): the typed grams were lost on OK / Weigh.
 TEST(Input, load_cell_grams_command_uses_the_typed_value) {
   ASSERT_EQ(cal_input_command(CalFlow::LOAD_CELL, "1531"),
             std::string("NEBULAOS_LOAD_CELL_CALIBRATE GRAMS=1531.0"));

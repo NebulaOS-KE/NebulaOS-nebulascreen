@@ -14,7 +14,7 @@
 // FIRMWARE_RESTART), MCU firmware (install a .bin, run 4), and the screen's
 // printer preferences: default extruder
 // temperature, ask before an emergency stop, inverted Y/Z jog arrows.
-// Run 23 (Tim): Statistics (print time, prints, filament).
+// Run 23: Statistics (print time, prints, filament).
 class PrinterSettingsPanel {
  public:
   PrinterSettingsPanel(KWebSocketClient &ws, std::mutex &lock);

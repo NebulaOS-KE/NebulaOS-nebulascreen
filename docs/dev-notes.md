@@ -182,7 +182,7 @@ and the `nightly-ke-next` testing flow.
 ## Simulator build (Linux desktop)
 
 ```sh
-sudo dnf install sdl2-compat-devel   # Fedora/Nobara
+sudo dnf install sdl2-compat-devel   # Fedora
 make libhv.a && make libspdlog.a && make wpaclient
 make -j$(nproc) \
   CFLAGS="-O3 -g0 -MD -MP -I./ -I./lvgl/ -I/usr/include/SDL2 -D_GNU_SOURCE=1 -Wno-incompatible-pointer-types" \
@@ -200,7 +200,7 @@ make -j$(nproc) \
 
 ## Confirmed on-device state (verified via SSH 2026-05-25)
 
-Hostname: `Ender3V3KE-4C14`
+Hostname: `Ender3V3KE-XXXX` (stock names the printer after the last 4 digits of its MAC)
 
 ### printer.cfg
 - `[include gcode_macro.cfg]` **IS present** (line 8) — installer sed path will work; prepend fallback is unused but kept as insurance

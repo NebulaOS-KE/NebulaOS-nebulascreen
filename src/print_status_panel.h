@@ -106,7 +106,7 @@ class PrintStatusPanel : public NotifyConsumer {
   ImageLabel time_left;
   /* ImageLabel fan2; */
 
-  // Run 21 (Tim): progress and time left exactly like Mainsail - the inputs
+  // Run 21: progress and time left exactly like Mainsail - the inputs
   // Mainsail's getters read (kept from the status deltas: this panel sees a
   // notification before State does) and Mainsail's own settings (Moonraker
   // database, namespace "mainsail", key "general"). See print_estimate.h.
@@ -122,7 +122,7 @@ class PrintStatusPanel : public NotifyConsumer {
   // G112 (2026-10-31): the step list while START_PRINT runs (print_start.h).
   void update_start();
   lv_obj_t *start_label = NULL;
-  // Run 23 (Tim): the preview is sized by fit_thumbnail() to the room left in
+  // Run 23: the preview is sized by fit_thumbnail() to the room left in
   // the column - above the step list while START_PRINT runs if it fits, full
   // size again when the start is done.
   void fit_thumbnail();

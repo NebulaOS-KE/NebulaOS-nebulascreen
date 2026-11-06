@@ -7,7 +7,7 @@
 // NebulaScreen's own Linux framebuffer output (G97, Run 18), replacing
 // lv_drivers' fbdev_init()/fbdev_flush() on the printer.
 //
-// Why: Tim saw ~0.5 s of black between the boot card and the app's first
+// Why: the owner saw ~0.5 s of black between the boot card and the app's first
 // frame. lv_drivers' fbdev_init() - and GuppyScreen::init() right after it -
 // issue FBIOBLANK(FB_BLANK_UNBLANK). On the KE's Ingenic DPU that is not a
 // no-op for a panel that is already on: ingenicfb_blank() -> dpu_ctrl_resume()

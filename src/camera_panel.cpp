@@ -42,7 +42,7 @@ CameraPanel::CameraPanel(KWebSocketClient &c, std::mutex &lock)
     lv_obj_add_event_cb(dd, &CameraPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
   }
 
-  // 2026-10-31 (Tim): nothing reaches the camera until Save, which applies
+  // 2026-10-31: nothing reaches the camera until Save, which applies
   // the changes and keeps them for every start.
   save_btn = lv_btn_create(left);
   lv_obj_set_size(save_btn, LV_PCT(100), 32);
@@ -271,7 +271,7 @@ void CameraPanel::handle_callback(lv_event_t *e) {
   }
   if (code != LV_EVENT_CLICKED) return;
   if (obj == defaults_btn) {
-    // Every setting, night mode and anti-flicker included (Tim 2026-10-29);
+    // Every setting, night mode and anti-flicker included (2026-10-29);
     // manual exposure only ends with a camera restart (Defaults does one).
     bool manual = camera_bool(config, "exposure_manual", false);
     SettingsUi::confirm("Defaults",

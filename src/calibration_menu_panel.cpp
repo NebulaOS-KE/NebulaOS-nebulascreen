@@ -190,7 +190,7 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   lv_obj_add_flag(list_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_scrollbar_mode(list_cont, LV_SCROLLBAR_MODE_AUTO);
 
-  // G105 (Run 19): Tim's order and the status line under every row
+  // G105 (Run 19): the owner's order and the status line under every row
   auto add = [this](const CalMenuEntry &e, const void *icon, const char *number) {
     lv_obj_t *sub = nullptr;
     lv_obj_t *row = make_row(list_cont, icon, e.title, &CalibrationMenuPanel::_handle_callback,

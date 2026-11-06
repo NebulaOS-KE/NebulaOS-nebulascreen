@@ -219,7 +219,7 @@ static std::string fmt(const char *f, double a) {
 }
 
 // The four corners as the bed lies in front of you (rear on top), G89.
-// Run 17 (Tim): SIGNED values, so a rigid mount reads as "lower than the
+// Run 17: SIGNED values, so a rigid mount reads as "lower than the
 // highest corner" and not as a height:
 //   Rear:   left -0.05 OK    right  0.00 highest
 //   Front:  left -0.23 ADJUST    right -0.12 later

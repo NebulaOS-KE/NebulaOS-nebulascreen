@@ -1,7 +1,7 @@
 #ifndef __PRINT_ESTIMATE_H__
 #define __PRINT_ESTIMATE_H__
 
-// Print progress and time left, computed exactly like Mainsail (Run 21, Tim:
+// Print progress and time left, computed exactly like Mainsail (Run 21:
 // "the screen and Mainsail must show the same"). Ported from Mainsail's
 // printer store getters (getPrintPercent*, getEstimatedTimeFile/Filament,
 // getEstimatedTimeAvg) and its gui.general defaults:

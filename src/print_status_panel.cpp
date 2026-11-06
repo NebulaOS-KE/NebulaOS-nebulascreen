@@ -165,7 +165,7 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   lv_obj_move_to_index(filename_label, 1);
 
   // G112: while START_PRINT runs, its steps go between the preview and the
-  // file name. Run 23 (Tim): sized to its text so the column centres it as
+  // file name. Run 23: sized to its text so the column centres it as
   // a block, the lines left-aligned under each other.
   start_label = lv_label_create(thumbnail_cont);
   lv_obj_set_width(start_label, LV_SIZE_CONTENT);

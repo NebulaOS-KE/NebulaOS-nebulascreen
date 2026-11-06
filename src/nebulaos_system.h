@@ -140,7 +140,7 @@ std::string cleanup_text(const CleanupPlan &p, bool videos);
 // After cleanup.creality: the line for the dialog.
 std::string cleanup_result_text(const json &reply);
 
-// Run 23 (Tim): "Free up space" - NebulaOS's own leftovers (old logs, old
+// Run 23: "Free up space" - NebulaOS's own leftovers (old logs, old
 // update backups, unfinished downloads, uploaded images, the download cache);
 // never print files, settings, calibration or Creality's data.
 extern const char *const FREE_SPACE_PLAN_METHOD;   // machine.nebulaos.cleanup.nebulaos.plan
@@ -154,7 +154,7 @@ FreeSpacePlan free_space_plan(const json &plan_reply);
 // After cleanup.nebulaos: the line for the dialog.
 std::string free_space_result_text(const json &reply);
 
-// Run 23 (Tim): Settings > Printer > Statistics - machine.nebulaos.stats:
+// Run 23: Settings > Printer > Statistics - machine.nebulaos.stats:
 // NebulaOS's own prints (Moonraker's history) and, imported once, what the
 // printer printed before NebulaOS (Creality's counter, an earlier Moonraker).
 extern const char *const STATS_METHOD;             // machine.nebulaos.stats
