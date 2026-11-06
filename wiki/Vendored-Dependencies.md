@@ -22,7 +22,7 @@ The repository still contains tooling from its OpenKE history (see
   and outputs under `scripts/vendor/` — rebuilds of target-side packages and kernel modules for the
   stock Creality system.
 - `docker/k1-bash-build/` — a reconstruction of Pellcorp's `k1-bash-build` toolchain image those scripts
-  use (credit and details in [`docker/README.md`](https://github.com/coreflake1/NebulaOS-guppyscreen/blob/main/docker/README.md)).
+  use (credit and details in [`docker/README.md`](https://github.com/NebulaOS-KE/NebulaOS-nebulascreen/blob/main/docker/README.md)).
 - `docker/Dockerfile` — a standalone toolchain image (Bootlin mips32el musl and an aarch64 toolchain),
   the replacement for upstream `ballaswag/guppydev`.
 - `docs/VENDORING.md` — describes the Klipper-mod vendoring of the old installer. That machinery was

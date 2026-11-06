@@ -17,7 +17,7 @@ and the **MIPS** build for the Ender-3 V3 KE. The MIPS build is always done by
 ## 1. Clone with submodules
 
 ```bash
-git clone --recurse-submodules https://github.com/coreflake1/NebulaOS-guppyscreen.git
+git clone --recurse-submodules https://github.com/NebulaOS-KE/NebulaOS-nebulascreen.git
 cd NebulaOS-guppyscreen
 ```
 
