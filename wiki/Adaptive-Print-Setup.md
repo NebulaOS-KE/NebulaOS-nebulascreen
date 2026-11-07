@@ -32,14 +32,18 @@ it and let the rest keep printing.
 In OrcaSlicer: printer profile → **Machine G-code** → **Machine start G-code**:
 
 ```gcode
-START_PRINT EXTRUDER_TEMP=[nozzle_temperature_initial_layer] BED_TEMP=[bed_temperature_initial_layer_single]
+START_PRINT EXTRUDER_TEMP=[nozzle_temperature_initial_layer] BED_TEMP=[bed_temperature_initial_layer_single] RETRACT_LENGTH={retraction_length[0]} RETRACT_SPEED={retraction_speed[0]} UNRETRACT_SPEED={deretraction_speed[0]} UNRETRACT_EXTRA_LENGTH={retract_restart_extra[0]}
 ```
 
 To soak the bed only for filaments that warp (ABS, ASA), let the slicer add `BED_SOAK=1`:
 
 ```gcode
-START_PRINT EXTRUDER_TEMP=[nozzle_temperature_initial_layer] BED_TEMP=[bed_temperature_initial_layer_single] {if filament_type[0]=="ABS" or filament_type[0]=="ASA"}BED_SOAK=1{endif}
+START_PRINT EXTRUDER_TEMP=[nozzle_temperature_initial_layer] BED_TEMP=[bed_temperature_initial_layer_single] RETRACT_LENGTH={retraction_length[0]} RETRACT_SPEED={retraction_speed[0]} UNRETRACT_SPEED={deretraction_speed[0]} UNRETRACT_EXTRA_LENGTH={retract_restart_extra[0]} {if filament_type[0]=="ABS" or filament_type[0]=="ASA"}BED_SOAK=1{endif}
 ```
+
+The `RETRACT_*` values are the slicer's firmware retraction settings: `START_PRINT` applies them with
+`SET_RETRACTION`, and they are used when the slicer has **Use firmware retraction** on (`G10`/`G11`).
+`START_PRINT` also sets speed and flow back to 100 %, so `M220 S100` / `M221 S100` are not needed.
 
 `START_PRINT` then does, in order:
 
