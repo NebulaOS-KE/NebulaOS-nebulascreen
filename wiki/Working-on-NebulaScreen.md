@@ -54,9 +54,10 @@ the relative paths do not resolve, and the run fails in a way that looks like a 
 suite. (Observed: `cannot find -l:libhv.a`.) Build the simulator with your overrides if you need
 them; run the tests plainly.
 
-At `dee0f6f` on a desktop: **18 suites, 262 tests, 0 failures, 2 skips.** The two skips are the
-test suite itself detecting that `AF_UNIX` is not permitted in the environment and saying so,
-which is the right behaviour.
+At `fd47cb6` on a desktop - the commit NebulaScreen v1.0.1 and NebulaOS 1.0.2 ship:
+**18 suites, 264 tests, 0 failures, 2 skips** (re-run 2026-11-10). The two skips are the test
+suite itself detecting that `AF_UNIX` is not permitted in the environment and saying so, which
+is the right behaviour.
 
 That is a genuinely good return for a UI codebase, and it exists because of the split above.
 
