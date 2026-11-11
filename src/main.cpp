@@ -37,7 +37,13 @@ static void hal_init(lv_color_t p, lv_color_t s);
 
 using namespace hv;
 
-#define DISP_BUF_SIZE (128 * 1024)
+// LVGL draw buffer, in pixels. A quarter of the 480x272 panel (68 rows).
+// One buffer is enough: nsfb_flush() copies synchronously and calls
+// lv_disp_flush_ready() before it returns, so a second buffer never let
+// LVGL draw while a flush was still running. This was 2 x 128K pixels
+// (2 x 512 KiB at 32 bpp, a full frame each); LVGL now renders a full-screen
+// change in four strips.
+#define DISP_BUF_SIZE (480 * 68)
 
 int main(void)
 {
@@ -113,11 +119,10 @@ static void nsfb_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *co
 static void hal_init(lv_color_t primary, lv_color_t secondary) {
     /*A small buffer for LittlevGL to draw the screen's content*/
     static lv_color_t buf[DISP_BUF_SIZE];
-    static lv_color_t buf2[DISP_BUF_SIZE];
 
     /*Initialize a descriptor for the buffer*/
     static lv_disp_draw_buf_t disp_buf;
-    lv_disp_draw_buf_init(&disp_buf, buf, buf2, DISP_BUF_SIZE);
+    lv_disp_draw_buf_init(&disp_buf, buf, NULL, DISP_BUF_SIZE);
 
     /*Initialize and register a display driver*/
     static lv_disp_drv_t disp_drv;

@@ -22,6 +22,8 @@ class ExcludeObjectPanel : public NotifyConsumer {
   void consume(json &j);
   void handle_callback(lv_event_t *e);
   void handle_canvas_click(lv_event_t *e);
+  bool ensure_canvas();
+  void release_canvas();
 
   static void _handle_callback(lv_event_t *e) {
     static_cast<ExcludeObjectPanel *>(e->user_data)->handle_callback(e);

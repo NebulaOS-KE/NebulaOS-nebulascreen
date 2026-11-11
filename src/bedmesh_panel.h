@@ -29,6 +29,7 @@ class BedMeshPanel : public NotifyConsumer {
   void mesh_draw_cb(lv_event_t *e);
   void draw_3d_mesh();
   void resize_canvas();
+  void release_canvas();
   void handle_z_zoom_in(lv_event_t *event);
   void handle_z_zoom_out(lv_event_t *event);
   void handle_fov_zoom_in(lv_event_t *event);

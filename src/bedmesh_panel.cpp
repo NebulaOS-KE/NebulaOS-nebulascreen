@@ -124,20 +124,16 @@ BedMeshPanel::BedMeshPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_set_flex_grow(mesh_table, 1);
   lv_obj_clear_flag(mesh_table, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Setup 3D canvas - start with larger initial size
+  // Setup 3D canvas - start with larger initial size. Its pixel buffer is
+  // allocated only while the 3D view is shown (resize_canvas) and freed again
+  // on the way back to the table (release_canvas): at 32 bpp a 400x400
+  // buffer is 625 KiB the screen otherwise held from start-up on.
   auto canvas_width = 400;
   auto canvas_height = 400;
 
-  canvas_draw_buf = lv_mem_alloc(LV_CANVAS_BUF_SIZE_TRUE_COLOR(canvas_width, canvas_height));
-  lv_canvas_set_buffer(mesh_canvas, canvas_draw_buf, canvas_width, canvas_height, LV_IMG_CF_TRUE_COLOR);
   lv_obj_set_size(mesh_canvas, canvas_width, canvas_height);
   lv_obj_set_flex_grow(mesh_canvas, 1);
   lv_obj_set_align(mesh_canvas, LV_ALIGN_CENTER);
-
-  // Fill canvas with dark slate gray background initially
-  lv_canvas_fill_bg(mesh_canvas, lv_color_make(40, 40, 40), LV_OPA_COVER);
-
-  spdlog::debug("Initial canvas size: {}x{}", canvas_width, canvas_height);
 
   // Add resize callback to update canvas size when container changes
   lv_obj_add_event_cb(display_cont, [](lv_event_t *e) {
@@ -798,9 +794,23 @@ void BedMeshPanel::mesh_draw_cb(lv_event_t *e)
   }
 }
 
-void BedMeshPanel::resize_canvas()
+void BedMeshPanel::release_canvas()
 {
   if (canvas_draw_buf == nullptr) {
+    return;
+  }
+  // The canvas keeps a pointer to its buffer: point it at a 1x1 placeholder
+  // before the real buffer is freed.
+  static lv_color_t placeholder[1];
+  lv_canvas_set_buffer(mesh_canvas, placeholder, 1, 1, LV_IMG_CF_TRUE_COLOR);
+  lv_mem_free(canvas_draw_buf);
+  canvas_draw_buf = nullptr;
+}
+
+void BedMeshPanel::resize_canvas()
+{
+  // The buffer exists only in the 3D view; the table view needs none.
+  if (!show_3d_view) {
     return;
   }
 
@@ -818,11 +828,19 @@ void BedMeshPanel::resize_canvas()
   auto current_width = lv_obj_get_width(mesh_canvas);
   auto current_height = lv_obj_get_height(mesh_canvas);
 
-  if (abs(canvas_width - current_width) > 10 || abs(canvas_height - current_height) > 10) {
-    // Free old buffer and create new one
-    lv_mem_free(canvas_draw_buf);
-    canvas_draw_buf = lv_mem_alloc(LV_CANVAS_BUF_SIZE_TRUE_COLOR(canvas_width, canvas_height));
-    lv_canvas_set_buffer(mesh_canvas, canvas_draw_buf, canvas_width, canvas_height, LV_IMG_CF_TRUE_COLOR);
+  if (canvas_draw_buf == nullptr
+      || abs(canvas_width - current_width) > 10 || abs(canvas_height - current_height) > 10) {
+    // Create the new buffer, hand it to the canvas, then free the old one.
+    void *new_buf = lv_mem_alloc(LV_CANVAS_BUF_SIZE_TRUE_COLOR(canvas_width, canvas_height));
+    if (new_buf == nullptr) {
+      spdlog::error("bed mesh: no memory for a {}x{} 3D canvas", canvas_width, canvas_height);
+      return;
+    }
+    lv_canvas_set_buffer(mesh_canvas, new_buf, canvas_width, canvas_height, LV_IMG_CF_TRUE_COLOR);
+    if (canvas_draw_buf != nullptr) {
+      lv_mem_free(canvas_draw_buf);
+    }
+    canvas_draw_buf = new_buf;
     lv_obj_set_size(mesh_canvas, canvas_width, canvas_height);
 
     // Fill with dark slate gray background
@@ -2368,6 +2386,8 @@ void BedMeshPanel::show_table_view() {
   lv_obj_clear_flag(clear_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   lv_obj_clear_flag(calibrate_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   lv_obj_clear_flag(toggle_view_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+
+  release_canvas();
 }
 
 // Fullscreen 3D: canvas fills the left, a narrow right-side strip holds the
