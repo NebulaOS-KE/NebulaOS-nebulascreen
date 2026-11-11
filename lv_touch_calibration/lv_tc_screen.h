@@ -35,6 +35,9 @@ typedef struct {
     uint8_t currentStep;            /* The current calibration step */
     uint8_t tapCount;               /* Sub-taps collected for the current crosshair (0..LV_TC_TAPS_PER_POINT-1) */
     lv_point_t tapAccum;            /* Running sum of sub-taps for the current crosshair */
+    lv_point_t tapMin;              /* Per-axis smallest sub-tap on the current crosshair */
+    lv_point_t tapMax;              /* Per-axis largest sub-tap on the current crosshair */
+    const char *pendingMsg;         /* Shown instead of the start message on the next first crosshair (a retry) */
     lv_timer_t *startDelayTimer;    /* The timer for delaying user input after opening the screen */
     lv_timer_t *recalibrateTimer;   /* The timer for automatic recalibration */
 } lv_tc_screen_t;

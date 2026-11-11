@@ -86,6 +86,21 @@ extern "C" {
 //if it is not accepted by the user. This makes sure that a faulty calibration can
 //always be restarted - even when it is impossible to press the 'recalibrate' button
 //Set to 0 to disable
+//Plausibility checks (lv_tc_check.h): the taps on one crosshair must lie
+//within this many pixels of each other, and the touched triangle's area must
+//be within these percentages of the crosshairs' triangle.
+#ifndef LV_TC_TAP_SPREAD_MAX_PX
+#define LV_TC_TAP_SPREAD_MAX_PX                 40
+#endif
+#ifndef LV_TC_AREA_MIN_PCT
+#define LV_TC_AREA_MIN_PCT                      60
+#endif
+#ifndef LV_TC_AREA_MAX_PCT
+#define LV_TC_AREA_MAX_PCT                      170
+#endif
+#define LV_TC_RETRY_TAPS_MSG                    "Those taps were too far apart. Tap the centre of the cross again, 3 times."
+#define LV_TC_RETRY_ALL_MSG                     "That did not line up. Once more: tap the centre of each cross, 3 times."
+
 #if defined CONFIG_LV_TC_RECALIB_TIMEOUT_S
 #define LV_TC_RECALIB_TIMEOUT_S CONFIG_LV_TC_RECALIB_TIMEOUT_S
 #else

@@ -195,6 +195,13 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
         lv_obj_t *touch_calibrate_scr = lv_tc_screen_create();
 
         lv_disp_load_scr(touch_calibrate_scr);
+        // NebulaOS (2026-11-11, issue #7): popups live on the top layer, above
+        // every screen, and the wizard takes every tap - so a notice shown now
+        // (the one after a clean reset) covered the crosshairs, could not be
+        // closed, and the taps meant for its OK button became the calibration.
+        // Hide the top layer until the calibration is done; whatever was put
+        // there in the meantime shows then.
+        lv_obj_add_flag(lv_layer_top(), LV_OBJ_FLAG_HIDDEN);
 
         lv_tc_screen_start(touch_calibrate_scr);
         lv_obj_add_event_cb(touch_calibrate_scr, &GuppyScreen::handle_calibrated, LV_EVENT_READY, main_screen);
@@ -326,6 +333,7 @@ void GuppyScreen::handle_calibrated(lv_event_t *event) {
   spdlog::info("finished calibration");
   lv_obj_t *main_screen = (lv_obj_t *)event->user_data;
   lv_disp_load_scr(main_screen);
+  lv_obj_clear_flag(lv_layer_top(), LV_OBJ_FLAG_HIDDEN);
 }
 
 void GuppyScreen::save_calibration_coeff(lv_tc_coeff_t coeff) {

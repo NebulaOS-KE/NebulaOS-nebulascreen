@@ -8,6 +8,7 @@
 
 #include "lv_tc.h"
 #include "lv_tc_config.h"
+#include "lv_tc_check.h"
 
 
 /*********************
@@ -81,7 +82,8 @@ void lv_tc_screen_start_with_config(lv_obj_t* screenObj, lv_tc_start_delay_t sta
         tCScreenObj->recalibrateTimer = NULL;
     }
 
-    lv_label_set_text_static(tCScreenObj->msgLabelObj, LV_TC_START_MSG);
+    lv_label_set_text_static(tCScreenObj->msgLabelObj,
+        tCScreenObj->pendingMsg ? tCScreenObj->pendingMsg : LV_TC_START_MSG);
     lv_obj_add_flag(tCScreenObj->recalibrateBtnObj, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(tCScreenObj->acceptBtnObj, LV_OBJ_FLAG_HIDDEN);
     
@@ -207,11 +209,31 @@ static void lv_tc_screen_process_input(lv_obj_t* screenObj, lv_point_t tchPoint)
     if(tCScreenObj->currentStep > STEP_INIT && tCScreenObj->currentStep < STEP_FINISH) {
         tCScreenObj->inputEnabled = false;
 
+        if(tCScreenObj->tapCount == 0) {
+            tCScreenObj->tapMin = tchPoint;
+            tCScreenObj->tapMax = tchPoint;
+        } else {
+            if(tchPoint.x < tCScreenObj->tapMin.x) tCScreenObj->tapMin.x = tchPoint.x;
+            if(tchPoint.y < tCScreenObj->tapMin.y) tCScreenObj->tapMin.y = tchPoint.y;
+            if(tchPoint.x > tCScreenObj->tapMax.x) tCScreenObj->tapMax.x = tchPoint.x;
+            if(tchPoint.y > tCScreenObj->tapMax.y) tCScreenObj->tapMax.y = tchPoint.y;
+        }
         tCScreenObj->tapAccum.x += tchPoint.x;
         tCScreenObj->tapAccum.y += tchPoint.y;
         tCScreenObj->tapCount++;
 
         if(tCScreenObj->tapCount >= LV_TC_TAPS_PER_POINT) {
+            /* NebulaOS: taps scattered over the screen (one of them meant for
+             * something else) are not a crosshair - collect this one again. */
+            lv_tc_check_point_t mn = {tCScreenObj->tapMin.x, tCScreenObj->tapMin.y};
+            lv_tc_check_point_t mx = {tCScreenObj->tapMax.x, tCScreenObj->tapMax.y};
+            if(!lv_tc_check_taps_close(mn, mx, LV_TC_TAP_SPREAD_MAX_PX)) {
+                tCScreenObj->tapCount = 0;
+                tCScreenObj->tapAccum.x = 0;
+                tCScreenObj->tapAccum.y = 0;
+                lv_label_set_text_static(tCScreenObj->msgLabelObj, LV_TC_RETRY_TAPS_MSG);
+                return;
+            }
             /* All sub-taps collected — average them and advance to next crosshair */
             lv_point_t avg = {
                 tCScreenObj->tapAccum.x / LV_TC_TAPS_PER_POINT,
@@ -239,7 +261,12 @@ static void lv_tc_screen_step(lv_obj_t* screenObj, uint8_t step, lv_point_t tchP
     tCScreenObj->tapAccum.x = 0;
     tCScreenObj->tapAccum.y = 0;
     if(step > STEP_INIT && step < STEP_FINISH) {
-        lv_label_set_text_static(tCScreenObj->msgLabelObj, LV_TC_START_MSG);
+        if(step == STEP_FIRST && tCScreenObj->pendingMsg) {
+            lv_label_set_text_static(tCScreenObj->msgLabelObj, tCScreenObj->pendingMsg);
+            tCScreenObj->pendingMsg = NULL;
+        } else {
+            lv_label_set_text_static(tCScreenObj->msgLabelObj, LV_TC_START_MSG);
+        }
     }
 
     if(step > STEP_FIRST) {
@@ -284,6 +311,20 @@ static void lv_tc_screen_step(lv_obj_t* screenObj, uint8_t step, lv_point_t tchP
             }
         } else {
             for(int ci = 0; ci < 3; ci++) evdevScrPoints[ci] = tCScreenObj->scrPoints[ci];
+        }
+        /* NebulaOS: a result that does not line up with the crosshairs is
+         * never saved - with touch misaligned it could not be redone. */
+        lv_tc_check_point_t cs[3], ct[3];
+        for(int ci = 0; ci < 3; ci++) {
+            cs[ci].x = evdevScrPoints[ci].x;
+            cs[ci].y = evdevScrPoints[ci].y;
+            ct[ci].x = tCScreenObj->tchPoints[ci].x;
+            ct[ci].y = tCScreenObj->tchPoints[ci].y;
+        }
+        if(!lv_tc_check_triangle(cs, ct, LV_TC_AREA_MIN_PCT, LV_TC_AREA_MAX_PCT)) {
+            tCScreenObj->pendingMsg = LV_TC_RETRY_ALL_MSG;
+            lv_tc_screen_start(screenObj);
+            return;
         }
         lv_tc_compute_coeff(evdevScrPoints, tCScreenObj->tchPoints, false);
         lv_tc_screen_ready(screenObj);
