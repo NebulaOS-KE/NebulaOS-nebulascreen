@@ -20,9 +20,12 @@ This page explains how that copy happens and the conventions to follow so it doe
 
 The GitHub Wiki maps a file like `Calibration-Explained.md` to the page URL `…/wiki/Calibration-Explained`.
 
-- **Link to other pages without the `.md` and without a path:** `[text](Calibration-Explained)`, not
-  `[text](Calibration-Explained.md)` or `[text](wiki/Calibration-Explained.md)`. The `.md`/path form
-  works when browsing the repo but **404s on the Wiki tab** — and the Wiki tab is the canonical home.
+- **Link to other pages without the `.md` and without a path:** write
+  `[text](Calibration-Explained)`. The forms `[text]` + `(Calibration-Explained.md)` and
+  `[text]` + `(wiki/Calibration-Explained.md)` work when browsing the repository but **404 on
+  the Wiki tab** — and the Wiki tab is the canonical home. (Those two are spelled out here
+  rather than written as links on purpose: a link checker cannot tell a bad example from a bad
+  link.)
 - **`_Sidebar.md`** is the left-hand navigation. **`Home.md`** is the wiki landing page.
 - Use dashes in filenames; spaces in the page title (the `# H1`) are fine.
 
