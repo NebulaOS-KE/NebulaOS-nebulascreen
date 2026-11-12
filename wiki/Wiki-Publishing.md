@@ -2,7 +2,7 @@
 
 *(Developer doc.)* The pages you're reading live as Markdown in the **`wiki/` folder of the main repo**.
 That folder is the source of truth — edit it in a normal pull request like any other code. GitHub's
-**Wiki tab** (`github.com/coreflake1/NebulaOS-guppyscreen/wiki`) is a *separate* git repository
+**Wiki tab** (`github.com/NebulaOS-KE/NebulaOS-nebulascreen/wiki`) is a *separate* git repository
 (`...NebulaOS-guppyscreen.wiki.git`), so the files have to be copied across to actually appear there.
 The workflow below publishes to this repository's own wiki (the action takes the repository from the
 workflow context).
@@ -20,9 +20,12 @@ This page explains how that copy happens and the conventions to follow so it doe
 
 The GitHub Wiki maps a file like `Calibration-Explained.md` to the page URL `…/wiki/Calibration-Explained`.
 
-- **Link to other pages without the `.md` and without a path:** `[text](Calibration-Explained)`, not
-  `[text](Calibration-Explained.md)` or `[text](wiki/Calibration-Explained.md)`. The `.md`/path form
-  works when browsing the repo but **404s on the Wiki tab** — and the Wiki tab is the canonical home.
+- **Link to other pages without the `.md` and without a path:** write
+  `[text](Calibration-Explained)`. The forms `[text]` + `(Calibration-Explained.md)` and
+  `[text]` + `(wiki/Calibration-Explained.md)` work when browsing the repository but **404 on
+  the Wiki tab** — and the Wiki tab is the canonical home. (Those two are spelled out here
+  rather than written as links on purpose: a link checker cannot tell a bad example from a bad
+  link.)
 - **`_Sidebar.md`** is the left-hand navigation. **`Home.md`** is the wiki landing page.
 - Use dashes in filenames; spaces in the page title (the `# H1`) are fine.
 
@@ -63,7 +66,7 @@ push:
 # one-time: clone the wiki repo (must have at least one page created via the Wiki tab first —
 # a genuinely empty GitHub wiki's .wiki.git doesn't exist yet and this clone will 404 until then;
 # confirmed live 2026-08-15, the same way the CI job above failed the same way on 2026-08-14)
-git clone https://github.com/coreflake1/NebulaOS-guppyscreen.wiki.git /tmp/nebulaos-guppyscreen-wiki
+git clone https://github.com/NebulaOS-KE/NebulaOS-nebulascreen.wiki.git /tmp/nebulaos-guppyscreen-wiki
 
 # each publish:
 cp wiki/*.md /tmp/nebulaos-guppyscreen-wiki/

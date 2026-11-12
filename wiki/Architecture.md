@@ -1,8 +1,24 @@
 # Architecture
 
+> Working on the code? [Working on NebulaScreen](Working-on-NebulaScreen) covers the
+> logic/LVGL split that makes most of it testable without a printer, how to drive the UI in the
+> simulator, and the UI API contract that stops a mismatched build from starting.
+
 NebulaScreen is a single C++17 program on LVGL 8. It is based on GuppyScreen by ballaswag (GPL-3);
 see [History and credits](History-and-Credits). Some internal names keep the upstream spelling (for
 example the `GuppyScreen` class in `src/guppyscreen.cpp`).
+
+## Which build this describes
+
+This page and the other developer pages are written against **`fd47cb6`**, which is
+NebulaScreen **v1.0.1** and the screen NebulaOS **1.0.2** ships
+(`NEBULASCREEN_PIN` / `NEBULASCREEN_VERSION` in `NebulaOS-firmware/manifests/dependencies.conf`
+at tag `v1.0.2`).
+
+`main` has moved past that pin, but only by documentation and a comment-only privacy pass
+(`3c710c2` and two wiki commits), so **the shipped binary and the newest source behave
+identically** - checked by reading the diff, not inferred from the dates. When that stops being
+true, the pin is what ships and the tip is not.
 
 ## Components
 

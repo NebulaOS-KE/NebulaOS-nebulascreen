@@ -1,3 +1,4 @@
+<!-- moved-page-stub -->
 # Emergency factory reset
 
 This page described the `S58factoryreset` service and the USB `emergency_factory_reset` trigger of

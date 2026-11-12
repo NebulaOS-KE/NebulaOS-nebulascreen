@@ -27,6 +27,7 @@
 
 ---
 ### 🛠️ Developers
+- [Working on NebulaScreen](Working-on-NebulaScreen)
 - [Build from source](Building-from-Source)
 - [Dev & simulator](Development-and-Simulator)
 - [Architecture](Architecture)

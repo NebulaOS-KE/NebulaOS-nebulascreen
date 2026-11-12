@@ -1,3 +1,4 @@
+<!-- moved-page-stub -->
 # Upgrading
 
 NebulaScreen ships inside NebulaOS and is updated with it: see
