@@ -114,6 +114,12 @@ struct SystemNotice {
 };
 extern const char *const ACK_NOTICE_METHOD;   // machine.nebulaos.system.ack_notice
 std::vector<SystemNotice> system_notices(const json &info_reply);
+// Issue #8 (2026-11-13): "mcu-unreachable" (S50nebulaos-mcu-guard: its own
+// check before Klipper could not reach the mainboard) only matters when
+// Klipper cannot reach it either. Shown only if Klipper is not ready within
+// MCU_NOTICE_WAIT_MS; acknowledged without showing once Klipper is ready.
+bool notice_waits_for_klipper(const SystemNotice &n);
+constexpr uint32_t MCU_NOTICE_WAIT_MS = 45000;
 
 // G69 (2026-10-16): System > Report a problem.
 extern const char *const REPORT_ISSUES_URL;   // github.com/NebulaOS-KE/NebulaOS/issues

@@ -3,6 +3,7 @@
 
 #include "lvgl/lvgl.h"
 #include "websocket_client.h"
+#include "nebulaos_system.h"
 #include "main_panel.h"
 #include "bedmesh_panel.h"
 #include "print_status_panel.h"
@@ -25,6 +26,7 @@ class InitPanel {
 
  private:
   void image_result(int tries);
+  void klipper_state_for_notices(bool ready);  // LVGL lock held
 
   lv_obj_t *cont;
   lv_obj_t *label;
@@ -35,6 +37,9 @@ class InitPanel {
   KWebSocketClient *ws = NULL;   // for image_result's retries
   lv_timer_t *image_timer = NULL;
   int image_tries = 0;
+  // Issue #8: the held-back "mcu-unreachable" notice (notice_waits_for_klipper).
+  lv_timer_t *mcu_notice_timer = NULL;
+  SystemNotice mcu_notice;
 };
 
 #endif // __INIT_PANEL_H__

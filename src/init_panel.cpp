@@ -82,8 +82,36 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	// connected again, then tell NebulaOS the notice was shown.
 	// G65: NebulaOS's own one-time notices (e.g. config/nebulaos edits kept
 	// by an update), each shown once and acknowledged.
-	ws.send_jsonrpc(SYSTEM_INFO_METHOD, json::object(), [this, &ws](json &j) {
+	// connected() runs when the websocket opens (Klipper often still
+	// starting: printer.objects.list is an error) and again when Klipper is
+	// ready, so both paths come through here.
+	bool klipper_ready = d.contains("result");
+	{
+	  std::lock_guard<std::mutex> lock(this->lv_lock);
+	  klipper_state_for_notices(klipper_ready);
+	}
+	ws.send_jsonrpc(SYSTEM_INFO_METHOD, json::object(), [this, &ws, klipper_ready](json &j) {
 	  for (const auto &n : system_notices(j)) {
+	    if (notice_waits_for_klipper(n)) {
+	      if (klipper_ready) {
+	        spdlog::info("notice {} not shown: Klipper reached the mainboard", n.id);
+	        ws.send_jsonrpc(ACK_NOTICE_METHOD, json{{"id", n.id}}, [](json &) {});
+	        continue;
+	      }
+	      std::lock_guard<std::mutex> lock(this->lv_lock);
+	      this->mcu_notice = n;
+	      if (this->mcu_notice_timer == NULL) {
+	        this->mcu_notice_timer = lv_timer_create([](lv_timer_t *t) {
+	          auto *self = (InitPanel *)t->user_data;
+	          lv_timer_del(t);
+	          self->mcu_notice_timer = NULL;
+	          SettingsUi::notice("NebulaOS", self->mcu_notice.text.c_str());
+	          self->ws->send_jsonrpc(ACK_NOTICE_METHOD, json{{"id", self->mcu_notice.id}},
+	                                 [](json &) {});
+	        }, MCU_NOTICE_WAIT_MS, this);
+	      }
+	      continue;
+	    }
 	    {
 	      std::lock_guard<std::mutex> lock(this->lv_lock);
 	      SettingsUi::notice("NebulaOS", n.text.c_str());
@@ -190,6 +218,15 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	}
   });
 
+}
+
+// Klipper ready: a held-back "mcu-unreachable" notice is dropped (the
+// SYSTEM_INFO reply that follows acknowledges it without showing it).
+void InitPanel::klipper_state_for_notices(bool ready) {
+  if (ready && mcu_notice_timer != NULL) {
+    lv_timer_del(mcu_notice_timer);
+    mcu_notice_timer = NULL;
+  }
 }
 
 void InitPanel::disconnected(KWebSocketClient &ws) {

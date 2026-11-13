@@ -383,6 +383,10 @@ std::vector<SystemNotice> system_notices(const json &info_reply) {
   return out;
 }
 
+bool notice_waits_for_klipper(const SystemNotice &n) {
+  return n.id == "mcu-unreachable";
+}
+
 std::string debug_note(const json &status_reply) {
   const json &r = result_of(status_reply);
   if (r.is_object() && r.contains("debug_until") && r["debug_until"].is_number()) {

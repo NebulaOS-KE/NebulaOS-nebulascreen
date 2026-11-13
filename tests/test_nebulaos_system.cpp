@@ -247,6 +247,8 @@ TEST(Notices, from_info) {
   ASSERT_EQ((int)n.size(), 1);
   ASSERT_EQ(n[0].id, std::string("config-edits"));
   ASSERT_TRUE(system_notices(info_reply()).empty());
+  ASSERT_TRUE(notice_waits_for_klipper(SystemNotice{"mcu-unreachable", "x"}));
+  ASSERT_TRUE(!notice_waits_for_klipper(SystemNotice{"config-edits", "x"}));
   ASSERT_EQ(std::string(ACK_NOTICE_METHOD), std::string("machine.nebulaos.system.ack_notice"));
 }
 
