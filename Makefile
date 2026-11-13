@@ -89,8 +89,14 @@ DEFINES +=  -D LV_BUILD_TEST=0 -D SIMULATOR
 LDLIBS += -lSDL2
 endif
 
-COMPILE_CC				= $(CC) $(CFLAGS) $(INC) $(DEFINES)
-COMPILE_CXX				= $(CC) $(CFLAGS) $(INC) $(DEFINES)
+# Every function and object in its own section, so the linker can drop what
+# nothing references (--gc-sections below). All of LVGL, lv_drivers and the
+# icon set are compiled as plain objects and would otherwise be linked whole.
+SECTION_FLAGS			:= -ffunction-sections -fdata-sections
+GC_LDFLAGS				:= -Wl,--gc-sections
+
+COMPILE_CC				= $(CC) $(CFLAGS) $(SECTION_FLAGS) $(INC) $(DEFINES)
+COMPILE_CXX				= $(CC) $(CFLAGS) $(SECTION_FLAGS) $(INC) $(DEFINES)
 
 ## MAINOBJ -> OBJFILES
 
@@ -291,7 +297,7 @@ $(BUILD_OBJ_DIR)/%.o: %.c
 
 default: $(TARGET)
 	@mkdir -p $(dir $(BUILD_BIN_DIR)/)
-	$(CXX) -o $(BUILD_BIN_DIR)/$(BIN) $(TARGET) $(LDFLAGS) $(LDLIBS)
+	$(CXX) -o $(BUILD_BIN_DIR)/$(BIN) $(TARGET) $(GC_LDFLAGS) $(LDFLAGS) $(LDLIBS)
 	@echo "CXX $<"
 
 spdlogclean:

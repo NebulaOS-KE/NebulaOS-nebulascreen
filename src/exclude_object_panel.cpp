@@ -35,7 +35,7 @@ ExcludeObjectPanel::ExcludeObjectPanel(KWebSocketClient &websocket_client, std::
   , ws(websocket_client)
   , panel_cont(lv_obj_create(lv_scr_act()))
   , canvas(lv_canvas_create(panel_cont))
-  , canvas_buf((lv_color_t *)malloc(LV_CANVAS_BUF_SIZE_TRUE_COLOR(CANVAS_DIM, CANVAS_DIM)))
+  , canvas_buf(nullptr)
   , info_cont(lv_obj_create(panel_cont))
   , title_label(lv_label_create(info_cont))
   , status_label(lv_label_create(info_cont))
@@ -46,13 +46,14 @@ ExcludeObjectPanel::ExcludeObjectPanel(KWebSocketClient &websocket_client, std::
   lv_obj_set_size(panel_cont, LV_PCT(100), LV_PCT(100));
   lv_obj_set_style_pad_all(panel_cont, 6, 0);
 
-  // Bed-map canvas on the left, framed like the app's other cards.
-  lv_canvas_set_buffer(canvas, canvas_buf, CANVAS_DIM, CANVAS_DIM, LV_IMG_CF_TRUE_COLOR);
+  // Bed-map canvas on the left, framed like the app's other cards. Its pixel
+  // buffer (250x250 at 32 bpp, 244 KiB) exists only while the panel is open:
+  // foreground() allocates it, leaving the panel frees it (release_canvas).
+  lv_obj_set_size(canvas, CANVAS_DIM, CANVAS_DIM);
   lv_obj_align(canvas, LV_ALIGN_LEFT_MID, 4, 0);
   lv_obj_set_style_border_width(canvas, 2, 0);
   lv_obj_set_style_border_color(canvas, lv_palette_darken(LV_PALETTE_GREY, 2), 0);
   lv_obj_set_style_radius(canvas, 4, 0);
-  lv_canvas_fill_bg(canvas, lv_color_make(30, 30, 30), LV_OPA_COVER);
 
   // The canvas (an lv_img) isn't clickable, so a tap on the bed map routes up to
   // the nearest clickable ancestor - panel_cont. Handle taps there and hit-test
@@ -98,10 +99,38 @@ ExcludeObjectPanel::~ExcludeObjectPanel() {
   }
 }
 
+bool ExcludeObjectPanel::ensure_canvas() {
+  if (canvas_buf != nullptr) {
+    return true;
+  }
+  canvas_buf = (lv_color_t *)malloc(LV_CANVAS_BUF_SIZE_TRUE_COLOR(CANVAS_DIM, CANVAS_DIM));
+  if (canvas_buf == nullptr) {
+    spdlog::error("exclude_object: no memory for the bed map");
+    return false;
+  }
+  lv_canvas_set_buffer(canvas, canvas_buf, CANVAS_DIM, CANVAS_DIM, LV_IMG_CF_TRUE_COLOR);
+  return true;
+}
+
+void ExcludeObjectPanel::release_canvas() {
+  if (canvas_buf == nullptr) {
+    return;
+  }
+  // The canvas keeps a pointer to its buffer: point it at a 1x1 placeholder
+  // before the real buffer is freed. The object keeps its 250x250 size.
+  static lv_color_t placeholder[1];
+  lv_canvas_set_buffer(canvas, placeholder, 1, 1, LV_IMG_CF_TRUE_COLOR);
+  free(canvas_buf);
+  canvas_buf = nullptr;
+}
+
 void ExcludeObjectPanel::foreground() {
   // Called from a button callback, which already runs under lv_lock (held by the
   // main loop) - taking it again would deadlock the UI. consume() locks itself
   // because it runs on the websocket thread.
+  if (!ensure_canvas()) {
+    return;
+  }
   is_foreground = true;
   load_bed_bounds();
   redraw();
@@ -149,6 +178,9 @@ lv_point_t ExcludeObjectPanel::to_px(double mx, double my) {
 }
 
 void ExcludeObjectPanel::redraw() {
+  if (canvas_buf == nullptr) {
+    return;
+  }
   obj_boxes.clear();
   lv_canvas_fill_bg(canvas, lv_color_make(30, 30, 30), LV_OPA_COVER);
 
@@ -389,6 +421,7 @@ void ExcludeObjectPanel::confirm_exclude(const std::string &name) {
         self->ws.send_jsonrpc("printer.print.cancel");
         self->is_foreground = false;
         lv_obj_move_background(self->panel_cont);
+        self->release_canvas();
       } else {
         self->do_exclude();
       }
@@ -426,5 +459,6 @@ void ExcludeObjectPanel::handle_callback(lv_event_t *e) {
   if (btn == back_btn.get_container()) {
     is_foreground = false;
     lv_obj_move_background(panel_cont);
+    release_canvas();
   }
 }

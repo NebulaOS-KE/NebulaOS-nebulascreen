@@ -102,8 +102,12 @@ TmcStatusContainer::TmcStatusContainer(KWebSocketClient &c,
   lv_chart_set_axis_tick(chart, LV_CHART_AXIS_PRIMARY_Y, 0, 0, 6, 5, true, 50);
 
   lv_chart_set_div_line_count(chart, 3, 8);
-  lv_chart_set_point_count(chart, 5000);
-  lv_chart_set_zoom_x(chart, 5000);
+  // 1000 points per series (was 5000): 4 series x 4 bytes, so 16 KB instead of
+  // 80 KB per driver, allocated and initialised when the container is built.
+  // zoom_x keeps the same ratio, so each sample is drawn as wide as before;
+  // the chart just holds a shorter history.
+  lv_chart_set_point_count(chart, 1000);
+  lv_chart_set_zoom_x(chart, 1000);
   lv_obj_scroll_to_x(chart, LV_COORD_MAX, LV_ANIM_OFF);
 
   lv_obj_set_flex_grow(stepper_config, 1);
