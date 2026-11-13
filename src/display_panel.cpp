@@ -4,6 +4,7 @@
 #include "nebulaos_camera.h"
 #include "nebulaos_display.h"
 #include "nebulaos_system.h"
+#include "nebulascreen_paths.h"
 #include "settings_ui.h"
 #include "theme.h"
 #include "touch_beep.h"
@@ -108,6 +109,8 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
   camera_btn = SettingsUi::icon_button(right, &camera_img, "Nebula Camera",
                                        &DisplayPanel::_handle_callback, this);
   lv_obj_add_state(camera_btn, LV_STATE_DISABLED);
+  rotate_btn = SettingsUi::icon_button(right, &display_img, "Turn 180°",
+                                       &DisplayPanel::_handle_callback, this);
 
   for (lv_obj_t *w : {brightness_dd, sleep_dd, theme_dd, beep_sw}) {
     lv_obj_add_event_cb(w, &DisplayPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
@@ -185,6 +188,34 @@ void DisplayPanel::show_brightness(const json &reply) {
   }
 }
 
+// display_rotate + 2 (mod 4): 2 (the KE's mounting) <-> 0. The calibration
+// belongs to the old orientation: cleared exactly like Reset touch
+// calibration, so the wizard runs after the restart.
+void DisplayPanel::turn_180() {
+  Config *conf = Config::get_instance();
+  uint32_t rotate = 0;
+  auto v = conf->get_json("/display_rotate");
+  if (v.is_number_unsigned() || v.is_number_integer()) {
+    rotate = v.template get<uint32_t>() % 4;
+  }
+  rotate = (rotate + 2) % 4;
+  spdlog::warn("Display turned 180 degrees: display_rotate -> {}, touch calibration cleared.", rotate);
+  conf->set<uint32_t>("/display_rotate", rotate);
+  conf->set<bool>("/touch_calibrated", true);
+  conf->set<json>("/touch_calibration_coeff", json());
+  conf->save();
+  json params = {{"service", nebulascreen::kService}};
+  ws.send_jsonrpc("machine.services.restart", params, [this](json &reply) {
+    auto err = jsonrpc_error_message(reply);
+    if (err.empty()) {
+      return;
+    }
+    spdlog::warn("NebulaScreen restart failed: {}", err);
+    std::lock_guard<std::mutex> lock(lv_lock);
+    KUtils::notify_toast("Saved. Restart failed (" + err + ") - reboot to apply.", 6000);
+  });
+}
+
 #ifdef SIMULATOR
 void DisplayPanel::sim_fill() {
   show_brightness(json::parse(R"({"result":{"levels":[25,50,75,100],
@@ -206,6 +237,14 @@ void DisplayPanel::handle_callback(lv_event_t *e) {
   }
   if (code == LV_EVENT_CLICKED && obj == boot_logo_btn) {
     boot_logo_panel.foreground();
+    return;
+  }
+  if (code == LV_EVENT_CLICKED && obj == rotate_btn) {
+    SettingsUi::confirm("Turn the screen 180°",
+      "For a screen mounted the other way round. The screen restarts upside "
+      "down and asks you to calibrate touch again: tap the centre of each "
+      "crosshair. Klipper keeps running. Turn it again to go back.",
+      "Turn", SettingsUi::Tone::Normal, [this]() { turn_180(); });
     return;
   }
   if (code != LV_EVENT_VALUE_CHANGED || updating) {
