@@ -12,6 +12,7 @@
 #include "spdlog/spdlog.h"
 
 #include <experimental/filesystem>
+#include <fstream>
 #include <iterator>
 
 namespace fs = std::experimental::filesystem;
@@ -38,6 +39,24 @@ static const SleepOption sleep_options[] = {
 static const std::vector<std::string> themes = {
   "blue", "red", "green", "purple", "pink", "yellow"
 };
+
+// The orientation the image ships (its default nebulascreen.json; 2 on the
+// KE, whose panel sits upside down in the case).
+static uint32_t normal_rotate() {
+  std::ifstream in(nebulascreen::kDefaultConfig);
+  if (in) {
+    json d = json::parse(in, nullptr, false);
+    if (d.is_object() && d.contains("display_rotate") && d["display_rotate"].is_number_integer()) {
+      return d["display_rotate"].template get<uint32_t>() % 4;
+    }
+  }
+  return 2;
+}
+
+static uint32_t current_rotate() {
+  auto v = Config::get_instance()->get_json("/display_rotate");
+  return v.is_number_integer() ? v.template get<uint32_t>() % 4 : normal_rotate();
+}
 
 static lv_obj_t *right_dropdown(lv_obj_t *row, const char *options) {
   lv_obj_t *dd = lv_dropdown_create(row);
@@ -97,6 +116,13 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
     lv_obj_add_state(beep_sw, LV_STATE_CHECKED);
   }
 
+  lv_obj_t *rotate_row = SettingsUi::row(left, "Rotate screen");
+  rotate_sw = lv_switch_create(rotate_row);
+  lv_obj_align(rotate_sw, LV_ALIGN_RIGHT_MID, 0, 0);
+  if (current_rotate() != normal_rotate()) {
+    lv_obj_add_state(rotate_sw, LV_STATE_CHECKED);
+  }
+
   // G58 (2026-10-15): always a boot logo, NebulaOS's by default; the choice
   // is also the power-on logo (the RTOS of the running slot).
   // G61 (2026-10-16): the boot logo has its own page (submenu rule).
@@ -109,10 +135,8 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
   camera_btn = SettingsUi::icon_button(right, &camera_img, "Nebula Camera",
                                        &DisplayPanel::_handle_callback, this);
   lv_obj_add_state(camera_btn, LV_STATE_DISABLED);
-  rotate_btn = SettingsUi::icon_button(right, &display_img, "Turn 180°",
-                                       &DisplayPanel::_handle_callback, this);
 
-  for (lv_obj_t *w : {brightness_dd, sleep_dd, theme_dd, beep_sw}) {
+  for (lv_obj_t *w : {brightness_dd, sleep_dd, theme_dd, beep_sw, rotate_sw}) {
     lv_obj_add_event_cb(w, &DisplayPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
   }
 
@@ -188,18 +212,18 @@ void DisplayPanel::show_brightness(const json &reply) {
   }
 }
 
-// display_rotate + 2 (mod 4): 2 (the KE's mounting) <-> 0. The calibration
-// belongs to the old orientation: cleared exactly like Reset touch
-// calibration, so the wizard runs after the restart.
-void DisplayPanel::turn_180() {
+// On: the normal orientation + 2 (mod 4), i.e. the KE's 2 -> 0; off: the
+// normal one. The calibration belongs to the old orientation: cleared exactly
+// like Reset touch calibration, so the wizard runs after the restart.
+void DisplayPanel::set_rotated(bool rotated) {
   Config *conf = Config::get_instance();
-  uint32_t rotate = 0;
-  auto v = conf->get_json("/display_rotate");
-  if (v.is_number_unsigned() || v.is_number_integer()) {
-    rotate = v.template get<uint32_t>() % 4;
+  uint32_t normal = normal_rotate();
+  uint32_t rotate = rotated ? (normal + 2) % 4 : normal;
+  if (rotate == current_rotate()) {
+    return;
   }
-  rotate = (rotate + 2) % 4;
-  spdlog::warn("Display turned 180 degrees: display_rotate -> {}, touch calibration cleared.", rotate);
+  spdlog::warn("Rotate screen {}: display_rotate -> {}, touch calibration cleared.",
+               rotated ? "on" : "off", rotate);
   conf->set<uint32_t>("/display_rotate", rotate);
   conf->set<bool>("/touch_calibrated", true);
   conf->set<json>("/touch_calibration_coeff", json());
@@ -239,14 +263,6 @@ void DisplayPanel::handle_callback(lv_event_t *e) {
     boot_logo_panel.foreground();
     return;
   }
-  if (code == LV_EVENT_CLICKED && obj == rotate_btn) {
-    SettingsUi::confirm("Turn the screen 180°",
-      "For a screen mounted the other way round. The screen restarts upside "
-      "down and asks you to calibrate touch again: tap the centre of each "
-      "crosshair. Klipper keeps running. Turn it again to go back.",
-      "Turn", SettingsUi::Tone::Normal, [this]() { turn_180(); });
-    return;
-  }
   if (code != LV_EVENT_VALUE_CHANGED || updating) {
     return;
   }
@@ -276,6 +292,8 @@ void DisplayPanel::handle_callback(lv_event_t *e) {
       ThemeConfig::get_instance()->init(theme_config);
       GuppyScreen::refresh_theme();
     }
+  } else if (obj == rotate_sw) {
+    set_rotated(lv_obj_has_state(rotate_sw, LV_STATE_CHECKED));
   } else if (obj == beep_sw) {
     bool enabled = lv_obj_has_state(beep_sw, LV_STATE_CHECKED);
     conf->set<bool>("/touch_beep", enabled);

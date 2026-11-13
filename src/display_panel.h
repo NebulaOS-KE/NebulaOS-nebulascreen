@@ -14,11 +14,12 @@
 // Settings > Display (S1, 2026-10-11): brightness (NebulaOS backlight), sleep
 // timer, theme colour and touch beep (GuppyScreen settings), and the boot screen
 // mode and image (machine.nebulaos.boot_display.*).
-// Turn 180° (issues #5/#10, 2026-11-13): for a screen mounted the other way
+// Rotate screen (issues #5/#10, 2026-11-13): a switch, on = turned 180°
+// from the image's normal orientation, for a screen mounted the other way
 // round. display_rotate is read once at start, and the touch calibration is
 // made for one orientation (LVGL rotates the calibrated point afterwards), so
-// turning clears the calibration and restarts the GUI: the touch wizard comes
-// up in the new orientation, as on a first start.
+// switching clears the calibration and restarts the GUI: the touch wizard
+// comes up in the new orientation, as on a first start.
 class DisplayPanel {
  public:
   DisplayPanel(KWebSocketClient &ws, std::mutex &lock);
@@ -42,7 +43,7 @@ class DisplayPanel {
   void show_brightness(const json &display_status_reply);
   void show_camera_present(bool present);
   void report_error(json &reply, const char *what);
-  void turn_180();
+  void set_rotated(bool rotated);
 
   KWebSocketClient &ws;
   std::mutex &lv_lock;
@@ -55,7 +56,7 @@ class DisplayPanel {
   lv_obj_t *beep_sw;
   lv_obj_t *boot_logo_btn;
   lv_obj_t *camera_btn;
-  lv_obj_t *rotate_btn;
+  lv_obj_t *rotate_sw;
   lv_obj_t *power_label;
   ButtonContainer back_btn;
   BootLogoPanel boot_logo_panel;  // G61: its own page
