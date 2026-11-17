@@ -836,7 +836,10 @@ void MainPanel::sim_tour(const char *dir) {
       {"state", "awaiting_adjustment"}, {"mount", "adjustable"},
       {"deviations", {0.0, 0.08, 0.1, 0.02}}, {"signed_deviations", {0.0, 0.08, -0.1, 0.02}},
       {"reference", "front left"}, {"accepted", {true, false, false, true}}, {"target", "rear right"},
-      {"message", "Rear right: -0.10 mm. Turn the screw a quarter turn clockwise (as seen from above)."}}); }},
+      // the extensions' real wording: -0.10 mm = lower than the base corner;
+      // upstream with screw_thread CCW-M4 (issue #18) says CCW, 0.10/0.7 = 1/8 turn
+      {"message", "Rear right: -0.10 mm. Turn the screw an eighth of a turn counter-clockwise. "
+                  "Do not touch the other corners."}}); }},
     {"m44-tram-adjust-older-extensions", [guided]() { guided(CalFlow::BED_TRAM, {
       {"state", "awaiting_adjustment"}, {"mount", "rigid"}, {"signed_deviations", nullptr},
       {"reference", nullptr}, {"deviations", {0.15, 0.0, 0.12, 0.03}},
