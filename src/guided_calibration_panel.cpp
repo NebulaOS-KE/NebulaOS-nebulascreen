@@ -244,6 +244,75 @@ GuidedCalibrationPanel::GuidedCalibrationPanel(KWebSocketClient &c, std::mutex &
     lv_obj_add_flag(graph_row, LV_OBJ_FLAG_HIDDEN);
   }
 
+  if (flow == CalFlow::BED_TRAM) {
+    // 1.0.4: the bed as seen from the front, right of the text, above Back
+    lv_obj_t *mid = lv_obj_create(cont);
+    lv_obj_move_to_index(mid, lv_obj_get_index(body));
+    lv_obj_set_width(mid, LV_PCT(100));
+    lv_obj_set_flex_grow(mid, 1);
+    lv_obj_set_style_pad_all(mid, 0, 0);
+    lv_obj_set_style_pad_column(mid, 8, 0);
+    lv_obj_set_style_border_width(mid, 0, 0);
+    lv_obj_set_style_bg_opa(mid, LV_OPA_TRANSP, 0);
+    lv_obj_clear_flag(mid, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(mid, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(mid, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_parent(body, mid);
+    lv_obj_set_flex_grow(body, 1);
+    lv_obj_set_height(body, LV_PCT(100));
+
+    tram_box = lv_obj_create(mid);
+    lv_obj_set_size(tram_box, kTramW, kTramH);   // ends above Back
+    lv_obj_set_style_pad_all(tram_box, 4, 0);
+    lv_obj_set_style_radius(tram_box, 8, 0);
+    lv_obj_set_style_border_width(tram_box, 2, 0);
+    lv_obj_set_style_border_color(tram_box, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_set_style_bg_color(tram_box, lv_color_hex(0x33363b), 0);
+    lv_obj_set_style_bg_opa(tram_box, LV_OPA_COVER, 0);
+    lv_obj_clear_flag(tram_box, LV_OBJ_FLAG_SCROLLABLE);
+    auto edge = [this](const char *t, lv_align_t a) {
+      lv_obj_t *l = lv_label_create(tram_box);
+      lv_label_set_text(l, t);
+      lv_obj_set_style_text_font(l, &lv_font_montserrat_12, 0);
+      lv_obj_set_style_text_color(l, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
+      lv_obj_align(l, a, 0, 0);
+    };
+    edge("Rear", LV_ALIGN_TOP_MID);
+    edge("Front (screen)", LV_ALIGN_BOTTOM_MID);
+    tram_note = lv_label_create(tram_box);
+    lv_obj_set_style_text_font(tram_note, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(tram_note, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
+    lv_obj_align(tram_note, LV_ALIGN_CENTER, 0, 0);
+    // front left, front right, rear right, rear left
+    static const lv_align_t where[4] = {LV_ALIGN_BOTTOM_LEFT, LV_ALIGN_BOTTOM_RIGHT,
+                                        LV_ALIGN_TOP_RIGHT, LV_ALIGN_TOP_LEFT};
+    for (int i = 0; i < 4; i++) {
+      lv_obj_t *c = lv_obj_create(tram_box);
+      tram_cells[i] = c;
+      lv_obj_set_size(c, kTramCellW, kTramCellH);
+      lv_obj_set_style_pad_all(c, 0, 0);
+      lv_obj_set_style_pad_row(c, 0, 0);
+      lv_obj_set_style_radius(c, 6, 0);
+      lv_obj_set_style_border_width(c, 0, 0);
+      lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+      lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
+      lv_obj_set_flex_flow(c, LV_FLEX_FLOW_COLUMN);
+      lv_obj_set_flex_align(c, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+      lv_obj_align(c, where[i], 0, i < 2 ? -kTramEdge : kTramEdge);
+      tram_values[i] = lv_label_create(c);
+      lv_obj_set_style_text_font(tram_values[i], &lv_font_montserrat_16, 0);
+      lv_obj_set_style_text_color(tram_values[i], lv_color_white(), 0);
+      tram_states[i] = lv_label_create(c);
+      lv_obj_set_style_text_font(tram_states[i], &lv_font_montserrat_12, 0);
+      lv_obj_set_style_text_color(tram_states[i], lv_color_white(), 0);
+    }
+    lv_obj_add_flag(tram_box, LV_OBJ_FLAG_HIDDEN);
+
+    tram_spinner = lv_spinner_create(mid, 1000, 60);
+    lv_obj_set_size(tram_spinner, 64, 64);
+    lv_obj_add_flag(tram_spinner, LV_OBJ_FLAG_HIDDEN);
+  }
+
   if (flow == CalFlow::LOAD_CELL) {
     // Run 19: the owner's load-cell icon in the free top-right corner (46 px on
     // the small screen, 64 px otherwise - the Makefile's ASSET_DIR)
@@ -277,9 +346,47 @@ void GuidedCalibrationPanel::foreground() {
   lv_obj_move_foreground(cont);
 }
 
-void GuidedCalibrationPanel::refresh() {
-  auto status = State::get_instance()->get_data(
+json GuidedCalibrationPanel::tram_status() {
+  return State::get_instance()->get_data(
     json::json_pointer(std::string("/printer_state/") + cal_status_object(flow)));
+}
+
+// 1.0.4: the corner picture, or the spinner while measuring
+void GuidedCalibrationPanel::show_tram(const CalView &v) {
+  if (tram_box == nullptr) return;
+  bool pic = v.tram.size() == 4;
+  if (pic) {
+    for (int i = 0; i < 4; i++) {
+      const auto &c = v.tram[i];
+      lv_label_set_text(tram_values[i], c.value.c_str());
+      lv_label_set_text(tram_states[i], c.state.c_str());
+      lv_color_t bg = c.state == "ADJUST" ? lv_palette_main(LV_PALETTE_ORANGE)
+        : c.state == "OK" ? lv_palette_darken(LV_PALETTE_GREEN, 2)
+        : c.state == "highest" || c.state == "base" ? lv_palette_darken(LV_PALETTE_BLUE, 2)
+        : lv_palette_darken(LV_PALETTE_GREY, 3);
+      lv_obj_set_style_bg_color(tram_cells[i], bg, 0);
+    }
+    lv_label_set_text(tram_note, v.tram_note.c_str());
+    lv_obj_align(tram_note, LV_ALIGN_CENTER, 0, 0);
+  }
+  if (pic) lv_obj_clear_flag(tram_box, LV_OBJ_FLAG_HIDDEN);
+  else lv_obj_add_flag(tram_box, LV_OBJ_FLAG_HIDDEN);
+  if (v.working) lv_obj_clear_flag(tram_spinner, LV_OBJ_FLAG_HIDDEN);
+  else lv_obj_add_flag(tram_spinner, LV_OBJ_FLAG_HIDDEN);
+}
+
+void GuidedCalibrationPanel::refresh() {
+  auto status = tram_status();
+  if (tram_pending) {
+    // 1.0.4: "measuring" from the tap on, until the status moves on
+    std::string state = status.is_object() && status.contains("state") && status["state"].is_string()
+      ? status["state"].template get<std::string>() : "";
+    if (state == tram_pending_from) {
+      status["state"] = "measuring";
+    } else {
+      tram_pending = false;
+    }
+  }
   CalView v = cal_view(flow, status, KUtils::is_printing());
   // G104: step list, restart notice, end / failure screen
   auto wh = State::get_instance()->get_data("/printer_state/webhooks/state"_json_pointer);
@@ -335,6 +442,7 @@ void GuidedCalibrationPanel::refresh() {
     show(action_btns[i], on);
   }
   show_graphs(v);
+  show_tram(v);
   show(measure_row, v.needs_measurement);
   if (!cal_input_keep(v) && *lv_textarea_get_text(measure_ta) != '\0') {
     lv_textarea_set_text(measure_ta, "");   // the flow is over: a new run starts empty
@@ -535,10 +643,24 @@ void GuidedCalibrationPanel::consume(json &j) {
 void GuidedCalibrationPanel::send(const std::string &gcode, const char *what) {
   std::string label(what);
   spdlog::info("guided calibration: {}", gcode);
+  if (flow == CalFlow::BED_TRAM) {
+    json st = tram_status();
+    std::string state = st.is_object() && st.contains("state") && st["state"].is_string()
+      ? st["state"].template get<std::string>() : "";
+    if (cal_tram_starts_measuring(state, gcode)) {
+      tram_pending = true;
+      tram_pending_from = state;
+    } else if (gcode.rfind("NEBULAOS_BED_TRAM MOUNT=", 0) == 0) {
+      KUtils::notify_toast(gcode.find("adjustable") != std::string::npos
+        ? "Bed mount set to rubber or springs." : "Bed mount set to rigid spacers.", 3000);
+    }
+    refresh();
+  }
   ws.gcode_script(gcode, [this, label](json &reply) {
     if (!reply.contains("error")) {
       return;
     }
+    tram_pending = false;
     std::string msg = reply["/error/message"_json_pointer].is_string()
       ? reply["/error/message"_json_pointer].template get<std::string>()
       : reply["error"].dump();

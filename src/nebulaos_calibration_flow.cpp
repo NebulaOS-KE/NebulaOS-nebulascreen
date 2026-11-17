@@ -218,16 +218,13 @@ static std::string fmt(const char *f, double a) {
   return buf;
 }
 
-// The four corners as the bed lies in front of you (rear on top), G89.
-// Run 17: SIGNED values, so a rigid mount reads as "lower than the
-// highest corner" and not as a height:
-//   Rear:   left -0.05 OK    right  0.00 highest
-//   Front:  left -0.23 ADJUST    right -0.12 later
-// The extensions report signed_deviations + reference (rigid: vs the highest
-// corner; adjustable: vs the base corner, + higher, - lower). Older extensions
-// only have the unsigned deviations: for a rigid mount those are "how far below
-// the highest corner", so they are shown negated; for an adjustable mount the
-// direction is unknown and the plain distance is shown.
+// The four corners (G89, Run 17: SIGNED values, so a rigid mount reads as
+// "lower than the highest corner" and not as a height). The extensions report
+// signed_deviations + reference (rigid: vs the highest corner; adjustable: vs
+// the base corner, + higher, - lower). Older extensions only have the unsigned
+// deviations: for a rigid mount those are "how far below the highest corner",
+// so they are shown negated; for an adjustable mount the direction is unknown
+// and the plain distance is shown. 1.0.4: drawn as a picture of the bed.
 static int corner_index(const json &ref, const char *const names[]) {
   if (ref.is_number_integer()) {
     int i = ref.get<int>();
@@ -244,7 +241,7 @@ static int corner_index(const json &ref, const char *const names[]) {
   return -1;
 }
 
-static std::string tram_corners(const json &st) {
+static void tram_corners(const json &st, CalView &v) {
   static const char *const names[] = {"Front left", "Front right", "Rear right", "Rear left"};
   const json &ok = st.contains("accepted") ? st["accepted"] : json();
   std::string target = str(st, "target");
@@ -254,47 +251,45 @@ static std::string tram_corners(const json &st) {
   const json &udev = st.contains("deviations") ? st["deviations"] : empty;
   bool is_signed = sdev.is_array() && sdev.size() == 4;
   const json &dev = is_signed ? sdev : udev;
-  if (!dev.is_array() || dev.size() != 4) return "";
-  double v[4];
+  if (!dev.is_array() || dev.size() != 4) return;
+  double d[4];
   for (int i = 0; i < 4; i++) {
-    v[i] = dev[i].is_number() ? dev[i].get<double>() : 0;
-    if (!is_signed && rigid) v[i] = -v[i];    // unsigned rigid = below the highest
+    d[i] = dev[i].is_number() ? dev[i].get<double>() : 0;
+    if (!is_signed && rigid) d[i] = -d[i];    // unsigned rigid = below the highest
   }
   bool show_sign = is_signed || rigid;
   int ref = is_signed && st.contains("reference") ? corner_index(st["reference"], names) : -1;
   if (ref < 0 && show_sign && rigid) {
     // older extensions: the highest corner is the one at 0
     for (int i = 0; i < 4 && ref < 0; i++) {
-      if (std::fabs(v[i]) < 0.0005) ref = i;
+      if (std::fabs(d[i]) < 0.0005) ref = i;
     }
   }
   auto lower = [](std::string x) {
     for (auto &c : x) c = (char)std::tolower((unsigned char)c);
     return x;
   };
-  auto value = [&](double d) {
-    if (!show_sign) return fmt("%.2f", d);
-    if (std::fabs(d) < 0.005) return std::string(" 0.00");
-    return fmt("%+.2f", d);
-  };
-  auto cell = [&](int i) {
-    std::string state;
+  for (int i = 0; i < 4; i++) {
+    CalView::TramCorner c;
+    if (!show_sign) c.value = fmt("%.2f", d[i]);
+    else if (std::fabs(d[i]) < 0.005) c.value = "0.00";
+    else c.value = fmt("%+.2f", d[i]);
     if (i == ref) {
-      state = rigid ? "highest" : "base";
+      c.state = rigid ? "highest" : "base";
     } else if (ok.is_array() && ok.size() == 4 && ok[i].is_boolean() && ok[i].get<bool>()) {
-      state = "OK";
+      c.state = "OK";
     } else if (!target.empty()) {
-      state = lower(names[i]) == lower(target) ? "ADJUST" : "later";
+      c.state = lower(names[i]) == lower(target) ? "ADJUST" : "later";
     }
-    return std::string(i == 0 || i == 3 ? "left " : "right ") + value(v[i])
-           + (state.empty() ? "" : " " + state);
-  };
-  std::string head = !show_sign ? "Corners (mm), front = the side with the screen:"
-    : rigid ? "Corners in mm vs the highest corner.\nFront = the side with the screen."
-    : "Corners in mm vs the base corner (+ higher).\nFront = the side with the screen.";
-  return head + "\n"
-         "Rear:   " + cell(3) + "    " + cell(2) + "\n"
-         "Front:  " + cell(0) + "    " + cell(1);
+    v.tram.push_back(c);
+  }
+  v.tram_note = !show_sign ? "mm" : rigid ? "mm vs highest" : "mm vs base";
+}
+
+bool cal_tram_starts_measuring(const std::string &state, const std::string &gcode) {
+  if (gcode == "NEBULAOS_BED_TRAM") return true;                     // Start
+  if (gcode == "NEBULAOS_BED_TRAM CONFIRM=1") return state == "awaiting_adjustment";
+  return state == "awaiting_mount" && gcode.rfind("NEBULAOS_BED_TRAM MOUNT=", 0) == 0;
 }
 
 static CalView bed_tram_view(CalView v, const json &st, bool printing) {
@@ -310,13 +305,18 @@ static CalView bed_tram_view(CalView v, const json &st, bool printing) {
              "Rubber or springs: a common upgrade with screws you turn.";
     v.actions = {{"Rigid spacers", rigid}, {"Rubber or springs", adjustable}};
     v.can_cancel = true;
+  } else if (state == "measuring") {
+    v.text = "Measuring the four corners...\nThe printer homes and probes each "
+             "corner. This takes a few minutes.\nKeep your hands off the bed.";
+    v.working = true;
   } else if (state == "awaiting_adjustment") {
-    v.text = tram_corners(st) + "\n\n" + message;
+    tram_corners(st, v);
+    v.text = message;
     v.actions = {{"Done - measure again", "NEBULAOS_BED_TRAM CONFIRM=1"}};
     v.can_cancel = true;
   } else if (state == "complete" || state == "stopped") {
-    std::string head = state == "complete" ? message : "Stopped: " + message;
-    v.text = head + "\n\n" + tram_corners(st);
+    tram_corners(st, v);
+    v.text = state == "complete" ? message : "Stopped: " + message;
     if (state == "complete" && st.contains("load_cell_corner_changed")
         && st["load_cell_corner_changed"].is_boolean() && st["load_cell_corner_changed"].get<bool>()) {
       v.text += "\n\nThe front-left corner (load cell) was changed: calibrate the load cell next.";

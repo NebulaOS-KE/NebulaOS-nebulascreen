@@ -234,6 +234,13 @@ TEST(Prompts, hidden_on_screen_for_page_flows) {
   ASSERT_FALSE(cal_prompt_hidden_on_screen("RESUME aborted !!!"));
 }
 
+// 1.0.4: the corners as "value state", front left, front right, rear right, rear left
+static std::string corners(const CalView &v) {
+  std::string out;
+  for (const auto &c : v.tram) out += (out.empty() ? "" : " | ") + c.value + " " + c.state;
+  return out;
+}
+
 TEST(BedTram, page) {
   ASSERT_EQ(cal_start_command(CalFlow::BED_TRAM), std::string("NEBULAOS_BED_TRAM"));
   ASSERT_EQ(cal_cancel_command(CalFlow::BED_TRAM), std::string("_NEBULAOS_BED_TRAM_CANCEL"));
@@ -260,10 +267,9 @@ TEST(BedTram, page) {
   s["message"] = "Front left: add a 0.10 mm shim.";
   v = cal_view(CalFlow::BED_TRAM, s, false);
   // older extensions (unsigned deviations), rigid: shown as below the highest corner
-  ASSERT_TRUE(v.text.find("Front:  left -0.15 ADJUST    right  0.00 highest") != std::string::npos);
-  ASSERT_TRUE(v.text.find("Rear:   left -0.03 OK    right -0.12 later") != std::string::npos);
-  ASSERT_TRUE(v.text.find("Rear:") < v.text.find("Front:"));            // rear row on top
-  ASSERT_TRUE(v.text.find("add a 0.10 mm shim") != std::string::npos);
+  ASSERT_EQ(corners(v), std::string("-0.15 ADJUST | 0.00 highest | -0.12 later | -0.03 OK"));
+  ASSERT_EQ(v.tram_note, std::string("mm vs highest"));
+  ASSERT_EQ(v.text, std::string("Front left: add a 0.10 mm shim."));   // the picture has the corners
   ASSERT_TRUE(has_action(v, "Done - measure again", "NEBULAOS_BED_TRAM CONFIRM=1"));
 
   s["state"] = "complete";
@@ -272,7 +278,33 @@ TEST(BedTram, page) {
   v = cal_view(CalFlow::BED_TRAM, s, false);
   ASSERT_TRUE(v.text.find("Bed tramming complete") != std::string::npos);
   ASSERT_TRUE(v.text.find("calibrate the load cell next") != std::string::npos);
+  ASSERT_EQ(v.tram.size(), 4u);                                        // the picture at the end too
   ASSERT_TRUE(v.can_start);
+}
+
+// 1.0.4: measuring shows at once, with a spinner and no buttons
+TEST(BedTram, measuring) {
+  json s = json::object();
+  s["state"] = "measuring";
+  s["mount"] = "rigid";
+  auto v = cal_view(CalFlow::BED_TRAM, s, false);
+  ASSERT_TRUE(v.working);
+  ASSERT_TRUE(v.text.find("Measuring the four corners") != std::string::npos);
+  ASSERT_TRUE(v.actions.empty());
+  ASSERT_FALSE(v.can_start);
+  ASSERT_FALSE(v.can_cancel);
+  ASSERT_TRUE(v.tram.empty());
+}
+
+TEST(BedTram, which_taps_start_measuring) {
+  ASSERT_TRUE(cal_tram_starts_measuring("idle", "NEBULAOS_BED_TRAM"));
+  ASSERT_TRUE(cal_tram_starts_measuring("complete", "NEBULAOS_BED_TRAM"));
+  ASSERT_TRUE(cal_tram_starts_measuring("awaiting_mount", "NEBULAOS_BED_TRAM MOUNT=rigid"));
+  ASSERT_TRUE(cal_tram_starts_measuring("awaiting_mount", "NEBULAOS_BED_TRAM MOUNT=adjustable"));
+  ASSERT_TRUE(cal_tram_starts_measuring("awaiting_adjustment", "NEBULAOS_BED_TRAM CONFIRM=1"));
+  // switching the remembered mount between runs measures nothing
+  ASSERT_FALSE(cal_tram_starts_measuring("idle", "NEBULAOS_BED_TRAM MOUNT=adjustable"));
+  ASSERT_FALSE(cal_tram_starts_measuring("awaiting_adjustment", "_NEBULAOS_BED_TRAM_CANCEL"));
 }
 
 // Run 17: signed values from signed_deviations + reference.
@@ -287,9 +319,8 @@ TEST(BedTram, signed_grid_rigid) {
   s["target"] = "front left";
   s["message"] = "Front left: -0.23 mm. Add a 0.20 mm shim to raise it.";
   auto v = cal_view(CalFlow::BED_TRAM, s, false);
-  ASSERT_TRUE(v.text.find("Rear:   left -0.05 OK    right  0.00 highest") != std::string::npos);
-  ASSERT_TRUE(v.text.find("Front:  left -0.23 ADJUST    right -0.12 later") != std::string::npos);
-  ASSERT_TRUE(v.text.find("Corners in mm vs the highest corner.\nFront = the side with the screen.") != std::string::npos);
+  ASSERT_EQ(corners(v), std::string("-0.23 ADJUST | -0.12 later | 0.00 highest | -0.05 OK"));
+  ASSERT_EQ(v.tram_note, std::string("mm vs highest"));
   ASSERT_TRUE(v.text.find("Add a 0.20 mm shim") != std::string::npos);
 }
 
@@ -303,9 +334,8 @@ TEST(BedTram, signed_grid_adjustable) {
   s["accepted"] = {true, false, false, true};
   s["target"] = "rear right";
   auto v = cal_view(CalFlow::BED_TRAM, s, false);
-  ASSERT_TRUE(v.text.find("Rear:   left +0.02 OK    right -0.10 ADJUST") != std::string::npos);
-  ASSERT_TRUE(v.text.find("Front:  left  0.00 base    right +0.08 later") != std::string::npos);
-  ASSERT_TRUE(v.text.find("+ higher") != std::string::npos);
+  ASSERT_EQ(corners(v), std::string("0.00 base | +0.08 later | -0.10 ADJUST | +0.02 OK"));
+  ASSERT_EQ(v.tram_note, std::string("mm vs base"));
 }
 
 TEST(BedTram, unsigned_adjustable_fallback_has_no_sign) {
@@ -316,9 +346,8 @@ TEST(BedTram, unsigned_adjustable_fallback_has_no_sign) {
   s["accepted"] = {true, true, true, true};
   s["message"] = "Bed tramming complete.";
   auto v = cal_view(CalFlow::BED_TRAM, s, false);
-  ASSERT_TRUE(v.text.find("Rear:   left 0.00 OK    right 0.02 OK") != std::string::npos);
-  ASSERT_TRUE(v.text.find("Front:  left 0.00 OK    right 0.01 OK") != std::string::npos);
-  ASSERT_TRUE(v.text.find("Corners (mm), front = the side with the screen:") != std::string::npos);
+  ASSERT_EQ(corners(v), std::string("0.00 OK | 0.01 OK | 0.02 OK | 0.00 OK"));
+  ASSERT_EQ(v.tram_note, std::string("mm"));
 }
 
 TEST(BedTram, bad_signed_values_fall_back) {
@@ -331,9 +360,8 @@ TEST(BedTram, bad_signed_values_fall_back) {
   s["accepted"] = {false, true, true, true};
   s["target"] = "front left";
   auto v = cal_view(CalFlow::BED_TRAM, s, false);
-  ASSERT_TRUE(v.text.find("Front:  left -0.10 ADJUST    right  0.00 highest") != std::string::npos);
   // only one corner is "highest"
-  ASSERT_TRUE(v.text.find("0.00 highest") == v.text.rfind("0.00 highest"));
+  ASSERT_EQ(corners(v), std::string("-0.10 ADJUST | 0.00 highest | 0.00 OK | 0.00 OK"));
 }
 
 // G94 (Run 18, the Run 17 test): the typed grams were lost on OK / Weigh.

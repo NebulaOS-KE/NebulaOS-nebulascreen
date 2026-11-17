@@ -47,7 +47,19 @@ struct CalView {
   // idle / end page, never while a run is active) and the graphs to show.
   bool graph_switch = false;
   std::vector<std::pair<std::string, std::string>> graphs;   // (label "X", png path)
+  // 1.0.4: Bed Tramming draws the bed with its four corners (front left,
+  // front right, rear right, rear left) instead of a text grid; empty when
+  // there is no measurement. state: ADJUST, OK, later, highest, base or "".
+  struct TramCorner { std::string value; std::string state; };
+  std::vector<TramCorner> tram;
+  std::string tram_note;   // what the values are relative to
+  bool working = false;    // a long step runs (spinner, no buttons)
 };
+
+// 1.0.4: the screen shows "measuring" at once after a tap that starts the
+// homing and probing (before the status says so, and with older extensions
+// that never report it): true for those commands in that state.
+bool cal_tram_starts_measuring(const std::string &state, const std::string &gcode);
 
 // G109: the Input Shaper start command with the remembered graph choice.
 std::string cal_shaper_start_command(bool graphs);   // ... GRAPHS=1|0

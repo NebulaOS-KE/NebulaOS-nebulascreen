@@ -824,6 +824,8 @@ void MainPanel::sim_tour(const char *dir) {
     // Bed tramming (G89): every step, signed corner grid
     {"m40-tram-idle", [guided]() { guided(CalFlow::BED_TRAM, {{"state", "idle"}, {"mount", "rigid"}}); }},
     {"m41-tram-mount", [guided]() { guided(CalFlow::BED_TRAM, {{"state", "awaiting_mount"}}); }},
+    {"m41a-tram-measuring", [guided]() { guided(CalFlow::BED_TRAM, {
+      {"state", "measuring"}, {"mount", "rigid"}}); }},
     {"m42-tram-adjust-rigid", [guided]() { guided(CalFlow::BED_TRAM, {
       {"state", "awaiting_adjustment"}, {"mount", "rigid"},
       {"deviations", {0.23, 0.12, 0.0, 0.05}}, {"signed_deviations", {-0.23, -0.12, 0.0, -0.05}},

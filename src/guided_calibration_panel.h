@@ -120,6 +120,24 @@ class GuidedCalibrationPanel : public NotifyConsumer {
   std::string graph_src[kMaxGraphs];     // "A:<path>" shown in each slot
   long long graph_stamp[kMaxGraphs] = {}; // mtime+size of the shown file
   lv_obj_t *graph_full = nullptr;        // full-screen view on the top layer
+  // 1.0.4, Bed Tramming only: the bed drawn with its four corners (right of
+  // the text), a spinner while measuring, and "measuring" shown from the tap
+  // until the status changes (tram_pending_from = the state at the tap).
+#ifdef GUPPY_SMALL_SCREEN
+  static constexpr lv_coord_t kTramW = 176, kTramH = 156, kTramCellW = 78, kTramCellH = 46, kTramEdge = 15;
+#else
+  static constexpr lv_coord_t kTramW = 290, kTramH = 270, kTramCellW = 130, kTramCellH = 80, kTramEdge = 22;
+#endif
+  lv_obj_t *tram_box = nullptr;
+  lv_obj_t *tram_cells[4] = {};
+  lv_obj_t *tram_values[4] = {};
+  lv_obj_t *tram_states[4] = {};
+  lv_obj_t *tram_note = nullptr;
+  lv_obj_t *tram_spinner = nullptr;
+  bool tram_pending = false;
+  std::string tram_pending_from;
+  json tram_status();
+  void show_tram(const CalView &v);
 };
 
 #endif // __GUIDED_CALIBRATION_PANEL_H__
