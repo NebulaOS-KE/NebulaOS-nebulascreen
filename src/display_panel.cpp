@@ -122,6 +122,8 @@ DisplayPanel::DisplayPanel(KWebSocketClient &c, std::mutex &lock)
   if (current_rotate() != normal_rotate()) {
     lv_obj_add_state(rotate_sw, LV_STATE_CHECKED);
   }
+  // Issue #23: say what the switch does before it is used.
+  SettingsUi::hint(left, "The screen restarts at once to turn, then asks you to tap the touch points again.");
 
   // G58 (2026-10-15): always a boot logo, NebulaOS's by default; the choice
   // is also the power-on logo (the RTOS of the running slot).
@@ -228,6 +230,13 @@ void DisplayPanel::set_rotated(bool rotated) {
   conf->set<bool>("/touch_calibrated", true);
   conf->set<json>("/touch_calibration_coeff", json());
   conf->save();
+  // Issue #23: always say what happens. The restart ends this process, so
+  // the fallback below only fires when the restart did not happen.
+  KUtils::notify_toast("Turning the screen - it restarts now.", 5000);
+  lv_timer_t *fallback = lv_timer_create([](lv_timer_t *) {
+    KUtils::notify_toast("Saved. The screen did not restart - restart the printer to turn it.", 10000);
+  }, 20000, nullptr);
+  lv_timer_set_repeat_count(fallback, 1);
   json params = {{"service", nebulascreen::kService}};
   ws.send_jsonrpc("machine.services.restart", params, [this](json &reply) {
     auto err = jsonrpc_error_message(reply);
