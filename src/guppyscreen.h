@@ -1,6 +1,7 @@
 #ifndef __GUPPY_SCREEN_H__
 #define __GUPPY_SCREEN_H__
 
+#include <atomic>
 #include <mutex>
 #include <functional>
 
@@ -37,6 +38,9 @@ class GuppyScreen {
   FilamentRunoutPanel filament_runout_panel;
 
  public:
+  // #27: true while the display sleeps (read by the touch wake gate).
+  static std::atomic_bool display_asleep;
+
   GuppyScreen();
   GuppyScreen(GuppyScreen &o) = delete;
   void operator=(const GuppyScreen &) = delete;

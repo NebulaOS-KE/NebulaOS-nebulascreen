@@ -31,6 +31,7 @@ lv_theme_t GuppyScreen::th_new;
 #ifndef OS_ANDROID
 lv_obj_t *GuppyScreen::screen_saver = NULL;
 #endif
+std::atomic_bool GuppyScreen::display_asleep(false);
 
 KWebSocketClient GuppyScreen::ws(NULL);
 
@@ -230,7 +231,7 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
 void GuppyScreen::loop() {
   /*Handle LitlevGL tasks (tickless mode)*/
 #if !defined(SIMULATOR) && !defined(OS_ANDROID)
-  std::atomic_bool is_sleeping(false);
+  std::atomic_bool &is_sleeping = display_asleep;
   Config *conf = Config::get_instance();
   // Brightness is NebulaOS's: it persists the level and restores it at boot.
   auto display_call = [](const char *method) {
