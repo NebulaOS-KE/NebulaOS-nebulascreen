@@ -57,6 +57,10 @@ class PowerPanel : public NotifyConsumer {
     lv_obj_t *recovery_status = nullptr;
     lv_obj_t *recovery_resume_btn = nullptr;
     lv_obj_t *recovery_dismiss_btn = nullptr;
+    // #30: while the resume waits for the nozzle to be cleaned
+    lv_obj_t *recovery_continue_btn = nullptr;
+    lv_obj_t *recovery_purge_btn = nullptr;
+    lv_obj_t *recovery_stop_btn = nullptr;
 
 };
 

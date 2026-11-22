@@ -169,6 +169,43 @@ TEST(Commands, confirm_text_names_the_file_and_the_z_assumption) {
   ASSERT_TRUE(t.size() - std::string("bracket.gcode").size() <= 140);
 }
 
+TEST(View, waiting_offers_continue_purge_stop_only) {
+  json j = available("physical");
+  j["plr_phase"] = "waiting";
+  auto s = parse_plr_status(j);
+  ASSERT_EQ(s.phase, std::string("waiting"));
+  auto v = plr_view(s, false);
+  ASSERT_TRUE(v.show_waiting);
+  ASSERT_FALSE(v.show_resume);
+  ASSERT_FALSE(v.show_discard);
+  ASSERT_TRUE(v.text.find("Continue") != std::string::npos);
+  ASSERT_EQ(plr_offer_key(s, false), std::string(""));   // no "Resume?" popup meanwhile
+}
+
+TEST(View, preparing_and_continuing_show_resuming) {
+  for (const char *p : {"preparing", "continuing"}) {
+    json j = available("physical");
+    j["plr_phase"] = p;
+    auto v = plr_view(parse_plr_status(j), false);
+    ASSERT_EQ(v.text, std::string("Resuming..."));
+    ASSERT_FALSE(v.show_resume || v.show_discard || v.show_waiting);
+  }
+}
+
+TEST(View, idle_after_stop_offers_resume_again) {
+  json j = available("physical");
+  j["plr_phase"] = "idle";
+  auto v = plr_view(parse_plr_status(j), false);
+  ASSERT_TRUE(v.show_resume);
+  ASSERT_FALSE(v.show_waiting);
+}
+
+TEST(Commands, waiting_commands) {
+  ASSERT_EQ(std::string(PLR_CONTINUE_COMMAND), std::string("NEBULAOS_PLR_CONTINUE"));
+  ASSERT_EQ(std::string(PLR_PURGE_COMMAND), std::string("NEBULAOS_PLR_PURGE"));
+  ASSERT_EQ(std::string(PLR_STOP_COMMAND), std::string("NEBULAOS_PLR_ABORT"));
+}
+
 TEST(Offer, asked_once_per_physical_record) {
   PlrStatus s;
   s.present = true;

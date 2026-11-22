@@ -68,6 +68,19 @@ void PowerPanel::build_recovery_section() {
   lv_obj_center(dl);
   lv_obj_add_event_cb(recovery_dismiss_btn, &PowerPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
+  auto add_btn = [this, btn_row](const char *text) {
+    lv_obj_t *b = lv_btn_create(btn_row);
+    lv_obj_t *l = lv_label_create(b);
+    lv_label_set_text(l, text);
+    lv_obj_center(l);
+    lv_obj_add_event_cb(b, &PowerPanel::_handle_callback, LV_EVENT_CLICKED, this);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN);
+    return b;
+  };
+  recovery_continue_btn = add_btn(LV_SYMBOL_OK " Continue");
+  recovery_purge_btn = add_btn(LV_SYMBOL_REFRESH " Purge more");
+  recovery_stop_btn = add_btn(LV_SYMBOL_STOP " Stop");
+
   // Hidden until refresh_recovery() finds a recoverable print.
   lv_obj_add_flag(recovery_resume_btn, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
@@ -91,6 +104,10 @@ void PowerPanel::refresh_recovery() {
     lv_obj_clear_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
   } else {
     lv_obj_add_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
+  }
+  for (lv_obj_t *b : {recovery_continue_btn, recovery_purge_btn, recovery_stop_btn}) {
+    if (view.show_waiting) lv_obj_clear_flag(b, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(b, LV_OBJ_FLAG_HIDDEN);
   }
   std::string key = plr_offer_key(plr, KUtils::is_printing());
   if (!key.empty() && key != offered_key) {
@@ -298,6 +315,14 @@ void PowerPanel::handle_callback(lv_event_t *e) {
       lv_obj_move_background(cont);
     } else if (btn == recovery_resume_btn) {
       confirm_resume();
+    } else if (btn == recovery_continue_btn) {
+      send_plr_command(PLR_CONTINUE_COMMAND, "Continue failed");
+      lv_obj_add_flag(recovery_continue_btn, LV_OBJ_FLAG_HIDDEN);
+    } else if (btn == recovery_purge_btn) {
+      send_plr_command(PLR_PURGE_COMMAND, "Purge failed");
+    } else if (btn == recovery_stop_btn) {
+      send_plr_command(PLR_STOP_COMMAND, "Stop failed");
+      lv_obj_add_flag(recovery_stop_btn, LV_OBJ_FLAG_HIDDEN);
     } else if (btn == recovery_dismiss_btn) {
       send_plr_command(PLR_DISCARD_COMMAND, "Discard failed");
       lv_obj_add_flag(recovery_resume_btn, LV_OBJ_FLAG_HIDDEN);

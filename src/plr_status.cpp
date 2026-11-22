@@ -5,6 +5,9 @@
 
 const char *const PLR_RESUME_COMMAND = "NEBULAOS_RESUME_POWER_LOSS ALLOW_UNSAFE=1 PHYSICAL=1";
 const char *const PLR_DISCARD_COMMAND = "NEBULAOS_CLEAR_POWER_LOSS_RECOVERY";
+const char *const PLR_CONTINUE_COMMAND = "NEBULAOS_PLR_CONTINUE";
+const char *const PLR_PURGE_COMMAND = "NEBULAOS_PLR_PURGE";
+const char *const PLR_STOP_COMMAND = "NEBULAOS_PLR_ABORT";
 
 static std::string get_string(const json &j, const char *key) {
   if (j.is_object() && j.contains(key) && j[key].is_string()) {
@@ -22,6 +25,7 @@ PlrStatus parse_plr_status(const json &snapshot) {
   s.state = get_string(snapshot, "state");
   s.resume_mode = get_string(snapshot, "resume_mode");
   s.last_error = get_string(snapshot, "last_error");
+  s.phase = get_string(snapshot, "plr_phase");
   if (snapshot.contains("resume_in_progress") && snapshot["resume_in_progress"].is_boolean()) {
     s.resume_in_progress = snapshot["resume_in_progress"].template get<bool>();
   }
@@ -57,7 +61,15 @@ PlrView plr_view(const PlrStatus &s, bool printing) {
     v.text = "Power-loss recovery is not available on this printer.";
     return v;
   }
-  if (s.resume_in_progress) {
+  // #30: the resume waits between parking/priming and continuing - checked
+  // first, so leaving the dialog never hides the way to continue or stop.
+  if (s.phase == "waiting") {
+    v.text = file_line(s) + "\nRecovery waiting: remove the loose filament from the "
+      "nozzle (careful, it is hot), then press Continue.";
+    v.show_waiting = true;
+    return v;
+  }
+  if (s.resume_in_progress || s.phase == "preparing" || s.phase == "continuing") {
     v.text = "Resuming...";
     return v;
   }
@@ -114,6 +126,6 @@ std::string plr_resume_confirm_text(const PlrStatus &s) {
   char pct[16];
   std::snprintf(pct, sizeof(pct), "%d%%", (int)std::lround(s.progress * 100.0));
   return "Resume " + plr_display_name(s.file) + " at " + pct + "?\n\n"
-    "It heats up, homes X and Y and continues. Z is NOT re-homed: "
-    "only resume if the part is still on the bed.";
+    "It parks, primes and waits for you to clean the nozzle. Z is NOT "
+    "re-homed: only resume if the part is still on the bed.";
 }

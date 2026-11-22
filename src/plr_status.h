@@ -30,6 +30,7 @@ struct PlrStatus {
   std::string reason;              // why a record is incompatible
   std::string last_error;
   bool resume_in_progress = false;
+  std::string phase;               // #30: plr_phase - idle, preparing, waiting, continuing
 };
 
 // Parses one merged snapshot (null/absent => present=false). Wrongly typed fields are
@@ -40,6 +41,8 @@ struct PlrView {
   std::string text;                // status line shown in the panel
   bool show_resume = false;        // physical resume offered (always behind a confirmation)
   bool show_discard = false;       // a stored record can be discarded
+  // #30: the resume waits for the nozzle to be cleaned (Continue / Purge more / Stop)
+  bool show_waiting = false;
 };
 
 // What the panel shows. `printing` = print_stats is printing/paused. Resume is offered
@@ -53,6 +56,10 @@ PlrView plr_view(const PlrStatus &s, bool printing);
 // true: Z is assumed to have held while unpowered) and PHYSICAL=1.
 extern const char *const PLR_RESUME_COMMAND;
 extern const char *const PLR_DISCARD_COMMAND;
+// #30: while the resume waits (plr_phase "waiting"), backend commands.
+extern const char *const PLR_CONTINUE_COMMAND;
+extern const char *const PLR_PURGE_COMMAND;
+extern const char *const PLR_STOP_COMMAND;
 
 // G80 (Run 22): the popup after a power loss ("Resume?") - asked once per
 // record. "" = nothing to ask (no physical resume available, a print running,
