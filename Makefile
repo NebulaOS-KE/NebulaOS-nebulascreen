@@ -122,7 +122,7 @@ wpaclient:
 ## the matching tests/test_*.cpp.
 .PHONY: test test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb test-touch-beep-client test-touch-wake-gate test-touch-calibration-check test-print-estimate test-nebulaos-camera test-print-start
 
-test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb test-touch-beep-client test-touch-wake-gate test-print-estimate test-nebulaos-camera
+test: test-nebulascreen-paths test-subscription-baseline-ordering test-config-theme-parse-safety test-plr-status test-nebulaos-display test-nebulaos-network test-nebulaos-macros test-nebulaos-calibration-flow test-nebulaos-calibration-status test-nebulaos-system test-nebulaos-settings test-nebulaos-image test-nebulaos-z-adjust test-nebulaos-refusal test-nebulascreen-fb test-touch-beep-client test-touch-wake-gate test-print-estimate test-nebulaos-camera test-skew-gcode
 
 # G108: the touch click goes to Klipper's nebulaos_beeper (no hardware access).
 test-touch-beep-client:
@@ -189,6 +189,13 @@ test-nebulaos-camera: libhv.a
 	./build/test_nebulaos_camera
 
 # G112 (2026-10-31): the print start step list (src/print_start.cpp).
+# #31: the skew screen's G-code (src/skew_gcode.h).
+test-skew-gcode: libhv.a
+	g++ -std=c++17 -Wall -Wextra -I./libhv/include -I. \
+		tests/test_skew_gcode.cpp \
+		-o build/test_skew_gcode
+	./build/test_skew_gcode
+
 test-print-start:
 	g++ -std=c++17 -Wall -Wextra -I. \
 		src/print_start.cpp tests/test_print_start.cpp \

@@ -38,9 +38,9 @@ measures the error from a test print and shears every move by the opposite amoun
 
 - ⏱️ **Time:** ~15 minutes (a short test print + three caliper measurements).
 - 🧰 **You need:** a pair of calipers (digital is easiest), and filament loaded. No computer, no tools.
-- ↩️ **Safe to try:** it changes nothing until you enter measurements and tap **Apply & Save**. Undoing
-  it isn't a screen button — it's one console command (`SET_SKEW CLEAR=1`, see
-  [Undoing / clearing it](#undoing--clearing-it) below) — but it is quick and fully reversible.
+- ↩️ **Safe to try:** it changes nothing until you enter measurements and tap **Apply & Save**, and
+  **Clear correction** on the same screen removes it again (see
+  [Undoing / clearing it](#undoing--clearing-it) below).
 
 > **Requirement:** Klipper needs a `[skew_correction]` section. NebulaOS ships one in its machine config
 > (`/etc/nebulaos/klipper/machine.cfg`). Without it, tapping the row shows *"Skew correction isn't
@@ -49,6 +49,10 @@ measures the error from a test print and shears every move by the opposite amoun
 ---
 
 ## Step 1 — Print a calibration square
+
+**Already have a correction saved?** Tap **Clear correction** on the Skew Correction screen first (the
+status line says *Skew correction: on*). Otherwise the test print comes out *with* the old correction and
+the new measurement is wrong.
 
 You need one flat, square print to measure. **Slice it with your own normal profile** — that way the
 extrusion is dialed in for your printer and filament, and the corners come out crisp.
@@ -100,8 +104,12 @@ if your calipers allow):
 2. Tap each field and type the millimetre value (the keypad has a decimal point): **A-C**, **B-D**, **A-D**.
 3. Tap **Apply & Save**.
 
-That sends `SET_SKEW` and saves it permanently (the printer restarts briefly to lock it in). Done — every
-print from now on comes out square. 🎉
+That sends `SET_SKEW`, saves it as the profile `nebulaos` and restarts Klipper briefly. NebulaOS loads
+that profile every time Klipper starts, so every print from now on uses it. The status line on the screen
+then reads **Skew correction: on**. 🎉
+
+> **Entered values before NebulaOS 1.0.5?** Those were never applied (a bug, fixed in 1.0.5). Enter them
+> once more; they are still in the calibration history.
 
 ### Option B — from the Klipper console (Mainsail/Fluidd)
 
@@ -109,10 +117,12 @@ Same three measurements, typed directly instead:
 
 ```
 SET_SKEW XY=<AC>,<BD>,<AD>
+SKEW_PROFILE SAVE=nebulaos
 SAVE_CONFIG
 ```
 
-Replace `<AC>`, `<BD>`, `<AD>` with your measured millimetre values, in that order.
+Replace `<AC>`, `<BD>`, `<AD>` with your measured millimetre values, in that order. Use the profile name
+`nebulaos`: that is the one NebulaOS loads at every Klipper start.
 
 *(Want to confirm either way? Re-print the frame and re-measure the diagonals — they should now match.)*
 
@@ -120,13 +130,19 @@ Replace `<AC>`, `<BD>`, `<AD>` with your measured millimetre values, in that ord
 
 ## Undoing / clearing it
 
-If you ever want to remove the correction, run this in the Klipper console (Mainsail/Fluidd) and `SAVE_CONFIG`:
+On the screen: **Tune → Calibration → 7 Skew Correction → Clear correction**, then confirm. Klipper
+restarts and the status line reads **Skew correction: off**.
+
+From the console, the same thing:
 
 ```
 SET_SKEW CLEAR=1
+SKEW_PROFILE REMOVE=nebulaos
+SAVE_CONFIG
 ```
 
-That zeroes the correction. Re-running Steps 1–3 overwrites it with fresh measurements any time.
+`SET_SKEW CLEAR=1` alone only zeroes it until the next restart; removing the profile makes it stick.
+Re-running Steps 1–3 overwrites it with fresh measurements any time.
 
 ---
 
@@ -140,7 +156,7 @@ still get *"Skew correction isn't enabled"* (for example with your own Klipper c
 [skew_correction]
 ```
 
-Your saved skew values live in the `SAVE_CONFIG` block of `printer.cfg`.
+Your saved skew values live in the `SAVE_CONFIG` block of `printer.cfg`, as `[skew_correction nebulaos]`.
 
 ---
 

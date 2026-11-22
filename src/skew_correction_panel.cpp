@@ -3,6 +3,7 @@
 #include "state.h"
 #include "utils.h"
 #include "nebulaos_calibration_status.h"
+#include "skew_gcode.h"
 #include "spdlog/spdlog.h"
 
 #include <string>
@@ -46,6 +47,11 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
   lv_obj_set_style_text_font(body, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_LEFT, 0);
 
+  status_label = lv_label_create(panel_cont);
+  lv_obj_set_style_text_font(status_label, &lv_font_montserrat_16, 0);
+  update_status();
+  SettingsUi::on_shown(panel_cont, [this]() { update_status(); });
+
   for (int i = 0; i < 3; i++) {
     lv_obj_t *row = lv_obj_create(panel_cont);
     lv_obj_set_size(row, LV_PCT(84), LV_SIZE_CONTENT);
@@ -79,12 +85,20 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
   back_btn = SettingsUi::back_tile(panel_cont, &SkewCorrectionPanel::_handle_callback, this);
 
   apply_btn = lv_btn_create(btnrow);
-  lv_obj_set_size(apply_btn, LV_PCT(100), 44);
+  lv_obj_set_size(apply_btn, LV_PCT(48), 44);
   lv_obj_t *al = lv_label_create(apply_btn);
   lv_label_set_text(al, LV_SYMBOL_OK "  Apply & Save");
   lv_obj_center(al);
   SettingsUi::style_text_button(apply_btn);
   lv_obj_add_event_cb(apply_btn, &SkewCorrectionPanel::_handle_callback, LV_EVENT_CLICKED, this);
+
+  clear_btn = lv_btn_create(btnrow);
+  lv_obj_set_size(clear_btn, LV_PCT(48), 44);
+  lv_obj_t *cl = lv_label_create(clear_btn);
+  lv_label_set_text(cl, LV_SYMBOL_TRASH "  Clear correction");
+  lv_obj_center(cl);
+  SettingsUi::style_text_button(clear_btn);
+  lv_obj_add_event_cb(clear_btn, &SkewCorrectionPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
   // Own decimal numeric keyboard (the shared Numpad is integer-only). Digits +
   // "." + backspace + OK. Overlays the bottom; hidden until a field is tapped.
@@ -110,7 +124,14 @@ SkewCorrectionPanel::~SkewCorrectionPanel() {
   }
 }
 
+void SkewCorrectionPanel::update_status() {
+  bool on = skew_is_on(State::get_instance()->get_data(
+    "/printer_state/skew_correction"_json_pointer));
+  lv_label_set_text(status_label, on ? "Skew correction: on" : "Skew correction: off");
+}
+
 void SkewCorrectionPanel::foreground() {
+  update_status();
   lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
   lv_obj_move_foreground(panel_cont);
 }
@@ -138,6 +159,11 @@ void SkewCorrectionPanel::handle_callback(lv_event_t *event) {
     lv_obj_move_background(panel_cont);
   } else if (btn == apply_btn) {
     apply_and_save();
+  } else if (btn == clear_btn) {
+    SettingsUi::confirm("Clear skew correction",
+      "Removes the saved correction, for a new calibration print. "
+      "Klipper restarts.", "Clear", SettingsUi::Tone::Warning,
+      [this]() { clear_correction(); });
   }
 }
 
@@ -151,13 +177,19 @@ void SkewCorrectionPanel::apply_and_save() {
       return;
     }
   }
-  // SET_SKEW XY=<ac>,<bd>,<ad> then persist (restarts Klipper).
+  // #31: values, profile save, persist (restarts Klipper; loaded at start).
   // G105 (Run 19): the Calibration menu's status line (newer extensions)
   std::string record = cal_record_prefix(State::get_instance()->get_data("/printer_state/nebulaos_calibration"_json_pointer), "skew",
     fmt::format("A-C {}, B-D {}, A-D {} mm", s[0], s[1], s[2]));
-  ws.gcode_script(fmt::format("SET_SKEW XY={},{},{}\n{}SAVE_CONFIG",
-                              s[0], s[1], s[2], record));
+  ws.gcode_script(skew_apply_gcode(s[0], s[1], s[2], record));
   KUtils::notify_toast("Skew applied. Saving and restarting Klipper.", 4000);
+  lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_background(panel_cont);
+}
+
+void SkewCorrectionPanel::clear_correction() {
+  ws.gcode_script(skew_clear_gcode());
+  KUtils::notify_toast("Skew correction cleared. Restarting Klipper.", 4000);
   lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
   lv_obj_move_background(panel_cont);
 }

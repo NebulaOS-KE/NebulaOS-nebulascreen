@@ -8,8 +8,10 @@
 // frame that isn't perfectly square (parts come out as faint parallelograms).
 // The user prints a skew calibration object, measures the three XY diagonals
 // (A-C, B-D, A-D) with calipers, types them in, and Apply & Save issues
-//   SET_SKEW XY=<ac>,<bd>,<ad>
-// followed by SAVE_CONFIG (persists to [skew_correction], restarts Klipper).
+//   SET_SKEW XY=<ac>,<bd>,<ad>, SKEW_PROFILE SAVE=nebulaos, SAVE_CONFIG
+// (#31: stores [skew_correction nebulaos]; calibration.cfg loads it at every
+// Klipper start). Clear correction removes the profile before a new
+// calibration print. The status line shows whether the profile is loaded.
 // Detection is via the config section (matches the Axis Twist pattern); the
 // Tune panel shows a toast instead of opening this if it isn't enabled.
 class SkewCorrectionPanel {
@@ -36,13 +38,17 @@ class SkewCorrectionPanel {
 
  private:
   void apply_and_save();
+  void clear_correction();
+  void update_status();
 
   KWebSocketClient &ws;
 
   lv_obj_t *panel_cont;
   lv_obj_t *ta[3];        // A-C, B-D, A-D measurement inputs (mm)
   lv_obj_t *kb;           // decimal numeric keyboard (hidden until a field is tapped)
+  lv_obj_t *status_label;  // "Skew correction: on/off"
   lv_obj_t *apply_btn;
+  lv_obj_t *clear_btn;
   lv_obj_t *back_btn;
 };
 
