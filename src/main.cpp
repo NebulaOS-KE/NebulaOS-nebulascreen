@@ -32,6 +32,7 @@ static void hal_init(lv_color_t p, lv_color_t s);
 #include "hv/hlog.h"
 #include "config.h"
 #include "touch_beep.h"
+#include "touch_wake_gate.h"
 
 #include <algorithm>
 
@@ -88,6 +89,19 @@ static void (*s_base_read_cb)(lv_indev_drv_t *, lv_indev_data_t *) = NULL;
 
 static void evdev_read_smoothed(lv_indev_drv_t *drv, lv_indev_data_t *data) {
     s_base_read_cb(drv, data);
+
+    // #27: the tap that wakes the dark display presses nothing (popups sit
+    // above the screen saver; the wake tap pressed "Resume" after a freeze).
+    static TouchWakeGate wake_gate;
+    bool wake = false;
+    bool pressed = wake_gate.filter(data->state == LV_INDEV_STATE_PR,
+                                    GuppyScreen::display_asleep.load(), &wake);
+    if (wake) {
+        lv_disp_trig_activity(NULL);   // the main loop wakes the display
+    }
+    if (!pressed) {
+        data->state = LV_INDEV_STATE_REL;
+    }
 
     static int32_t sx = 0, sy = 0;
     static bool was_pressed = false;
