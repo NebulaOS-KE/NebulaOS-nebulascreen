@@ -32,14 +32,14 @@ ReportPanel::ReportPanel(KWebSocketClient &c, std::mutex &lock)
 
   SettingsUi::hint(left, "Something not working? Help us fix it in three steps.");
 
-  step(left, "1. Turn on detailed logging, then do what went wrong once more.");
+  step(left, "1. Set the log level to Debug, then do what went wrong once more.");
   lv_obj_t *ll_row = SettingsUi::row(left, "Log level");
   loglevel_dd = lv_dropdown_create(ll_row);
   lv_dropdown_set_options(loglevel_dd, LOG_LEVEL_OPTIONS);
   lv_obj_set_width(loglevel_dd, 110);
   lv_obj_align(loglevel_dd, LV_ALIGN_RIGHT_MID, 0, 0);
   lv_obj_add_event_cb(loglevel_dd, &ReportPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
-  debug_note_label = SettingsUi::hint(left, "Debug switches back to Info by itself after 24 hours.");
+  debug_note_label = SettingsUi::hint(left, debug_note(json()).c_str());
 
   step(left, "2. Save the logs to a USB stick (button on the right).");
   step(left, "3. Report it on GitHub - scan the code or open\n"

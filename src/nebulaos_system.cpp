@@ -24,7 +24,7 @@ const char *const FREE_SPACE_METHOD = "machine.nebulaos.cleanup.nebulaos";
 const char *const STATS_METHOD = "machine.nebulaos.stats";
 // what fits above Back on the 480x272 panel, two lines each
 static const int STATS_RECENT_SHOWN = 4;
-const char *const LOG_LEVEL_OPTIONS = "Info\nWarning\nDebug";
+const char *const LOG_LEVEL_OPTIONS = "Info\nWarning\nDebug\nVerbose";
 const char *const BOOT_DISPLAY_IMAGES_METHOD = "machine.nebulaos.boot_display.images";
 const char *const BOOT_DISPLAY_PREVIEW_METHOD = "machine.nebulaos.boot_display.preview";
 const char *const BOOT_DISPLAY_IMPORT_METHOD = "machine.nebulaos.boot_display.import_usb";
@@ -330,19 +330,22 @@ std::string boot_logo_preview_src(const json &preview_reply) {
   return path.empty() || path[0] != '/' ? "" : "A:" + path;
 }
 
-static const char *const LOG_LEVELS[] = {"info", "warning", "debug"};
+// 1.0.5: Verbose = Debug plus Moonraker's verbose log; the screen itself
+// logs at debug for both.
+static const char *const LOG_LEVELS[] = {"info", "warning", "debug", "verbose"};
+static constexpr int N_LOG_LEVELS = 4;
 
 std::string log_level_at(int index) {
-  return index >= 0 && index < 3 ? LOG_LEVELS[index] : "";
+  return index >= 0 && index < N_LOG_LEVELS ? LOG_LEVELS[index] : "";
 }
 
 std::string log_level_spdlog(const std::string &level) {
-  return level == "warning" ? "warn" : level == "debug" ? "debug" : "info";
+  return level == "warning" ? "warn" : (level == "debug" || level == "verbose") ? "debug" : "info";
 }
 
 int log_level_index(const json &status_reply) {
   std::string level = str_at(result_of(status_reply), "/level"_json_pointer);
-  for (int i = 0; i < 3; ++i) {
+  for (int i = 0; i < N_LOG_LEVELS; ++i) {
     if (level == LOG_LEVELS[i]) return i;
   }
   return 0;
@@ -387,17 +390,32 @@ bool notice_waits_for_klipper(const SystemNotice &n) {
   return n.id == "mcu-unreachable";
 }
 
+// The level Debug/Verbose go back to (logs.status "default", 1.0.5):
+// Info in a release, Debug in a test build.
+static std::string default_level_name(const json &r) {
+  std::string d = str_at(r, "/default"_json_pointer);
+  if (d == "warning") return "Warning";
+  if (d == "debug") return "Debug";
+  if (d == "verbose") return "Verbose";
+  return "Info";
+}
+
 std::string debug_note(const json &status_reply) {
   const json &r = result_of(status_reply);
+  std::string back = default_level_name(r);
   if (r.is_object() && r.contains("debug_until") && r["debug_until"].is_number()) {
     time_t t = (time_t)r["debug_until"].get<long>();
     struct tm tmv;
     char buf[32];
     gmtime_r(&t, &tmv);
     std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &tmv);
-    return std::string("Detailed logging switches back to Info on ") + buf + " (UTC).";
+    return std::string("Detailed logging switches back to ") + back + " on " + buf + " (UTC).";
   }
-  return "Debug switches back to Info by itself after 24 hours.";
+  if (back == "Debug")
+    return "This test build logs at Debug. Verbose (also Moonraker's large log) "
+           "switches back to Debug after 24 hours.";
+  return "Debug and Verbose switch back to " + back + " by themselves after 24 hours. "
+         "Verbose also keeps Moonraker's very large log: only when we ask for it.";
 }
 
 static double num_at(const json &j, const char *key) {

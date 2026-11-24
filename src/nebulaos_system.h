@@ -98,9 +98,9 @@ std::string boot_logo_preview_src(const json &preview_reply);
 extern const char *const LOGS_STATUS_METHOD;  // machine.nebulaos.logs.status
 extern const char *const LOGS_LEVEL_METHOD;   // machine.nebulaos.logs.level {"level"}
 extern const char *const LOGS_SAVE_METHOD;    // machine.nebulaos.logs.save
-extern const char *const LOG_LEVEL_OPTIONS;   // "Info\nWarning\nDebug"
-std::string log_level_at(int index);           // "info" | "warning" | "debug" | ""
-std::string log_level_spdlog(const std::string &level);  // "info" | "warn" | "debug"
+extern const char *const LOG_LEVEL_OPTIONS;   // "Info\nWarning\nDebug\nVerbose"
+std::string log_level_at(int index);           // "info" | "warning" | "debug" | "verbose" | ""
+std::string log_level_spdlog(const std::string &level);  // "info" | "warn" | "debug" (also for verbose)
 int log_level_index(const json &status_reply);  // index of result.level, default Info
 // After logs.save: the line for the dialog.
 std::string logs_save_text(const json &reply, bool *ok);
@@ -123,8 +123,9 @@ constexpr uint32_t MCU_NOTICE_WAIT_MS = 45000;
 
 // G69 (2026-10-16): System > Report a problem.
 extern const char *const REPORT_ISSUES_URL;   // github.com/NebulaOS-KE/NebulaOS/issues
-// "Detailed logging switches back to Info at 14:05 (UTC)." while Debug is
-// on (logs.status "debug_until"), else the standing rule.
+// "Detailed logging switches back to Info at 14:05 (UTC)." while Debug or
+// Verbose is on (logs.status "debug_until"), else the standing rule. The
+// level it goes back to is logs.status "default" (1.0.5).
 std::string debug_note(const json &status_reply);
 
 // G66 (2026-10-16): System > Storage and "Clean up Creality files".

@@ -8,8 +8,8 @@
 #include <mutex>
 
 // Settings > System > Report a problem (G69, 2026-10-16): the three steps of a
-// useful bug report on one page - 1. the log level (Debug switches itself
-// back to Info after 24 hours), 2. Save logs to USB, 3. a QR code and the
+// useful bug report on one page - 1. the log level (Debug and Verbose switch
+// themselves back after 24 hours), 2. Save logs to USB, 3. a QR code and the
 // address of the NebulaOS issue tracker. The log level used to sit on the
 // System page and "Save logs to USB" on the Logs page (G60).
 class ReportPanel {

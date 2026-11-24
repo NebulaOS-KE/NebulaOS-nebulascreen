@@ -188,12 +188,15 @@ TEST(BootLogo, shipped_logos_have_no_delete) {
 }
 
 TEST(Logs, level_and_save) {
-  ASSERT_EQ(std::string(LOG_LEVEL_OPTIONS), std::string("Info\nWarning\nDebug"));
+  ASSERT_EQ(std::string(LOG_LEVEL_OPTIONS), std::string("Info\nWarning\nDebug\nVerbose"));
   ASSERT_EQ(log_level_at(1), std::string("warning"));
-  ASSERT_EQ(log_level_at(3), std::string(""));
+  ASSERT_EQ(log_level_at(3), std::string("verbose"));
+  ASSERT_EQ(log_level_at(4), std::string(""));
   ASSERT_EQ(log_level_spdlog("warning"), std::string("warn"));
   ASSERT_EQ(log_level_spdlog("debug"), std::string("debug"));
+  ASSERT_EQ(log_level_spdlog("verbose"), std::string("debug"));
   ASSERT_EQ(log_level_index(json::parse(R"({"result":{"level":"debug"}})")), 2);
+  ASSERT_EQ(log_level_index(json::parse(R"({"result":{"level":"verbose"}})")), 3);
   ASSERT_EQ(log_level_index(json()), 0);
   bool ok = false;
   auto t = logs_save_text(json::parse(R"({"result":{"result":"SAVED","file":"nebulaos-logs-x.zip","bytes":2500000}})"), &ok);
@@ -255,6 +258,11 @@ TEST(Notices, from_info) {
 TEST(Report, debug_note) {
   ASSERT_TRUE(debug_note(json::parse(R"({"result":{"level":"debug","debug_until":1792186400}})")).find("2026-10-16") != std::string::npos);
   ASSERT_TRUE(debug_note(json::parse(R"({"result":{"level":"info"}})")).find("24 hours") != std::string::npos);
+  // 1.0.5: back to the image's default; a test build's default is Debug
+  ASSERT_TRUE(debug_note(json::parse(R"({"result":{"level":"info"}})")).find("back to Info") != std::string::npos);
+  ASSERT_TRUE(debug_note(json::parse(R"({"result":{"level":"verbose","default":"debug","debug_until":1792186400}})")).find("back to Debug on 2026-10-16") != std::string::npos);
+  ASSERT_TRUE(debug_note(json::parse(R"({"result":{"level":"debug","default":"debug"}})")).find("test build logs at Debug") != std::string::npos);
+  ASSERT_TRUE(debug_note(json()).find("Moonraker") != std::string::npos);
   ASSERT_EQ(std::string(REPORT_ISSUES_URL), std::string("https://github.com/NebulaOS-KE/NebulaOS/issues"));
 }
 
