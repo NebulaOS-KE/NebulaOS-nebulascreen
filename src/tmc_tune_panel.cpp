@@ -18,11 +18,15 @@ static std::map<std::string, int> goal_idx_map = {
 
 // S4 (2026-10-11): the Ender-3 V3 KE's own motors, pre-selected for steppers
 // that have no [autotune_tmc] section yet (decision D8, from OpenKE's tuning:
-// X/Y creality-42-34 performance, Z creality-42-40 silent). Only a preselection
+// X/Y performance, Z silent). Only a preselection
 // on screen - nothing is written until Save. The extruder motor is unknown.
 static const std::map<std::string, std::pair<std::string, std::string>> ke_motor_defaults = {
-  {"stepper_x", {"creality-42-34", "performance"}},
-  {"stepper_y", {"creality-42-34", "performance"}},
+  // #34 (1.0.5): all three axes are 42-40 motors (Creality's exploded view
+  // shows one part for X, Y and Z; labels on a reporter's KE: Y and Z
+  // "42-40", X "BJ42D22-23V10", a 42-40). OpenKE's X/Y creality-42-34 was
+  // wrong.
+  {"stepper_x", {"creality-42-40", "performance"}},
+  {"stepper_y", {"creality-42-40", "performance"}},
   {"stepper_z", {"creality-42-40", "silent"}},
 };
 

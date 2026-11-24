@@ -58,9 +58,13 @@ For each axis, choose the **Motor** from the dropdown, then a **Tuning Goal**, t
 
 | Stepper | Motor | Tuning Goal |
 |---------|-------|-------------|
-| `stepper_x` | `creality-42-34` | **performance** |
-| `stepper_y` | `creality-42-34` | **performance** |
+| `stepper_x` | `creality-42-40` | **performance** |
+| `stepper_y` | `creality-42-40` | **performance** |
 | `stepper_z` | `creality-42-40` | **silent** |
+
+All three axes use the same 42-40 motor. Before NebulaOS 1.0.5 the screen suggested `creality-42-34`
+for X and Y, which is a different motor. If you tuned X or Y with `creality-42-34`, choose
+`creality-42-40` and tap **Save/Restart** again.
 
 The Tuning Goal dropdown has **four** choices:
 
