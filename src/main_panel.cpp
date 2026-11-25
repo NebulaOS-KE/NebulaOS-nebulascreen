@@ -781,6 +781,11 @@ void MainPanel::sim_tour(const char *dir) {
         + " - saving, Klipper restarts now. The screen reconnects by itself."); }},
     {"m20-axis-twist", [cal]() { cal().sim_tap_row(2); }},
     {"m21-skew", [cal]() { cal().sim_tap_row(6); }},
+    {"m21a-skew-saved", [st, cal]() {
+      st({{"skew_correction", {{"current_profile_name", "nebulaos"}}},
+          {"nebulaos_calibration", {{"history", {{"skew", {{"done_at", 1794050180.0},
+            {"summary", "A-C 141.12, B-D 141.29, A-D 99.71 mm"}, {"redo", nullptr}}}}}}}});
+      cal().sim_skew().foreground(); }},
     {"m21b-skew-keyboard-bd", [cal]() { cal().sim_skew().sim_type(1, "141.29"); }},
     {"m21c-skew-keyboard-ad", [cal]() { cal().sim_skew().sim_type(2, "99.71"); }},
     // Load cell G99 (Run 18): Automatic (default) / Manual

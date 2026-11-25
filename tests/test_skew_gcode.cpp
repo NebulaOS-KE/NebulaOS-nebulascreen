@@ -30,6 +30,25 @@ TEST(SkewGcode, status_follows_current_profile_name) {
   ASSERT_FALSE(skew_is_on({{"current_profile_name", nullptr}}));
 }
 
+TEST(SkewGcode, saved_values_from_history_summary) {
+  std::string v[3];
+  nlohmann::json st = {{"history", {{"skew", {{"summary", "A-C 141.12, B-D 141.29, A-D 99.71 mm"}}}}}};
+  ASSERT_TRUE(skew_saved_values(st, v));
+  ASSERT_EQ(v[0], std::string("141.12"));
+  ASSERT_EQ(v[1], std::string("141.29"));
+  ASSERT_EQ(v[2], std::string("99.71"));
+}
+
+TEST(SkewGcode, saved_values_missing_or_malformed) {
+  std::string v[3] = {"x", "y", "z"};
+  ASSERT_FALSE(skew_saved_values(nlohmann::json(), v));
+  ASSERT_FALSE(skew_saved_values({{"history", {{"skew", {{"summary", ""}}}}}}, v));
+  ASSERT_FALSE(skew_saved_values({{"history", {{"skew", {{"summary", "A-C 1, B-D 2"}}}}}}, v));
+  ASSERT_FALSE(skew_saved_values({{"history", {{"skew", {{"summary", nullptr}}}}}}, v));
+  ASSERT_FALSE(skew_saved_values({{"history", {{"skew", {{"summary", "A-C x, B-D 2, A-D 3"}}}}}}, v));
+  ASSERT_EQ(v[0], std::string("x"));  // untouched
+}
+
 int main() {
   return minitest::run_all("skew_gcode") > 0 ? 1 : 0;
 }

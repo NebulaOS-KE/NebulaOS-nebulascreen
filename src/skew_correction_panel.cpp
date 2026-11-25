@@ -49,7 +49,6 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
 
   status_label = lv_label_create(panel_cont);
   lv_obj_set_style_text_font(status_label, &lv_font_montserrat_16, 0);
-  update_status();
   SettingsUi::on_shown(panel_cont, [this]() { update_status(); });
 
   for (int i = 0; i < 3; i++) {
@@ -73,6 +72,7 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
     lv_obj_set_width(ta[i], LV_PCT(72));
     lv_obj_add_event_cb(ta[i], &SkewCorrectionPanel::_handle_ta, LV_EVENT_ALL, this);
   }
+  update_status();   // after the fields: it sets their hints
 
   lv_obj_t *btnrow = lv_obj_create(panel_cont);
   lv_obj_set_size(btnrow, LV_PCT(84), LV_SIZE_CONTENT);
@@ -131,6 +131,15 @@ void SkewCorrectionPanel::update_status() {
   bool on = skew_is_on(State::get_instance()->get_data(
     "/printer_state/skew_correction"_json_pointer));
   lv_label_set_text(status_label, on ? "Skew correction: on" : "Skew correction: off");
+  // The measurements behind the active correction as grey hints in the
+  // empty fields (Tim 2026-11-25: reopening the page showed nothing).
+  // Typing replaces them; Apply still needs all three typed.
+  std::string v[3];
+  bool known = on && skew_saved_values(State::get_instance()->get_data(
+    "/printer_state/nebulaos_calibration"_json_pointer), v);
+  for (int i = 0; i < 3; i++) {
+    lv_textarea_set_placeholder_text(ta[i], known ? (v[i] + " mm").c_str() : "mm");
+  }
 }
 
 void SkewCorrectionPanel::foreground() {
