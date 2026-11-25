@@ -22,6 +22,8 @@ class SkewCorrectionPanel {
   static bool is_enabled();   // [skew_correction] present in printer.cfg
 
   void foreground();
+  // simulator tour: tap field i and type text (keyboard shown)
+  void sim_type(int i, const char *text) { show_kb(ta[i]); lv_textarea_set_text(ta[i], text); }
 
   void handle_callback(lv_event_t *event);
   static void _handle_callback(lv_event_t *e) {
@@ -37,6 +39,7 @@ class SkewCorrectionPanel {
   }
 
  private:
+  void show_kb(lv_obj_t *field);
   void apply_and_save();
   void clear_correction();
   void update_status();
@@ -45,6 +48,8 @@ class SkewCorrectionPanel {
 
   lv_obj_t *panel_cont;
   lv_obj_t *ta[3];        // A-C, B-D, A-D measurement inputs (mm)
+  lv_obj_t *body;         // description (hidden while the keypad is shown)
+  lv_obj_t *rows[3];      // the A-C, B-D, A-D rows (narrow while the keypad is shown)
   lv_obj_t *kb;           // decimal numeric keyboard (hidden until a field is tapped)
   lv_obj_t *status_label;  // "Skew correction: on/off"
   lv_obj_t *apply_btn;

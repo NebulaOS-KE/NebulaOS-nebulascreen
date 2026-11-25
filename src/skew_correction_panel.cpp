@@ -38,7 +38,7 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
   // rows stop left of the tile
   SettingsUi::page_title(panel_cont, "Skew Correction");
 
-  lv_obj_t *body = lv_label_create(panel_cont);
+  body = lv_label_create(panel_cont);
   lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
   lv_obj_set_width(body, LV_PCT(96));
   lv_label_set_text(body,
@@ -54,6 +54,7 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
 
   for (int i = 0; i < 3; i++) {
     lv_obj_t *row = lv_obj_create(panel_cont);
+    rows[i] = row;
     lv_obj_set_size(row, LV_PCT(84), LV_SIZE_CONTENT);
     lv_obj_set_style_pad_all(row, 2, 0);
     lv_obj_set_style_border_width(row, 0, 0);
@@ -110,10 +111,12 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
   static const lv_btnmatrix_ctrl_t kb_ctrl[] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
   lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_USER_1, kb_map, kb_ctrl);
   lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_USER_1);
+  lv_obj_add_flag(kb, LV_OBJ_FLAG_FLOATING);
+  // Side keypad like the guided calibrations: the fields stay visible left of it
   lv_obj_add_flag(kb, LV_OBJ_FLAG_IGNORE_LAYOUT);
-  lv_obj_set_size(kb, LV_PCT(100), LV_PCT(52));
-  lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
-  lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_set_size(kb, LV_PCT(45), LV_PCT(62));
+  lv_obj_align(kb, LV_ALIGN_TOP_RIGHT, 0, 22);
+  show_kb(NULL);
   lv_obj_add_event_cb(kb, &SkewCorrectionPanel::_handle_kb, LV_EVENT_ALL, this);
 }
 
@@ -132,22 +135,41 @@ void SkewCorrectionPanel::update_status() {
 
 void SkewCorrectionPanel::foreground() {
   update_status();
-  lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  show_kb(NULL);
   lv_obj_move_foreground(panel_cont);
 }
 
 void SkewCorrectionPanel::handle_ta(lv_event_t *e) {
   if (lv_event_get_code(e) == LV_EVENT_FOCUSED) {
-    lv_keyboard_set_textarea(kb, lv_event_get_target(e));
+    show_kb(lv_event_get_target(e));
+  }
+}
+
+// #31 follow-up (2026-11-25): the keypad used to cover the bottom half, so
+// B-D and A-D were typed blind. Now it sits on the right (as in the guided
+// calibrations); while it is shown the description is hidden and the rows
+// narrow, so all three fields stay visible. NULL hides it again.
+void SkewCorrectionPanel::show_kb(lv_obj_t *field) {
+  bool on = field != NULL;
+  if (on) {
+    lv_keyboard_set_textarea(kb, field);
     lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(kb);
+    lv_obj_add_flag(body, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(body, LV_OBJ_FLAG_HIDDEN);
   }
+  // (LV_PCT does not parenthesize its argument: no ?: inside it)
+  lv_coord_t w = on ? LV_PCT(53) : LV_PCT(84);
+  for (int i = 0; i < 3; i++) lv_obj_set_width(rows[i], w);
+  lv_obj_scroll_to_y(panel_cont, 0, LV_ANIM_OFF);
 }
 
 void SkewCorrectionPanel::handle_kb(lv_event_t *e) {
   lv_event_code_t code = lv_event_get_code(e);
   if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
-    lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    show_kb(NULL);
   }
 }
 
@@ -155,7 +177,7 @@ void SkewCorrectionPanel::handle_callback(lv_event_t *event) {
   if (lv_event_get_code(event) != LV_EVENT_CLICKED) return;
   lv_obj_t *btn = lv_event_get_current_target(event);
   if (btn == back_btn) {
-    lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    show_kb(NULL);
     lv_obj_move_background(panel_cont);
   } else if (btn == apply_btn) {
     apply_and_save();
@@ -183,13 +205,13 @@ void SkewCorrectionPanel::apply_and_save() {
     fmt::format("A-C {}, B-D {}, A-D {} mm", s[0], s[1], s[2]));
   ws.gcode_script(skew_apply_gcode(s[0], s[1], s[2], record));
   KUtils::notify_toast("Skew applied. Saving and restarting Klipper.", 4000);
-  lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  show_kb(NULL);
   lv_obj_move_background(panel_cont);
 }
 
 void SkewCorrectionPanel::clear_correction() {
   ws.gcode_script(skew_clear_gcode());
   KUtils::notify_toast("Skew correction cleared. Restarting Klipper.", 4000);
-  lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+  show_kb(NULL);
   lv_obj_move_background(panel_cont);
 }

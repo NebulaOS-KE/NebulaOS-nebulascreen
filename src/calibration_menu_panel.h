@@ -57,6 +57,7 @@ class CalibrationMenuPanel : public NotifyConsumer {
   // Run 19: highlight a row and scroll it into view without animation
   void sim_show_row(int i) { set_highlight(i); lv_obj_scroll_to_view(rows[i], LV_ANIM_OFF); }
   PidCalibrationPanel &sim_pid() { return pid_panel; }
+  SkewCorrectionPanel &sim_skew() { return skew_correction_panel; }
   GuidedCalibrationPanel &sim_guided(CalFlow f) {
     return f == CalFlow::ESTEPS ? esteps_panel : f == CalFlow::LOAD_CELL ? load_cell_panel
       : f == CalFlow::BED_TRAM ? bed_tram_panel : f == CalFlow::INPUT_SHAPER ? input_shaper_panel

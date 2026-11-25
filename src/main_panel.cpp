@@ -781,6 +781,8 @@ void MainPanel::sim_tour(const char *dir) {
         + " - saving, Klipper restarts now. The screen reconnects by itself."); }},
     {"m20-axis-twist", [cal]() { cal().sim_tap_row(2); }},
     {"m21-skew", [cal]() { cal().sim_tap_row(6); }},
+    {"m21b-skew-keyboard-bd", [cal]() { cal().sim_skew().sim_type(1, "141.29"); }},
+    {"m21c-skew-keyboard-ad", [cal]() { cal().sim_skew().sim_type(2, "99.71"); }},
     // Load cell G99 (Run 18): Automatic (default) / Manual
     {"m29a-loadcell-auto-never", [lc]() { lc({{"state", "idle"}, {"mode", "auto"}, {"mode_choice", "auto"},
         {"auto_check", "never"}, {"auto_ready", false}, {"auto_check_reason", ""}}); }},
